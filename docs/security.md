@@ -18,6 +18,7 @@ Findings from rnsec (`security`, `security:full`), the dependency audit and any 
 | 2026-11-21 | rnsec | `MISSING_SESSION_TIMEOUT` (Medium) | `convex/auth.ts` | fixed | Session lifetimes are now stated: 60s access tokens, sessions end after 30 days or 30 days unused (Convex Auth's defaults, made explicit). FEE-21. |
 | 2026-11-21 | rnsec | `MISSING_SESSION_TIMEOUT` (Medium) | `src/app/auth.tsx`, `src/auth/auth-context.tsx` | false positive | Sessions expire on the server (`convex/auth.ts`); these app files only start sign-in and read its state. FEE-21. |
 | 2026-11-21 | review | New dependencies for FEE-21: `@convex-dev/auth@2.0.0`, `expo-secure-store@~58.0.3`; dev: `convex-test@0.0.67`, `vitest@5.1.0`, `@edge-runtime/vm@5.0.0` | package.json | accepted, with one exception | `@convex-dev/auth` 2.0.0 was nine days old at install, inside the two-week rule: it's Convex's own first stable v2, chosen in T14 (the only older v2 is a beta). Review again when 2.0.x patches land. The rest are pinned and over two weeks old (`expo-secure-store` via `expo install` for SDK 58). Tokens are kept in SecureStore (Q11). No lifecycle scripts approved. |
+| 2026-11-21 | review | New dependency for FEE-22: `@sentry/react-native@8.28.0` | package.json | accepted | The crash reporter (T10, T16) and the only third-party SDK that sends data (Q13). Pinned exact: `expo install` resolved 8.28.1, released four days before install, so 8.28.0 (2026-09-24). Its `@sentry/cli` postinstall (a fallback binary download) stays blocked; the binary comes from the per-platform `@sentry/cli-*` optional packages. The auth token for source-map upload is an EAS environment variable only (Q11); the DSN in `src/monitoring/sentry.ts` is public by design. |
 
 `security:full` scans the generated `android/` folder when it exists (after `expo run:android`), so it reports these three; without it, the scan has no findings.
 
@@ -30,9 +31,10 @@ Every dependency allowed to run lifecycle scripts (bun `trustedDependencies`, pn
 | Package | Version | Script reviewed | Notes |
 |---|---|---|---|
 
-None. `trustedDependencies` is empty, so bun blocks every lifecycle script. `@parcel/watcher@2.6.0` (`node scripts/build-from-source.js`) is blocked and not needed: everything works with its prebuilt binary.
+None. `trustedDependencies` is empty, so bun blocks every lifecycle script. `@parcel/watcher@2.6.0` (`node scripts/build-from-source.js`) is blocked and not needed: everything works with its prebuilt binary. `@sentry/cli` (3.8.0, and 2.58.6 under `@sentry/bundler-plugins`) runs `node ./scripts/install.js`, which downloads the CLI binary; it's blocked and not needed, since the binary comes from the `@sentry/cli-<platform>` optional packages.
 
 ## Personal data the app holds
 
 | Data | Where it's stored | Purpose | Retention | How it's deleted |
 |---|---|---|---|---|
+| Crash and error reports, Sentry Logs, Session Replay (T16) | Sentry, `mediated-reality/feedsmith` (US region) | Debugging crashes | The Sentry plan's data retention (FEE-20 asks the owner to confirm the plan) | Expires with retention. Deleting an Account (P18) doesn't remove its Sentry events: with `sendDefaultPii` on they carry the IP address and device details. Delete them from Sentry by hand if asked. |
