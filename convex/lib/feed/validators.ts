@@ -47,7 +47,6 @@ export const vAddFeedReason = v.union(
   v.literal('too-large'),
   v.literal('not-a-feed'),
   v.literal('no-feed-found'),
-  v.literal('already-added'),
 );
 
 /** A feed a web page advertises, offered to choose from (T21). */

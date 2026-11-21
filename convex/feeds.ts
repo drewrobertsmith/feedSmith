@@ -22,8 +22,14 @@ const vAddResult = v.union(
   v.object({ ok: v.literal(true) }),
   v.object({ ok: v.literal(false), reason: vAddFeedReason }),
   v.object({ ok: v.literal(false), reason: v.literal('choose'), choices: v.array(vFeedChoice) }),
+  /** A Feed the User already follows, by the same URL: the app takes them back to it, by name. */
+  v.object({ ok: v.literal(false), reason: v.literal('already-added'), title: v.string() }),
 );
-type AddResult = { ok: true } | { ok: false; reason: AddFeedReason } | { ok: false; reason: 'choose'; choices: FeedLink[] };
+type AddResult =
+  | { ok: true }
+  | { ok: false; reason: AddFeedReason }
+  | { ok: false; reason: 'choose'; choices: FeedLink[] }
+  | { ok: false; reason: 'already-added'; title: string };
 
 /** A typed address without a scheme is a website: `theverge.com` means `https://theverge.com` (T21). */
 function withScheme(typed: string): string {
@@ -51,6 +57,10 @@ export const add = action({
     const typed = url.length <= MAX_URL ? safeUrl(withScheme(url))?.href : undefined;
     if (!typed) return { ok: false, reason: 'invalid-url' };
 
+    // Already followed at this URL: known before fetching anything.
+    const following = await ctx.runQuery(internal.feeds.followed, { userId, url: typed });
+    if (following !== null) return { ok: false, reason: 'already-added', title: following };
+
     let feedUrl = typed;
     let outcome: FetchOutcome = await fetchFeed(typed);
     let meta: SiteMeta | undefined;
@@ -61,6 +71,8 @@ export const add = action({
       if (links.length > 1) return { ok: false, reason: 'choose', choices: links };
       meta = siteMeta(outcome.body, outcome.url);
       feedUrl = links[0].url;
+      const followingLink = await ctx.runQuery(internal.feeds.followed, { userId, url: feedUrl });
+      if (followingLink !== null) return { ok: false, reason: 'already-added', title: followingLink };
       outcome = await fetchFeed(feedUrl);
     }
     if (outcome._tag === 'Failed') return { ok: false, reason: outcome.reason };
@@ -80,7 +92,7 @@ export const add = action({
       now: Date.now(),
       ...outcome.validators,
     });
-    return stored === 'stored' ? { ok: true } : { ok: false, reason: stored };
+    return stored === null ? { ok: true } : { ok: false, reason: 'already-added', title: stored };
   },
 });
 
@@ -103,6 +115,19 @@ export const viewer = internalQuery({
   handler: (ctx) => requireUserId(ctx),
 });
 
+/** The name of the User's Feed at this exact URL, or null when they don't follow it. */
+export const followed = internalQuery({
+  args: { userId: v.id('users'), url: v.string() },
+  returns: v.union(v.null(), v.string()),
+  handler: async (ctx, { userId, url }) => {
+    const feed = await ctx.db
+      .query('feeds')
+      .withIndex('by_user_url', (q) => q.eq('userId', userId).eq('url', url))
+      .first();
+    return feed?.title ?? null;
+  },
+});
+
 /** A User's Feeds that weren't fetched in the last couple of minutes. */
 export const toRefresh = internalQuery({
   args: { userId: v.id('users'), now: v.number() },
@@ -116,7 +141,10 @@ export const toRefresh = internalQuery({
   },
 });
 
-/** Saves a newly fetched Feed and its Articles, unless the User already follows it. */
+/**
+ * Saves a newly fetched Feed and its Articles, unless the User already follows it: then it
+ * returns that Feed's name (checked again here, in case two adds raced). Null when stored.
+ */
 export const store = internalMutation({
   args: {
     userId: v.id('users'),
@@ -128,16 +156,16 @@ export const store = internalMutation({
     now: v.number(),
     ...vValidators,
   },
-  returns: v.union(v.literal('stored'), v.literal('already-added')),
+  returns: v.union(v.null(), v.string()),
   handler: async (ctx, { userId, url, title, siteUrl, iconUrl, articles, now, etag, lastModified }) => {
     const existing = await ctx.db
       .query('feeds')
       .withIndex('by_user_url', (q) => q.eq('userId', userId).eq('url', url))
       .first();
-    if (existing) return 'already-added' as const;
+    if (existing) return existing.title;
     const feedId = await ctx.db.insert('feeds', { userId, url, title, siteUrl, iconUrl });
     await storeNewArticles(ctx, userId, feedId, articles, now);
     await markWorking(ctx, feedId, now, { etag, lastModified });
-    return 'stored' as const;
+    return null;
   },
 });

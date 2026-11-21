@@ -5,7 +5,7 @@ import { parseFeed } from './parse';
 import { articlesToStore } from './store';
 import type { AddFeedReason, StoredArticle } from './validators';
 
-export type FetchFailure = Exclude<AddFeedReason, 'already-added' | 'no-feed-found'>;
+export type FetchFailure = Exclude<AddFeedReason, 'no-feed-found'>;
 
 const REASONS = {
   InvalidUrl: 'invalid-url',

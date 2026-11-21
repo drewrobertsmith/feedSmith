@@ -67,7 +67,14 @@ describe('adding a Feed', () => {
   test('the same Feed twice is refused, without a second fetch or duplicate Articles', async () => {
     const { a } = await setup();
     await a.action(api.feeds.add, { url: FEED_URL });
-    expect(await a.action(api.feeds.add, { url: FEED_URL })).toEqual({ ok: false, reason: 'already-added' });
+    network.mockClear();
+    expect(await a.action(api.feeds.add, { url: FEED_URL })).toEqual({
+      ok: false,
+      reason: 'already-added',
+      title: 'The Verge - Full RSS for subscribers | The Verge',
+    });
+    // Known before fetching: re-adding costs nothing.
+    expect(network).not.toHaveBeenCalled();
     expect(await a.query(api.articles.all, {})).toHaveLength(3);
   });
 
@@ -107,7 +114,7 @@ describe('what a fetch stores', () => {
     const { a } = await setup();
     await a.action(api.feeds.add, { url: FEED_URL });
     const shouted = FEED_URL.replace('www.theverge.com', 'WWW.TheVerge.com');
-    expect(await a.action(api.feeds.add, { url: `  ${shouted} ` })).toEqual({ ok: false, reason: 'already-added' });
+    expect(await a.action(api.feeds.add, { url: `  ${shouted} ` })).toMatchObject({ ok: false, reason: 'already-added' });
   });
 });
 
@@ -273,6 +280,22 @@ describe('finding a Feed from a website (T21)', () => {
     });
     expect(await t.run((ctx) => ctx.db.query('feeds').take(1))).toEqual([]);
     expect(await a.action(api.feeds.add, { url: 'https://site.example.com/reviews.atom' })).toEqual({ ok: true });
+  });
+
+  test("a site whose one feed you already follow says so, by the Feed's name, without fetching the feed again", async () => {
+    const { a } = await setup();
+    route({
+      'https://site.example.com/': () => html(SITE_HEAD),
+      'https://site.example.com/rss.xml': () => rssOf('Site feed'),
+    });
+    await a.action(api.feeds.add, { url: 'https://site.example.com/rss.xml' });
+    network.mockClear();
+    expect(await a.action(api.feeds.add, { url: 'site.example.com' })).toEqual({
+      ok: false,
+      reason: 'already-added',
+      title: 'Site feed',
+    });
+    expect(network.mock.calls.map(([url]) => url)).toEqual(['https://site.example.com/']);
   });
 
   test('a page with no feed says so', async () => {

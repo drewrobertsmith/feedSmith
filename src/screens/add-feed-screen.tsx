@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, TextInput, ToastAndroid, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/app-button';
@@ -19,7 +19,6 @@ const ERRORS: Record<AddFeedReason, string> = {
   'too-large': 'That feed is too large for feedSmith.',
   'not-a-feed': 'That address isn’t an RSS or Atom feed. Try the site’s feed URL.',
   'no-feed-found': 'No feed found at that address. Try the site’s feed URL.',
-  'already-added': 'You already follow this Feed.',
 };
 
 /** One of a site's feeds, to choose (T21): its title, and the site it's on. */
@@ -53,7 +52,10 @@ export function AddFeedScreen() {
 
   const addFrom = async (address: string) => {
     if (!address.trim() || busy) return;
-    if (await add(address)) router.back();
+    const outcome = await add(address);
+    // Already followed: back to All, with a quiet note naming it (a chip opens it once FEE-29 lands).
+    if (outcome.kind === 'already') ToastAndroid.show(`You already follow ${outcome.title}.`, ToastAndroid.SHORT);
+    if (outcome.kind !== 'stay') router.back();
   };
   const submit = () => addFrom(url);
 

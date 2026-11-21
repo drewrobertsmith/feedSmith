@@ -1,5 +1,6 @@
 import { act, fireEvent, userEvent } from '@testing-library/react-native';
 import { renderRouter, screen } from 'expo-router/testing-library';
+import { ToastAndroid } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { Uniwind } from 'uniwind';
 
@@ -219,6 +220,19 @@ describe('Add a Feed', () => {
     await user.press(screen.getByRole('button', { name: 'Add Feed' }));
     expect(w.feedsLog.added).toEqual(['https://www.theverge.com/rss/index.xml']);
     expect(await screen.findByRole('heading', { name: 'Feeds' })).toBeOnTheScreen();
+  });
+
+  test('a Feed you already follow takes you back to All, with a quiet note naming it', async () => {
+    const toast = jest.spyOn(ToastAndroid, 'show').mockImplementation(() => {});
+    const user = userEvent.setup();
+    await open({ colorScheme: 'dark', feeds: 'some', addFeed: 'already' });
+    await user.press(await screen.findByRole('button', { name: 'Add a Feed' }));
+    await user.type(await screen.findByLabelText('Website or feed URL'), 'theverge.com');
+    await user.press(screen.getByRole('button', { name: 'Add Feed' }));
+    expect(await screen.findByRole('heading', { name: 'Feeds' })).toBeOnTheScreen();
+    expect(toast).toHaveBeenCalledWith('You already follow The Verge.', ToastAndroid.SHORT);
+    expect(screen.queryByRole('alert')).not.toBeOnTheScreen();
+    toast.mockRestore();
   });
 
   test('a failed add stays on the screen with the URL kept', async () => {

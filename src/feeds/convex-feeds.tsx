@@ -2,7 +2,14 @@ import { useAction, useMutation, useQuery } from 'convex/react';
 import { useState, type ReactNode } from 'react';
 
 import { api } from '../../convex/_generated/api';
-import { FeedsContext, type AddFeedView, type AllView, type ArticleView, type FeedsData } from '@/feeds/feeds-data';
+import {
+  FeedsContext,
+  type AddFeedView,
+  type AddOutcome,
+  type AllView,
+  type ArticleView,
+  type FeedsData,
+} from '@/feeds/feeds-data';
 
 function useAll(): AllView {
   const articles = useQuery(api.articles.all);
@@ -19,18 +26,25 @@ function useAddFeed() {
   const addFeed = useAction(api.feeds.add);
   const [view, setView] = useState<AddFeedView>({ status: 'idle' });
 
-  const add = async (url: string) => {
+  const add = async (url: string): Promise<AddOutcome> => {
     setView({ status: 'busy' });
     try {
       const result = await addFeed({ url: url.trim() });
-      if (result.ok) setView({ status: 'idle' });
-      else if (result.reason === 'choose') setView({ status: 'choose', choices: result.choices });
+      if (result.ok) {
+        setView({ status: 'idle' });
+        return { kind: 'added' };
+      }
+      if (result.reason === 'already-added') {
+        setView({ status: 'idle' });
+        return { kind: 'already', title: result.title };
+      }
+      if (result.reason === 'choose') setView({ status: 'choose', choices: result.choices });
       else setView({ status: 'error', reason: result.reason });
-      return result.ok;
+      return { kind: 'stay' };
     } catch {
       // The call itself failed (no connection, or the server is down).
       setView({ status: 'error', reason: 'unreachable' });
-      return false;
+      return { kind: 'stay' };
     }
   };
 
