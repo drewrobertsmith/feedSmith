@@ -2,6 +2,7 @@
   "enabledPlugins": {
     "expo@claude-plugins-official": true,
     "expo-dev-loop@expo-dev-loop": true,
-    "mattpocock-skills@claude-plugins-official": true
+    "mattpocock-skills@claude-plugins-official": true,
+    "convex@claude-plugins-official": true
   }
 }

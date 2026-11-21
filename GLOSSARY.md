@@ -4,6 +4,10 @@ A personal, minimal RSS reader with a place to keep articles for later. It exist
 
 ## Language
 
+**User**:
+A person signed in to feedSmith. Each User's Feeds, Saved Articles and Read state are their own.
+_Avoid_: Account, member, subscriber, owner (when meaning any User)
+
 **Feed**:
 One website's RSS or Atom feed that you follow.
 _Avoid_: Source, channel, subscription, site
