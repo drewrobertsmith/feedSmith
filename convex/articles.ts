@@ -1,24 +1,51 @@
 import { v } from 'convex/values';
 
 import type { Id } from './_generated/dataModel';
-import { query, type QueryCtx } from './_generated/server';
+import { mutation, query, type QueryCtx } from './_generated/server';
 import { requireUserId } from './lib/currentUser';
 import { vBlock, vOmittedKind } from './lib/feed/validators';
 
 /** All shows a User's newest Articles, up to this many. */
 const ALL_LIMIT = 200;
 
-async function feedTitles(ctx: QueryCtx, feedIds: Id<'feeds'>[]) {
+type FeedFace = { title: string; faviconUrl?: string };
+
+/** Each Feed's name and favicon. The favicon comes from its site, never its secret URL (Q9). */
+async function feedFaces(ctx: QueryCtx, feedIds: Id<'feeds'>[]) {
   const ids = [...new Set(feedIds)];
   const feeds = await Promise.all(ids.map((id) => ctx.db.get(id)));
-  return new Map(ids.map((id, i) => [id, feeds[i]?.title ?? ''] as const));
+  return new Map<Id<'feeds'>, FeedFace>(
+    ids.map((id, i) => {
+      const feed = feeds[i];
+      const face: FeedFace = { title: feed?.title ?? '' };
+      if (feed?.siteUrl) face.faviconUrl = `${feed.siteUrl}/favicon.ico`;
+      return [id, face];
+    }),
+  );
+}
+
+/** A link's id as one of the signed-in User's Articles, or null (Q25). */
+async function ownArticle(ctx: QueryCtx, userId: Id<'users'>, rawId: string) {
+  // Convex ids are well under 64 characters; longer strings aren't worth normalising.
+  const id = rawId.length <= 64 ? ctx.db.normalizeId('articles', rawId) : null;
+  const article = id ? await ctx.db.get(id) : null;
+  return article && article.userId === userId ? article : null;
 }
 
 /** All: every Article from the signed-in User's Feeds, newest first. Never a feed URL (Q9). */
 export const all = query({
   args: {},
   returns: v.array(
-    v.object({ id: v.id('articles'), title: v.string(), feedTitle: v.string(), publishedAt: v.number() }),
+    v.object({
+      id: v.id('articles'),
+      title: v.string(),
+      subtitle: v.optional(v.string()),
+      imageUrl: v.optional(v.string()),
+      feedTitle: v.string(),
+      faviconUrl: v.optional(v.string()),
+      publishedAt: v.number(),
+      read: v.boolean(),
+    }),
   ),
   handler: async (ctx) => {
     const userId = await requireUserId(ctx);
@@ -27,13 +54,20 @@ export const all = query({
       .withIndex('by_user_published', (q) => q.eq('userId', userId))
       .order('desc')
       .take(ALL_LIMIT);
-    const titles = await feedTitles(ctx, articles.map((a) => a.feedId));
-    return articles.map((a) => ({
-      id: a._id,
-      title: a.title,
-      feedTitle: titles.get(a.feedId) ?? '',
-      publishedAt: a.publishedAt,
-    }));
+    const faces = await feedFaces(ctx, articles.map((a) => a.feedId));
+    return articles.map((a) => {
+      const face = faces.get(a.feedId);
+      return {
+        id: a._id,
+        title: a.title,
+        subtitle: a.subtitle,
+        imageUrl: a.imageUrl,
+        feedTitle: face?.title ?? '',
+        faviconUrl: face?.faviconUrl,
+        publishedAt: a.publishedAt,
+        read: a.readAt !== undefined,
+      };
+    });
   },
 });
 
@@ -56,10 +90,8 @@ export const get = query({
   ),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    // Convex ids are well under 64 characters; longer strings aren't worth normalising.
-    const id = args.id.length <= 64 ? ctx.db.normalizeId('articles', args.id) : null;
-    const article = id ? await ctx.db.get(id) : null;
-    if (!article || article.userId !== userId) return null;
+    const article = await ownArticle(ctx, userId, args.id);
+    if (!article) return null;
     const [feed, body] = await Promise.all([
       ctx.db.get(article.feedId),
       ctx.db
@@ -75,5 +107,17 @@ export const get = query({
       blocks: body?.blocks ?? [],
       omitted: body?.omitted ?? [],
     };
+  },
+});
+
+/** Opening an Article marks it Read (P7). Only the User's own; the first opening counts. */
+export const markRead = mutation({
+  args: { id: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const article = await ownArticle(ctx, userId, args.id);
+    if (article && article.readAt === undefined) await ctx.db.patch(article._id, { readAt: Date.now() });
+    return null;
   },
 });

@@ -16,7 +16,7 @@ const REASONS = {
 } as const satisfies Record<string, FetchFailure>;
 
 export type FetchOutcome =
-  | { _tag: 'Fetched'; title: string; articles: StoredArticle[]; validators: Validators }
+  | { _tag: 'Fetched'; title: string; siteUrl?: string; articles: StoredArticle[]; validators: Validators }
   | { _tag: 'NotModified' }
   | { _tag: 'Failed'; reason: FetchFailure };
 
@@ -35,6 +35,7 @@ export function fetchFeed(url: string, validators?: Validators): Promise<FetchOu
       return {
         _tag: 'Fetched' as const,
         title: feed.title,
+        siteUrl: feed.siteUrl,
         articles: articlesToStore(feed.articles),
         validators: { etag, lastModified },
       };

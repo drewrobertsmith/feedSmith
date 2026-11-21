@@ -172,3 +172,60 @@ describe('opening an Article', () => {
     expect(await a.query(api.articles.get, { id: feedId as unknown as Id<'articles'> })).toBeNull();
   });
 });
+
+describe('Article rows (FEE-27)', () => {
+  test('All carries each row: Subtitle, lead image, the Feed favicon from its site, and Read', async () => {
+    const { a } = await setup();
+    await a.action(api.feeds.add, { url: FEED_URL });
+    const [first] = await a.query(api.articles.all, {});
+    expect(first).toMatchObject({
+      subtitle: 'Countries agree to ‘start discussing options’ for rules around autonomous weapons.',
+      imageUrl: expect.stringMatching(/^https:\/\/platform\.theverge\.com\//),
+      faviconUrl: 'https://www.theverge.com/favicon.ico',
+      read: false,
+    });
+  });
+
+  test("the favicon comes from the Feed's site, never its secret URL (Q9)", async () => {
+    const { a } = await setup();
+    network.mockImplementation(
+      async () =>
+        new Response(
+          '<rss version="2.0"><channel><title>T</title><link>https://site.example.com/blog</link><item><title>A</title><guid>1</guid></item></channel></rss>',
+        ),
+    );
+    await a.action(api.feeds.add, { url: 'https://feeds.private.example.net/x.xml?key=SECRET-KEY-123' });
+    const [row] = await a.query(api.articles.all, {});
+    expect(row.faviconUrl).toBe('https://site.example.com/favicon.ico');
+    expect(JSON.stringify(row)).not.toMatch(/SECRET|feeds\.private/);
+  });
+});
+
+describe('Read (P7)', () => {
+  test('opening an Article marks it Read; Read Articles stay in All', async () => {
+    const { a } = await setup();
+    await a.action(api.feeds.add, { url: FEED_URL });
+    const [first, second] = await a.query(api.articles.all, {});
+    await a.mutation(api.articles.markRead, { id: first.id });
+    await a.mutation(api.articles.markRead, { id: first.id });
+    const all = await a.query(api.articles.all, {});
+    expect(all).toHaveLength(3);
+    expect(all.find((r) => r.id === first.id)!.read).toBe(true);
+    expect(all.find((r) => r.id === second.id)!.read).toBe(false);
+  });
+
+  test("another User can't mark an Article Read, and a malformed id marks nothing", async () => {
+    const { a, b } = await setup();
+    await a.action(api.feeds.add, { url: FEED_URL });
+    const [first] = await a.query(api.articles.all, {});
+    await b.mutation(api.articles.markRead, { id: first.id });
+    await a.mutation(api.articles.markRead, { id: 'not-an-id' });
+    await a.mutation(api.articles.markRead, { id: 'x'.repeat(10_000) });
+    expect((await a.query(api.articles.all, {})).every((r) => !r.read)).toBe(true);
+  });
+
+  test('signed out, it is refused', async () => {
+    const { t } = await setup();
+    await expect(t.mutation(api.articles.markRead, { id: 'x' })).rejects.toThrow(/SIGNED_OUT/);
+  });
+});

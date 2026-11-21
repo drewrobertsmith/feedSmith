@@ -33,9 +33,12 @@ export function articlesToStore(articles: ParsedArticle[], budget = MAX_FETCH_SI
     if (seen.has(fields.guid)) return [];
     seen.add(fields.guid);
     let body = content(articles[i]);
+    // The Article's own lead image, else the first image in its text.
+    const firstImage = body.blocks.find((block) => block.type === 'image');
+    const imageUrl = fields.imageUrl ?? (firstImage?.type === 'image' ? firstImage.src : undefined);
     const bodySize = JSON.stringify(body).length;
     if (size + bodySize > budget) body = subtitleOnly(articles[i]);
     else size += bodySize;
-    return [{ ...fields, ...body }];
+    return [{ ...fields, ...(imageUrl ? { imageUrl } : {}), ...body }];
   });
 }

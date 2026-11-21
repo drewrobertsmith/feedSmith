@@ -13,6 +13,8 @@ export default defineSchema({
     userId: v.id('users'),
     url: v.string(),
     title: v.string(),
+    /** The site's origin, from the Feed's own link (not the secret feed URL); its favicon lives there. */
+    siteUrl: v.optional(v.string()),
     /** Whether its last fetch worked (P15). Optional only for Feeds stored before FEE-24. */
     status: v.optional(v.union(v.literal('working'), v.literal('failing'))),
     /** Failed fetches in a row; each backs the next try off further (Q7). */
@@ -35,6 +37,10 @@ export default defineSchema({
     link: v.optional(v.string()),
     subtitle: v.optional(v.string()),
     publishedAt: v.number(),
+    /** The lead image All shows beside it (https). */
+    imageUrl: v.optional(v.string()),
+    /** When the User first opened it (P7). */
+    readAt: v.optional(v.number()),
   })
     .index('by_user_published', ['userId', 'publishedAt'])
     .index('by_feed_guid', ['feedId', 'guid'])

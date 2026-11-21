@@ -11,6 +11,7 @@ const MAX_FEED_TITLE = 200;
 const MAX_TITLE = 300;
 const MAX_SUBTITLE = 500;
 const MAX_GUID = 500;
+const MAX_IMAGE_URL = 2048;
 
 export type ParsedArticle = {
   guid: string;
@@ -18,11 +19,49 @@ export type ParsedArticle = {
   link?: string;
   subtitle?: string;
   publishedAt: number;
+  /** The Article's own lead image, from its media or enclosure tags (https only). */
+  imageUrl?: string;
   /** The Feed's full text for the Article, still HTML; `htmlToBlocks` cleans it. */
   html?: string;
 };
 
-export type ParsedFeed = { title: string; articles: ParsedArticle[] };
+export type ParsedFeed = {
+  title: string;
+  /** The site's origin, from the Feed's own link; never the feed URL, which is a secret (T9). */
+  siteUrl?: string;
+  articles: ParsedArticle[];
+};
+
+/** An https image URL of sensible length, or undefined. */
+function imageUrl(value: string | undefined, base: string): string | undefined {
+  const url = httpsUrl(value, base);
+  return url && url.length <= MAX_IMAGE_URL ? url : undefined;
+}
+
+/** The origin of an https site link, or undefined. */
+function siteOrigin(value: string | undefined): string | undefined {
+  const url = httpsUrl(value, NO_BASE);
+  return url && !url.startsWith(NO_BASE) ? new URL(url).origin : undefined;
+}
+
+const isImage = (el: Element) => (el.attribs.medium ?? '') === 'image' || (el.attribs.type ?? '').startsWith('image/');
+
+/** An Article's own lead image: media:content, media:thumbnail, or an image enclosure. */
+function leadImage(entry: Element, base: string): string | undefined {
+  const candidates = [
+    ...children(entry, 'media:content').filter(isImage).map((el) => el.attribs.url),
+    ...children(entry, 'media:thumbnail').map((el) => el.attribs.url),
+    ...children(entry, 'enclosure').filter(isImage).map((el) => el.attribs.url),
+    ...children(entry, 'link')
+      .filter((el) => el.attribs.rel === 'enclosure' && isImage(el))
+      .map((el) => el.attribs.href),
+  ];
+  for (const candidate of candidates) {
+    const url = imageUrl(candidate, base);
+    if (url) return url;
+  }
+  return undefined;
+}
 
 const clip = (text: string, max: number) => text.slice(0, max);
 const squash = (text: string) => text.replace(/\s+/g, ' ').trim();
@@ -50,14 +89,13 @@ function date(value: string, now: number): number {
   return Number.isFinite(ms) ? ms : now;
 }
 
-function article(
-  fields: { guid: string; title: string; link?: string; subtitle?: string; publishedAt: number; html?: string },
-): ParsedArticle | undefined {
+function article(fields: Omit<ParsedArticle, 'guid'> & { guid: string }): ParsedArticle | undefined {
   const guid = clip(fields.guid || fields.link || '', MAX_GUID);
   if (!guid || !fields.title) return undefined;
   const out: ParsedArticle = { guid, title: clip(fields.title, MAX_TITLE), publishedAt: fields.publishedAt };
   if (fields.link) out.link = fields.link;
   if (fields.subtitle) out.subtitle = clip(fields.subtitle, MAX_SUBTITLE);
+  if (fields.imageUrl) out.imageUrl = fields.imageUrl;
   if (fields.html) out.html = fields.html;
   return out;
 }
@@ -71,6 +109,7 @@ function rssArticle(item: Element, base: string, now: number): ParsedArticle | u
     link,
     subtitle: child(item, 'description') ? plain(description) : undefined,
     publishedAt: date(text(child(item, 'pubdate') ?? child(item, 'dc:date')), now),
+    imageUrl: leadImage(item, base),
     html: child(item, 'content:encoded') ? DomUtils.textContent(child(item, 'content:encoded')!) : undefined,
   });
 }
@@ -106,6 +145,7 @@ function atomArticle(entry: Element, base: string, now: number): ParsedArticle |
     link: httpsUrl(alternate?.attribs.href, base),
     subtitle: atomText(child(entry, 'summary')) || undefined,
     publishedAt: date(text(child(entry, 'published') ?? child(entry, 'updated')), now),
+    imageUrl: leadImage(entry, base),
     html: atomHtml(child(entry, 'content')),
   });
 }
@@ -126,6 +166,7 @@ export const parseFeed = Effect.fnUntraced(function* (xml: string, now: number) 
     const base = httpsUrl(text(child(channel, 'link')), NO_BASE) ?? NO_BASE;
     feed = {
       title: clip(plain(text(child(channel, 'title'))), MAX_FEED_TITLE),
+      siteUrl: siteOrigin(text(child(channel, 'link'))),
       articles: children(channel, 'item').flatMap((item) => rssArticle(item, base, now) ?? []),
     };
   } else if (root && name === 'feed') {
@@ -133,6 +174,7 @@ export const parseFeed = Effect.fnUntraced(function* (xml: string, now: number) 
     const base = httpsUrl(self?.attribs.href, NO_BASE) ?? NO_BASE;
     feed = {
       title: clip(atomText(child(root, 'title')), MAX_FEED_TITLE),
+      siteUrl: siteOrigin(self?.attribs.href),
       articles: children(root, 'entry').flatMap((entry) => atomArticle(entry, base, now) ?? []),
     };
   } else {
