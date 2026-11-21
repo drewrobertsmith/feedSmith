@@ -11,7 +11,7 @@
       "icon": "./assets/expo.icon"
     },
     "android": {
-      "package": "com.feedsmith.app",
+      "package": "com.mediatedreality.feedsmith",
       "adaptiveIcon": {
         "backgroundColor": "#1D2532",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
