@@ -74,6 +74,17 @@
       "typedRoutes": true,
       "reactCompiler": true
     },
-    "backgroundColor": "#1D2532"
+    "backgroundColor": "#1D2532",
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "b98c346f-cd8a-4725-9264-023976b2c4ed"
+      }
+    },
+    "owner": "mediated_reality"
   }
 }
