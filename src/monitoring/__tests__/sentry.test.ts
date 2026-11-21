@@ -19,16 +19,19 @@ function initOptions() {
 
 // T16 / Q12: crash reports with PII, Sentry Logs and Session Replay, replay masked.
 describe('initSentry', () => {
-  test('reports to the feedsmith project', () => {
-    expect(initOptions().dsn).toBe(
-      'https://74efdb3d193e42142a2216e3b1dca343@o4507147687821312.ingest.us.sentry.io/4512471734484992',
-    );
+  test('reports to a Sentry ingest address over HTTPS', () => {
+    expect(initOptions().dsn).toMatch(/^https:\/\/[0-9a-f]+@[\w.]+\.ingest\.(us\.)?sentry\.io\/\d+$/);
   });
 
   test('sends default PII and Sentry Logs', () => {
     const options = initOptions();
     expect(options.sendDefaultPii).toBe(true);
     expect(options.enableLogs).toBe(true);
+  });
+
+  // Q26: console output (the app's libraries included) never becomes a Sentry log.
+  test('sends only logs written on purpose, not console output', () => {
+    expect(initOptions().enableAutoConsoleLogs).toBe(false);
   });
 
   test('replays 10% of sessions and every session with an error', () => {

@@ -14,6 +14,8 @@ export function initSentry() {
     dsn,
     sendDefaultPii: true,
     enableLogs: true,
+    // Only `Sentry.logger` calls become logs; console output stays on the phone (Q26).
+    enableAutoConsoleLogs: false,
     replaysSessionSampleRate: 0.1,
     replaysOnErrorSampleRate: 1,
     integrations: [
