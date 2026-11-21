@@ -1,5 +1,5 @@
-import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useState, type ReactNode } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, type ReactNode } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -47,11 +47,11 @@ function WorldPreview({ entry, world, theme }: { entry: GalleryEntry; world: Cat
 /** Dev-only (T13): the real screens, once per world, to walk a ticket's state table. */
 export function GalleryScreen() {
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ world?: string }>();
-  const initial = ALL.find(({ world }) => world.id === params.world) ?? ALL[0];
-
-  const [selected, setSelected] = useState(initial);
-  const [theme, setTheme] = useState<ThemeName>(initial.world.spec.colorScheme);
+  // The link is the single source of truth, so `feedsmith://gallery?world=…&theme=…`
+  // switches an open gallery too.
+  const params = useLocalSearchParams<{ world?: string; theme?: ThemeName }>();
+  const selected = ALL.find(({ world }) => world.id === params.world) ?? ALL[0];
+  const theme = params.theme ?? selected.world.spec.colorScheme;
 
   return (
     <ScrollView className="flex-1 bg-background">
@@ -63,7 +63,7 @@ export function GalleryScreen() {
               key={name}
               label={name === 'dark' ? 'Dark' : 'Light'}
               selected={theme === name}
-              onPress={() => setTheme(name)}
+              onPress={() => router.setParams({ theme: name })}
             />
           ))}
         </Row>
@@ -78,10 +78,7 @@ export function GalleryScreen() {
                   key={world.id}
                   label={world.label}
                   selected={selected.world.id === world.id}
-                  onPress={() => {
-                    setSelected({ entry, world });
-                    setTheme(world.spec.colorScheme);
-                  }}
+                  onPress={() => router.setParams({ world: world.id, theme: undefined })}
                 />
               ))}
             </Row>

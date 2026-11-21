@@ -1,4 +1,5 @@
-import { userEvent } from '@testing-library/react-native';
+import { act, userEvent } from '@testing-library/react-native';
+import { router } from 'expo-router';
 import { renderRouter, screen } from 'expo-router/testing-library';
 import { Uniwind } from 'uniwind';
 
@@ -39,6 +40,17 @@ test('renders the real screen for the world named in the link', async () => {
   expect(await screen.findByRole('heading', { name: 'State gallery' })).toBeOnTheScreen();
   expect(screen.getByRole('heading', { name: 'Saved' })).toBeOnTheScreen();
   expect(Uniwind.currentTheme).toBe('dark');
+});
+
+test('a second link into the open gallery switches to its world', async () => {
+  await renderRouter(routes, { initialUrl: '/gallery?world=dark' });
+  await screen.findByRole('heading', { name: 'State gallery' });
+
+  await act(() => router.setParams({ world: 'light-saved' }));
+
+  expect(screen.getByRole('radio', { name: 'Light, Saved' })).toBeChecked();
+  expect(screen.getByRole('heading', { name: 'Saved' })).toBeOnTheScreen();
+  expect(Uniwind.currentTheme).toBe('light');
 });
 
 test('lists every shell world, and picking one shows it', async () => {
