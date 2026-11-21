@@ -50,6 +50,6 @@
     "security-and-hardening"
   ],
   "sourceFiles": "\\.(ts|tsx|js|jsx|mjs|cjs|kt|swift|m|mm)$",
-  "ignoredPaths": "^(docs/|\\.claude/|scripts/)",
+  "ignoredPaths": "^(docs/|\\.claude/|\\.agents/|scripts/|example/)",
   "stateGallery": null
 }

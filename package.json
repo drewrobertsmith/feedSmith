@@ -64,7 +64,9 @@
     },
     "testPathIgnorePatterns": [
       "/node_modules/",
-      "<rootDir>/example/"
+      "<rootDir>/example/",
+      "<rootDir>/.agents/",
+      "<rootDir>/.claude/"
     ]
   }
 }
