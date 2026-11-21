@@ -32,6 +32,10 @@ What this app must never get wrong. `/expo-dev-loop:feature` plans, reviews and 
 | Q22 | Without the owner's explicit say-so, the agent never touches the production Convex deployment (deploys, data, environment variables), uploads to the Play Store or runs EAS submit, uses the owner's real Google account, or turns on a paid service. Development uses a separate dev deployment with test data. | Real data and real releases are the owner's call. | every change | Review of every command that targets a deployment or store. |
 | Q23 | Dev-only surfaces (the state gallery, its `feedsmith://gallery` link, any debug route) can't be opened in a release build, and their code isn't in the release bundle. | A debug screen in a released app exposes internals and drives the app into states it was never meant to be in. | trust boundary, release | Test that the route renders nothing with `__DEV__` off; pre-release check that the exported release bundle doesn't contain the gallery's code. |
 | Q24 | Every space comes from the spacing scale (D9), on the 8-point grid with 4 only inside one element, and closer means more related: the space between two things is never smaller than the space inside either of them. | Proximity is how the app shows structure; off-grid or inverted spacing makes screens read as unrelated parts. | UI | Test that no source file uses an off-scale spacing class or a bare number for padding, margin or gap; review of each new screen's grouping against the relationship rule. |
+| Q25 | Deep-link parameters are untrusted. A route that reads them accepts only the shape it expects and ignores everything else, and a link can't open a screen the User couldn't reach by tapping (signed-in screens while signed out, dev-only screens in a release build). | Any app on the phone can open a `feedsmith://` link. | trust boundary | A test per link-reading route with hostile parameters (unexpected keys, wrong types, oversized values); the route guards' tests (signed out, release). |
+| Q26 | Session tokens are stored only in SecureStore, never in plain storage, files, logs or crash reports, and sessions expire: one-minute access tokens, and signing in again after 30 days. | A stolen token is a stolen Account. | trust boundary, release | Test that the auth adapter's storage is SecureStore; a grep that no token reaches `AsyncStorage`, a log line or a crash report; review of `convex/auth.ts`'s session lifetimes. |
+| Q27 | An element whose look its owner's guidelines set (D10: Google's sign-in button) follows those guidelines exactly and keeps its spec in one named file under `src/theme`. Those files are the only exceptions to Q19 and Q24, and their text still meets Q14's contrast. | Brand rules must not become a back door for off-token colours, type or spacing. | UI | The Q19 and Q24 tests name their exempt files; a contrast test for each such element in both themes. |
+| Q28 | Deleting an Account leaves nothing of it: the User, their sessions and Google sign-in link, and every row in every table that holds User data are removed, and no other User's data is touched (P18). | Deletion is the privacy promise; a table added later and forgotten would quietly break it. | data, trust boundary | A `convex-test` case that creates User A and User B with data in every User table, deletes A, and checks nothing of A remains and B is untouched. Every ticket that adds a User table extends that case. |
 
 ## Budgets
 
@@ -44,7 +48,7 @@ What this app must never get wrong. `/expo-dev-loop:feature` plans, reviews and 
 
 ## Release blockers
 
-Q1, Q2, Q3, Q4, Q8, Q9, Q10, Q11, Q12, Q14, Q15, Q22, Q23. Any other failure, including a missed budget, becomes a ticket.
+Q1, Q2, Q3, Q4, Q8, Q9, Q10, Q11, Q12, Q14, Q15, Q22, Q23, Q26, Q28. Any other failure, including a missed budget, becomes a ticket.
 
 ## Deferred
 

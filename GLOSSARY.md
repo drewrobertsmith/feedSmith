@@ -6,7 +6,11 @@ A personal, minimal RSS reader with a place to keep articles for later. It exist
 
 **User**:
 A person signed in to feedSmith. Each User's Feeds, Saved Articles and Read state are their own.
-_Avoid_: Account, member, subscriber, owner (when meaning any User)
+_Avoid_: Member, subscriber, owner (when meaning any User)
+
+**Account**:
+A User's Google sign-in and everything feedSmith keeps for them. Deleting an Account removes all of it.
+_Avoid_: Profile, settings (when meaning the Account)
 
 **Feed**:
 One website's RSS or Atom feed that you follow.
