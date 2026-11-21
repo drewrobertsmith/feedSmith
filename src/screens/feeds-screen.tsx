@@ -1,15 +1,16 @@
 import { LegendList } from '@legendapp/list/react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { useState } from 'react';
 import { Pressable, RefreshControl, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/app-button';
 import { AppText } from '@/components/app-text';
+import { FeedIcon } from '@/components/feed-icon';
 import { useEnvironment } from '@/environment';
-import { useAll, useRefresh, type ArticleRow } from '@/feeds/feeds-data';
+import { useAll, useChips, useRefresh, type ArticleRow } from '@/feeds/feeds-data';
 import { publishedAgo } from '@/feeds/format';
+import { ChipRow } from '@/screens/chip-row';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
 
@@ -21,35 +22,6 @@ const THUMBNAIL = 72;
 const FAVICON = 16;
 /** A row's usual height, for the list's first layout before rows measure themselves. */
 const ESTIMATED_ROW = 112;
-
-/** The Feed's favicon, or its initial when it has none or it won't load. */
-function FeedMark({ title, faviconUrl }: { title: string; faviconUrl?: string }) {
-  const { fontScale } = useEnvironment();
-  const [failed, setFailed] = useState(false);
-  const size = FAVICON * fontScale;
-  if (faviconUrl && !failed) {
-    return (
-      // The View clips the corners: expo-image doesn't take Uniwind's rounding classes.
-      <View className="overflow-hidden rounded-sm" style={{ width: size, height: size }}>
-        <Image
-          testID="row-favicon"
-          source={{ uri: faviconUrl }}
-          recyclingKey={faviconUrl}
-          onError={() => setFailed(true)}
-          accessible={false}
-          style={{ width: size, height: size }}
-        />
-      </View>
-    );
-  }
-  return (
-    <View className="items-center justify-center rounded-sm bg-surface" style={{ width: size, height: size }}>
-      <AppText variant="label" className="text-text-muted" accessible={false}>
-        {title.charAt(0).toUpperCase()}
-      </AppText>
-    </View>
-  );
-}
 
 function Row({ article }: { article: ArticleRow }) {
   const { colorScheme, fontScale, now } = useEnvironment();
@@ -68,7 +40,13 @@ function Row({ article }: { article: ArticleRow }) {
       <View className="flex-1 gap-inside">
         <View className="flex-row items-center gap-related">
           {/* Keyed by favicon, so a failed load never carries over to another Feed's row. */}
-          <FeedMark key={article.faviconUrl ?? article.feedTitle} title={article.feedTitle} faviconUrl={article.faviconUrl} />
+          <FeedIcon
+            key={article.faviconUrl ?? article.feedTitle}
+            url={article.faviconUrl}
+            title={article.feedTitle}
+            size={FAVICON}
+            testID="row-favicon"
+          />
           <AppText variant="label" className="shrink text-text-muted" numberOfLines={1}>
             {article.feedTitle}
           </AppText>
@@ -101,30 +79,40 @@ function Row({ article }: { article: ArticleRow }) {
   );
 }
 
-/** The Feeds section: All, every Article newest first (Q1, P12). Read is dimmed, never counted (P7). */
-export function FeedsScreen() {
+/**
+ * The Feeds section: All, or one Feed's Articles, newest first (Q1, P5, P12), under the chip
+ * row (P9). The chosen chip lives in the route (`?feed=`), so it can be restored and linked to;
+ * a link's value is untrusted, so anything but one of the User's chips means All (Q25).
+ */
+export function FeedsScreen({ feed }: { feed?: string }) {
   const insets = useSafeAreaInsets();
-  const all = useAll();
+  const chipsView = useChips();
+  const chips = chipsView.status === 'ready' ? chipsView.chips : [];
+  const selectedChip = chips.find((chip) => chip.id === feed) ?? null;
+  const all = useAll(selectedChip?.id ?? null);
   const { refreshing, refresh } = useRefresh();
   const { colorScheme } = useEnvironment();
   const theme = themes[colorScheme];
+  const noFeeds = chipsView.status === 'ready' && chips.length === 0;
   const empty = all.status === 'ready' && all.articles.length === 0;
 
+  const select = (feedId: string | null) => router.setParams({ feed: feedId ?? undefined });
+
   const header = (
-    <View className="flex-row items-center justify-between px-edge pb-related" style={{ paddingTop: insets.top + spacing.section }}>
-      <AppText variant="title">Feeds</AppText>
-      {/* Temporary: the "+" chip replaces this in the chips ticket. Hidden when the empty state offers it. */}
-      {all.status === 'ready' && !empty ? (
-        <Pressable role="button" aria-label="Add a Feed" onPress={addFeed} hitSlop={spacing.related} className="px-related py-inside">
-          <AppText variant="title" className="text-text" accessible={false}>
-            +
-          </AppText>
-        </Pressable>
+    <View className="gap-group pb-related" style={{ paddingTop: insets.top + spacing.section }}>
+      <AppText variant="title" className="px-edge text-text">
+        Feeds
+      </AppText>
+      {chips.length > 0 ? <ChipRow chips={chips} selected={selectedChip?.id ?? null} onSelect={select} onAdd={addFeed} /> : null}
+      {selectedChip && empty ? (
+        <AppText variant="reading" className="px-edge text-text-muted">
+          {`No Articles from ${selectedChip.title} in the last 30 days.`}
+        </AppText>
       ) : null}
     </View>
   );
 
-  if (empty) {
+  if (noFeeds) {
     return (
       <View className="flex-1 bg-background">
         {header}
@@ -145,6 +133,8 @@ export function FeedsScreen() {
       keyExtractor={(article) => article.id}
       renderItem={({ item }) => <Row article={item} />}
       estimatedItemSize={ESTIMATED_ROW}
+      // Rows hold small state (a favicon that failed): a reused row must start fresh.
+      recycleItems={false}
       ListHeaderComponent={header}
       refreshControl={
         <RefreshControl

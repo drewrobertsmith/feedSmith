@@ -8,12 +8,28 @@ import {
   type AddOutcome,
   type AllView,
   type ArticleView,
+  type ChipsView,
+  type PinOutcome,
   type FeedsData,
 } from '@/feeds/feeds-data';
 
-function useAll(): AllView {
-  const articles = useQuery(api.articles.all);
+function useAll(feedId: string | null): AllView {
+  const articles = useQuery(api.articles.all, feedId === null ? {} : { feedId });
   return articles === undefined ? { status: 'loading' } : { status: 'ready', articles };
+}
+
+function useChips(): ChipsView {
+  const chips = useQuery(api.feeds.chips);
+  return chips === undefined ? { status: 'loading' } : { status: 'ready', chips };
+}
+
+function useSetPinned() {
+  const setPinned = useMutation(api.feeds.setPinned);
+  return async (id: string, pinned: boolean): Promise<PinOutcome> => {
+    const result = await setPinned({ id, pinned }).catch(() => null);
+    if (!result) return 'not-found';
+    return result.ok ? 'ok' : result.reason;
+  };
 }
 
 function useArticle(id: string): ArticleView {
@@ -36,7 +52,7 @@ function useAddFeed() {
       }
       if (result.reason === 'already-added') {
         setView({ status: 'idle' });
-        return { kind: 'already', title: result.title };
+        return { kind: 'already', title: result.title, feedId: result.feedId };
       }
       if (result.reason === 'choose') setView({ status: 'choose', choices: result.choices });
       else setView({ status: 'error', reason: result.reason });
@@ -73,7 +89,7 @@ function useMarkRead() {
   };
 }
 
-const convexFeeds: FeedsData = { useAll, useArticle, useAddFeed, useRefresh, useMarkRead };
+const convexFeeds: FeedsData = { useAll, useChips, useSetPinned, useArticle, useAddFeed, useRefresh, useMarkRead };
 
 /** The app's Feeds and Articles, from Convex. Sits inside `ConvexAuth`, which owns the client. */
 export function ConvexFeeds({ children }: { children: ReactNode }) {

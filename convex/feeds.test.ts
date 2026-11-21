@@ -72,6 +72,7 @@ describe('adding a Feed', () => {
       ok: false,
       reason: 'already-added',
       title: 'The Verge - Full RSS for subscribers | The Verge',
+      feedId: expect.any(String),
     });
     // Known before fetching: re-adding costs nothing.
     expect(network).not.toHaveBeenCalled();
@@ -294,6 +295,7 @@ describe('finding a Feed from a website (T21)', () => {
       ok: false,
       reason: 'already-added',
       title: 'Site feed',
+      feedId: expect.any(String),
     });
     expect(network.mock.calls.map(([url]) => url)).toEqual(['https://site.example.com/']);
   });

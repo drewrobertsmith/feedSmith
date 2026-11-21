@@ -1,6 +1,6 @@
 import { act, fireEvent, userEvent } from '@testing-library/react-native';
 import { renderRouter, screen } from 'expo-router/testing-library';
-import { ToastAndroid } from 'react-native';
+import { Animated, ToastAndroid } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { Uniwind } from 'uniwind';
 
@@ -74,17 +74,30 @@ afterEach(() => {
 });
 
 describe('All', () => {
-  type Shows = { rows: number; read: number; empty: boolean; refreshing: boolean; theme: 'dark' | 'light'; titleSize: number };
+  type Shows = {
+    rows: number;
+    read: number;
+    empty: boolean;
+    refreshing: boolean;
+    theme: 'dark' | 'light';
+    titleSize: number;
+    selected: string;
+  };
   const ROWS = FIXTURE_ROWS.length;
   const READ = FIXTURE_ROWS.filter((r) => r.read).length;
+  const VERGE_ROWS = FIXTURE_ROWS.filter((r) => r.feedId === 'f1').length;
   const SHOWS: Record<AllWorldId, Shows> = {
-    'all-dark': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 24 },
-    'all-light': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'light', titleSize: 24 },
-    'all-read': { rows: ROWS, read: ROWS, empty: false, refreshing: false, theme: 'dark', titleSize: 24 },
-    'all-empty': { rows: 0, read: 0, empty: true, refreshing: false, theme: 'dark', titleSize: 24 },
-    'all-loading': { rows: 0, read: 0, empty: false, refreshing: false, theme: 'dark', titleSize: 24 },
-    'all-refreshing': { rows: ROWS, read: READ, empty: false, refreshing: true, theme: 'light', titleSize: 24 },
-    'all-largest-font': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 48 },
+    'all-dark': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All' },
+    'all-light': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'light', titleSize: 24, selected: 'All' },
+    'all-read': { rows: ROWS, read: ROWS, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All' },
+    'all-empty': { rows: 0, read: 0, empty: true, refreshing: false, theme: 'dark', titleSize: 24, selected: '' },
+    'all-loading': { rows: 0, read: 0, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: '' },
+    'all-refreshing': { rows: ROWS, read: READ, empty: false, refreshing: true, theme: 'light', titleSize: 24, selected: 'All' },
+    'all-largest-font': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 48, selected: 'All' },
+    'all-feed': { rows: VERGE_ROWS, read: 1, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'The Verge, Pinned' },
+    'all-feed-light': { rows: 1, read: 0, empty: false, refreshing: false, theme: 'light', titleSize: 24, selected: 'Calm Notes' },
+    'all-feed-empty': { rows: 0, read: 0, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'Daring Fireball' },
+    'all-remove-animations': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All' },
   };
 
   test.each(ALL_WORLDS)('$label', async ({ id, spec }) => {
@@ -102,7 +115,116 @@ describe('All', () => {
     if (!shows.empty && shows.rows > 0) {
       expect(screen.getByTestId('all-list').props.refreshControl.props.refreshing).toBe(shows.refreshing);
     }
+    if (shows.selected) expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName(shows.selected);
     expect(Uniwind.currentTheme).toBe(shows.theme);
+  });
+
+  test('the chip row: All, the Pinned Feed, the rest, then + (P5, P9)', async () => {
+    await open({ colorScheme: 'dark', feeds: 'some' });
+    const tabs = await screen.findAllByRole('tab');
+    const names = ['All', 'The Verge, Pinned', 'Calm Notes', 'Daring Fireball'];
+    expect(tabs).toHaveLength(names.length);
+    tabs.forEach((tab, i) => expect(tab).toHaveAccessibleName(names[i]));
+    // The "+" chip replaces the tracer bullet's top-bar button: one way to add.
+    expect(screen.getAllByRole('button', { name: 'Add a Feed' })).toHaveLength(1);
+  });
+
+  test("tapping a Feed's chip shows only its Articles; tapping All shows everything again", async () => {
+    const user = userEvent.setup();
+    await open({ colorScheme: 'dark', feeds: 'some' });
+    await user.press(await screen.findByRole('tab', { name: 'Calm Notes' }));
+    await layOutAll();
+    expect(screen.getByRole('tab', { name: 'Calm Notes' })).toBeSelected();
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+    await user.press(screen.getByRole('tab', { name: 'All' }));
+    await layOutAll();
+    expect(screen.getAllByRole('link')).toHaveLength(FIXTURE_ROWS.length);
+  });
+
+  test("a long Feed name stays on one line, so a chip can't run off the screen (Q16)", async () => {
+    await open({ colorScheme: 'dark', feeds: 'some', fontScale: 2 });
+    await screen.findAllByRole('tab');
+    expect(screen.getByText('Daring Fireball')).toHaveProp('numberOfLines', 1);
+  });
+
+  test('a Feed with nothing new says so, by name', async () => {
+    await open({ colorScheme: 'dark', feeds: 'some', feed: 'f3' });
+    expect(await screen.findByText('No Articles from Daring Fireball in the last 30 days.')).toBeOnTheScreen();
+  });
+
+  test.each([
+    ['not one of yours', '/?feed=someone-elses'],
+    ['malformed', '/?feed=%3Cscript%3E'],
+    ['oversized', `/?feed=${'a'.repeat(500)}`],
+  ])('a link to a Feed that is %s opens All (Q25)', async (_case, url) => {
+    await open({ colorScheme: 'dark', feeds: 'some' }, url);
+    expect(await screen.findByRole('tab', { selected: true })).toHaveAccessibleName('All');
+  });
+
+  describe('Pinning by long-press (P9)', () => {
+    let toast: jest.SpyInstance;
+    beforeEach(() => {
+      toast = jest.spyOn(ToastAndroid, 'show').mockImplementation(() => {});
+    });
+    afterEach(() => toast.mockRestore());
+
+    test('long-pressing a Feed Pins it; long-pressing a Pinned Feed unpins it', async () => {
+      const user = userEvent.setup();
+      const w = await open({ colorScheme: 'dark', feeds: 'some' });
+      await user.longPress(await screen.findByRole('tab', { name: 'Calm Notes' }));
+      expect(w.feedsLog.pins).toEqual([{ id: 'f2', pinned: true }]);
+      expect(toast).toHaveBeenLastCalledWith('Pinned Calm Notes.', ToastAndroid.SHORT);
+      await user.longPress(screen.getByRole('tab', { name: 'The Verge, Pinned' }));
+      expect(w.feedsLog.pins).toEqual([{ id: 'f2', pinned: true }, { id: 'f1', pinned: false }]);
+      expect(toast).toHaveBeenLastCalledWith('Unpinned The Verge.', ToastAndroid.SHORT);
+    });
+
+    test('a fourth Pin is refused, saying why', async () => {
+      const user = userEvent.setup();
+      await open({ colorScheme: 'dark', feeds: 'some', pins: 'full' });
+      await user.longPress(await screen.findByRole('tab', { name: 'Calm Notes' }));
+      expect(toast).toHaveBeenLastCalledWith('You can Pin up to 3 Feeds. Unpin one first.', ToastAndroid.SHORT);
+    });
+
+    test('TalkBack can Pin and unpin without a long-press (Q15)', async () => {
+      const w = await open({ colorScheme: 'dark', feeds: 'some' });
+      const calm = await screen.findByRole('tab', { name: 'Calm Notes' });
+      expect(calm.props.accessibilityActions).toEqual([{ name: 'pin', label: 'Pin' }]);
+      await act(async () => fireEvent(calm, 'accessibilityAction', { nativeEvent: { actionName: 'pin' } }));
+      expect(w.feedsLog.pins).toEqual([{ id: 'f2', pinned: true }]);
+      const verge = screen.getByRole('tab', { name: 'The Verge, Pinned' });
+      expect(verge.props.accessibilityActions).toEqual([{ name: 'pin', label: 'Unpin' }]);
+    });
+
+    test('All has nothing to Pin', async () => {
+      const user = userEvent.setup();
+      const w = await open({ colorScheme: 'dark', feeds: 'some' });
+      await user.longPress(await screen.findByRole('tab', { name: 'All' }));
+      expect(w.feedsLog.pins).toEqual([]);
+    });
+  });
+
+  describe('selecting a chip moves (D7, Q17)', () => {
+    let spring: jest.SpyInstance;
+    beforeEach(() => {
+      spring = jest.spyOn(Animated, 'spring');
+    });
+    afterEach(() => spring.mockRestore());
+
+    test('with motion on, the chosen chip springs', async () => {
+      const user = userEvent.setup();
+      await open({ colorScheme: 'dark', feeds: 'some' });
+      await user.press(await screen.findByRole('tab', { name: 'Calm Notes' }));
+      expect(spring).toHaveBeenCalled();
+    });
+
+    test('with Remove animations on, it changes without moving', async () => {
+      const user = userEvent.setup();
+      await open({ colorScheme: 'dark', feeds: 'some', reduceMotion: true });
+      await user.press(await screen.findByRole('tab', { name: 'Calm Notes' }));
+      expect(spring).not.toHaveBeenCalled();
+      expect(screen.getByRole('tab', { name: 'Calm Notes' })).toBeSelected();
+    });
   });
 
   test('pulling down asks every Feed to refresh, from the server (Q21)', async () => {
@@ -222,7 +344,7 @@ describe('Add a Feed', () => {
     expect(await screen.findByRole('heading', { name: 'Feeds' })).toBeOnTheScreen();
   });
 
-  test('a Feed you already follow takes you back to All, with a quiet note naming it', async () => {
+  test('a Feed you already follow takes you back to its chip, with a quiet note naming it', async () => {
     const toast = jest.spyOn(ToastAndroid, 'show').mockImplementation(() => {});
     const user = userEvent.setup();
     await open({ colorScheme: 'dark', feeds: 'some', addFeed: 'already' });
@@ -230,6 +352,7 @@ describe('Add a Feed', () => {
     await user.type(await screen.findByLabelText('Website or feed URL'), 'theverge.com');
     await user.press(screen.getByRole('button', { name: 'Add Feed' }));
     expect(await screen.findByRole('heading', { name: 'Feeds' })).toBeOnTheScreen();
+    expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName('The Verge, Pinned');
     expect(toast).toHaveBeenCalledWith('You already follow The Verge.', ToastAndroid.SHORT);
     expect(screen.queryByRole('alert')).not.toBeOnTheScreen();
     toast.mockRestore();

@@ -1,4 +1,4 @@
-import type { ArticleRow, ReadingArticle } from '@/feeds/feeds-data';
+import type { ArticleRow, FeedChip, ReadingArticle } from '@/feeds/feeds-data';
 
 /** Midday UTC, so the date reads the same in every time zone a test runs in. */
 const day = (d: number) => Date.UTC(2026, 10, d, 12);
@@ -8,7 +8,7 @@ const VERGE = 'The Verge';
 /** Two hours after the newest fixture Article: the "now" fixture rows are seen from. */
 export const FIXTURE_NOW = Date.UTC(2026, 10, 21, 14);
 
-const VERGE_FACE = { feedTitle: VERGE, faviconUrl: 'https://www.theverge.com/favicon.ico' };
+const VERGE_FACE = { feedId: 'f1', feedTitle: VERGE, faviconUrl: 'https://www.theverge.com/favicon.ico' };
 
 /**
  * All, as a few Feeds would fill it: newest first, with every kind of row (P12): image and
@@ -40,7 +40,7 @@ export const FIXTURE_ROWS: ArticleRow[] = [
     publishedAt: day(19),
     read: false,
   },
-  { id: 'a4', title: 'A quiet guide to slow reading', feedTitle: 'Calm Notes', publishedAt: day(17), read: false },
+  { id: 'a4', feedId: 'f2', title: 'A quiet guide to slow reading', feedTitle: 'Calm Notes', publishedAt: day(17), read: false },
 ];
 
 /** Every Article in All Read. */
@@ -106,4 +106,14 @@ export const FIXTURE_CHOICES = [
   { url: 'https://www.theverge.com/rss/index.xml', title: 'The Verge' },
   { url: 'https://www.theverge.com/rss/reviews/index.xml', title: 'The Verge – Reviews' },
   { url: 'https://www.theverge.com/rss/policy/index.xml', title: 'The Verge – Policy' },
+];
+
+/**
+ * The chip row (P9): one Pinned Feed, then the rest by their newest Article. Calm Notes has no
+ * icon; Daring Fireball has no Articles in the last 30 days.
+ */
+export const FIXTURE_CHIPS: FeedChip[] = [
+  { id: 'f1', title: VERGE, faviconUrl: 'https://www.theverge.com/favicon.ico', pinned: true },
+  { id: 'f2', title: 'Calm Notes', pinned: false },
+  { id: 'f3', title: 'Daring Fireball', faviconUrl: 'https://daringfireball.net/favicon.ico', pinned: false },
 ];

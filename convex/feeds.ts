@@ -1,9 +1,11 @@
 import { v } from 'convex/values';
 
 import { internal } from './_generated/api';
-import { action, internalMutation, internalQuery } from './_generated/server';
+import type { Id } from './_generated/dataModel';
+import { action, internalMutation, internalQuery, mutation, query, type QueryCtx } from './_generated/server';
 import { requireUserId } from './lib/currentUser';
 import { findFeedLinks, siteMeta, type FeedLink, type SiteMeta } from './lib/feed/discover';
+import { faviconOf } from './lib/feed/face';
 import { fetchFeed, type FetchOutcome } from './lib/feed/fetch';
 import { safeUrl } from './lib/feed/http';
 import { markWorking, storeNewArticles } from './lib/feed/record';
@@ -23,13 +25,13 @@ const vAddResult = v.union(
   v.object({ ok: v.literal(false), reason: vAddFeedReason }),
   v.object({ ok: v.literal(false), reason: v.literal('choose'), choices: v.array(vFeedChoice) }),
   /** A Feed the User already follows, by the same URL: the app takes them back to it, by name. */
-  v.object({ ok: v.literal(false), reason: v.literal('already-added'), title: v.string() }),
+  v.object({ ok: v.literal(false), reason: v.literal('already-added'), title: v.string(), feedId: v.id('feeds') }),
 );
 type AddResult =
   | { ok: true }
   | { ok: false; reason: AddFeedReason }
   | { ok: false; reason: 'choose'; choices: FeedLink[] }
-  | { ok: false; reason: 'already-added'; title: string };
+  | { ok: false; reason: 'already-added'; title: string; feedId: Id<'feeds'> };
 
 /** A typed address without a scheme is a website: `theverge.com` means `https://theverge.com` (T21). */
 function withScheme(typed: string): string {
@@ -59,7 +61,7 @@ export const add = action({
 
     // Already followed at this URL: known before fetching anything.
     const following = await ctx.runQuery(internal.feeds.followed, { userId, url: typed });
-    if (following !== null) return { ok: false, reason: 'already-added', title: following };
+    if (following !== null) return { ok: false, reason: 'already-added', ...following };
 
     let feedUrl = typed;
     let outcome: FetchOutcome = await fetchFeed(typed);
@@ -72,7 +74,7 @@ export const add = action({
       meta = siteMeta(outcome.body, outcome.url);
       feedUrl = links[0].url;
       const followingLink = await ctx.runQuery(internal.feeds.followed, { userId, url: feedUrl });
-      if (followingLink !== null) return { ok: false, reason: 'already-added', title: followingLink };
+      if (followingLink !== null) return { ok: false, reason: 'already-added', ...followingLink };
       outcome = await fetchFeed(feedUrl);
     }
     if (outcome._tag === 'Failed') return { ok: false, reason: outcome.reason };
@@ -92,7 +94,7 @@ export const add = action({
       now: Date.now(),
       ...outcome.validators,
     });
-    return stored === null ? { ok: true } : { ok: false, reason: 'already-added', title: stored };
+    return stored === null ? { ok: true } : { ok: false, reason: 'already-added', ...stored };
   },
 });
 
@@ -115,16 +117,18 @@ export const viewer = internalQuery({
   handler: (ctx) => requireUserId(ctx),
 });
 
-/** The name of the User's Feed at this exact URL, or null when they don't follow it. */
+const vFollowed = v.union(v.null(), v.object({ title: v.string(), feedId: v.id('feeds') }));
+
+/** The User's Feed at this exact URL (its name and id), or null when they don't follow it. */
 export const followed = internalQuery({
   args: { userId: v.id('users'), url: v.string() },
-  returns: v.union(v.null(), v.string()),
+  returns: vFollowed,
   handler: async (ctx, { userId, url }) => {
     const feed = await ctx.db
       .query('feeds')
       .withIndex('by_user_url', (q) => q.eq('userId', userId).eq('url', url))
       .first();
-    return feed?.title ?? null;
+    return feed ? { title: feed.title, feedId: feed._id } : null;
   },
 });
 
@@ -156,16 +160,115 @@ export const store = internalMutation({
     now: v.number(),
     ...vValidators,
   },
-  returns: v.union(v.null(), v.string()),
+  returns: vFollowed,
   handler: async (ctx, { userId, url, title, siteUrl, iconUrl, articles, now, etag, lastModified }) => {
     const existing = await ctx.db
       .query('feeds')
       .withIndex('by_user_url', (q) => q.eq('userId', userId).eq('url', url))
       .first();
-    if (existing) return existing.title;
+    if (existing) return { title: existing.title, feedId: existing._id };
     const feedId = await ctx.db.insert('feeds', { userId, url, title, siteUrl, iconUrl });
     await storeNewArticles(ctx, userId, feedId, articles, now);
     await markWorking(ctx, feedId, now, { etag, lastModified });
     return null;
+  },
+});
+
+/** A link's or caller's id as one of the signed-in User's Feeds, or null (Q25). */
+export async function ownFeed(ctx: QueryCtx, userId: Id<'users'>, rawId: string) {
+  // Convex ids are well under 64 characters; longer strings aren't worth normalising.
+  const feedId = rawId.length <= 64 ? ctx.db.normalizeId('feeds', rawId) : null;
+  const feed = feedId ? await ctx.db.get(feedId) : null;
+  return feed && feed.userId === userId ? feed : null;
+}
+
+/** The User's Pinned Feeds in their order, read straight from the Pin index. */
+function pinnedFeeds(ctx: QueryCtx, userId: Id<'users'>) {
+  return ctx.db
+    .query('feeds')
+    .withIndex('by_user_pin', (q) => q.eq('userId', userId).gte('pinOrder', 0))
+    .take(MAX_PINS + 1);
+}
+
+/** A User has at most this many Pinned Feeds (P9). */
+export const MAX_PINS = 3;
+/** Chips are a User's Feeds; more than this many isn't a reading list any more. */
+const CHIP_LIMIT = 200;
+
+/**
+ * The chip row (P5, P9): the signed-in User's Feeds, Pinned first in their order, then the
+ * rest by their newest Article. Never a feed URL (Q9).
+ */
+export const chips = query({
+  args: {},
+  returns: v.array(
+    v.object({ id: v.id('feeds'), title: v.string(), faviconUrl: v.optional(v.string()), pinned: v.boolean() }),
+  ),
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
+    // Pinned Feeds come from their own index, so they're never lost among many Feeds.
+    const pinned = await pinnedFeeds(ctx, userId);
+    const pinnedIds = new Set(pinned.map((feed) => feed._id));
+    const others = (
+      await ctx.db
+        .query('feeds')
+        .withIndex('by_user_url', (q) => q.eq('userId', userId))
+        .take(CHIP_LIMIT)
+    ).filter((feed) => !pinnedIds.has(feed._id));
+    const feeds = [...pinned, ...others];
+    const newest = await Promise.all(
+      feeds.map(async (feed) => {
+        const latest = await ctx.db
+          .query('articles')
+          .withIndex('by_feed_published', (q) => q.eq('feedId', feed._id))
+          .order('desc')
+          .first();
+        return latest?.publishedAt ?? 0;
+      }),
+    );
+    const ranked = feeds.map((feed, i) => ({ feed, newest: newest[i] }));
+    ranked.sort((x, y) => {
+      const xPin = x.feed.pinOrder;
+      const yPin = y.feed.pinOrder;
+      if (xPin !== undefined || yPin !== undefined) {
+        if (xPin === undefined) return 1;
+        if (yPin === undefined) return -1;
+        return xPin - yPin;
+      }
+      return y.newest - x.newest;
+    });
+    return ranked.map(({ feed }) => {
+      const chip: { id: typeof feed._id; title: string; faviconUrl?: string; pinned: boolean } = {
+        id: feed._id,
+        title: feed.title,
+        pinned: feed.pinOrder !== undefined,
+      };
+      const faviconUrl = faviconOf(feed);
+      if (faviconUrl) chip.faviconUrl = faviconUrl;
+      return chip;
+    });
+  },
+});
+
+/** Pins or unpins one of the signed-in User's Feeds (P9). A fourth Pin is refused. */
+export const setPinned = mutation({
+  args: { id: v.string(), pinned: v.boolean() },
+  returns: v.union(
+    v.object({ ok: v.literal(true) }),
+    v.object({ ok: v.literal(false), reason: v.union(v.literal('pins-full'), v.literal('not-found')) }),
+  ),
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const feed = await ownFeed(ctx, userId, args.id);
+    if (!feed) return { ok: false as const, reason: 'not-found' as const };
+    if (!args.pinned) {
+      if (feed.pinOrder !== undefined) await ctx.db.patch(feed._id, { pinOrder: undefined });
+      return { ok: true as const };
+    }
+    if (feed.pinOrder !== undefined) return { ok: true as const };
+    const pins = (await pinnedFeeds(ctx, userId)).map((f) => f.pinOrder ?? 0);
+    if (pins.length >= MAX_PINS) return { ok: false as const, reason: 'pins-full' as const };
+    await ctx.db.patch(feed._id, { pinOrder: Math.max(0, ...pins) + 1 });
+    return { ok: true as const };
   },
 });

@@ -8,6 +8,7 @@ export type { AddFeedReason, Block, OmittedKind, Span };
 /** One Article in All (P12). Never carries a feed URL (Q9). */
 export type ArticleRow = {
   id: string;
+  feedId: string;
   title: string;
   subtitle?: string;
   /** The lead image beside it, when there is one. */
@@ -32,12 +33,18 @@ export type ReadingArticle = {
 };
 
 export type AllView = { status: 'loading' } | { status: 'ready'; articles: ArticleRow[] };
+
+/** One Feed's chip (P5, P9). Never carries a feed URL (Q9). */
+export type FeedChip = { id: string; title: string; faviconUrl?: string; pinned: boolean };
+export type ChipsView = { status: 'loading' } | { status: 'ready'; chips: FeedChip[] };
+/** What Pinning or unpinning came to: a fourth Pin is refused (P9). */
+export type PinOutcome = 'ok' | 'pins-full' | 'not-found';
 export type ArticleView = { status: 'loading' } | { status: 'missing' } | { status: 'ready'; article: ReadingArticle };
 /**
  * What adding a Feed came to: added; already followed at that URL (by its name), which takes
  * the User back to it; or stay, with the view saying why (an error, or feeds to choose from).
  */
-export type AddOutcome = { kind: 'added' } | { kind: 'already'; title: string } | { kind: 'stay' };
+export type AddOutcome = { kind: 'added' } | { kind: 'already'; title: string; feedId: string } | { kind: 'stay' };
 
 /** A feed a site advertises, to choose from (T21). */
 export type FeedChoice = { url: string; title: string };
@@ -54,7 +61,12 @@ export type AddFeedView =
  * a hook, so call them unconditionally, at the top of a component.
  */
 export type FeedsData = {
-  useAll: () => AllView;
+  /** All, or with a Feed's id, only that Feed's Articles (P5). */
+  useAll: (feedId: string | null) => AllView;
+  /** The chip row's Feeds, in order (P9). */
+  useChips: () => ChipsView;
+  /** Pins or unpins a Feed. */
+  useSetPinned: () => (id: string, pinned: boolean) => Promise<PinOutcome>;
   useArticle: (id: string) => ArticleView;
   /** Adding a Feed: where it's up to, and `add`, which resolves to what happened. */
   useAddFeed: () => { view: AddFeedView; add: (url: string) => Promise<AddOutcome> };
@@ -75,9 +87,21 @@ export function useFeedsData(): FeedsData {
 // The adapters' hooks are chosen at runtime, which React Compiler can't follow; calling them
 // from these one-line hooks keeps the bail-out here instead of in every screen.
 
-/** All, from whichever Feeds the app or world provides. */
-export function useAll(): AllView {
+/** All, or one Feed's Articles, from whichever Feeds the app or world provides. */
+export function useAll(feedId: string | null): AllView {
   const { useAll: read } = useFeedsData();
+  return read(feedId);
+}
+
+/** The chip row's Feeds. */
+export function useChips(): ChipsView {
+  const { useChips: read } = useFeedsData();
+  return read();
+}
+
+/** Pinning and unpinning. */
+export function useSetPinned(): ReturnType<FeedsData['useSetPinned']> {
+  const { useSetPinned: read } = useFeedsData();
   return read();
 }
 

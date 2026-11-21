@@ -3,6 +3,8 @@ import { v } from 'convex/values';
 import type { Id } from './_generated/dataModel';
 import { mutation, query, type QueryCtx } from './_generated/server';
 import { requireUserId } from './lib/currentUser';
+import { ownFeed } from './feeds';
+import { faviconOf } from './lib/feed/face';
 import { vBlock, vOmittedKind } from './lib/feed/validators';
 
 /** All shows a User's newest Articles, up to this many: the scrolling budget's 300 (FEE-27). */
@@ -18,8 +20,8 @@ async function feedFaces(ctx: QueryCtx, feedIds: Id<'feeds'>[]) {
     ids.map((id, i) => {
       const feed = feeds[i];
       const face: FeedFace = { title: feed?.title ?? '' };
-      if (feed?.iconUrl) face.faviconUrl = feed.iconUrl;
-      else if (feed?.siteUrl) face.faviconUrl = `${feed.siteUrl}/favicon.ico`;
+      const faviconUrl = feed ? faviconOf(feed) : undefined;
+      if (faviconUrl) face.faviconUrl = faviconUrl;
       return [id, face];
     }),
   );
@@ -33,12 +35,16 @@ async function ownArticle(ctx: QueryCtx, userId: Id<'users'>, rawId: string) {
   return article && article.userId === userId ? article : null;
 }
 
-/** All: every Article from the signed-in User's Feeds, newest first. Never a feed URL (Q9). */
+/**
+ * All: every Article from the signed-in User's Feeds, newest first; with `feedId`, only that
+ * Feed's (P5). The id may come from a link, so any string is checked here (Q25). Never a feed URL (Q9).
+ */
 export const all = query({
-  args: {},
+  args: { feedId: v.optional(v.string()) },
   returns: v.array(
     v.object({
       id: v.id('articles'),
+      feedId: v.id('feeds'),
       title: v.string(),
       subtitle: v.optional(v.string()),
       imageUrl: v.optional(v.string()),
@@ -48,18 +54,30 @@ export const all = query({
       read: v.boolean(),
     }),
   ),
-  handler: async (ctx) => {
+  handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    const articles = await ctx.db
-      .query('articles')
-      .withIndex('by_user_published', (q) => q.eq('userId', userId))
-      .order('desc')
-      .take(ALL_LIMIT);
+    let articles;
+    if (args.feedId === undefined) {
+      articles = await ctx.db
+        .query('articles')
+        .withIndex('by_user_published', (q) => q.eq('userId', userId))
+        .order('desc')
+        .take(ALL_LIMIT);
+    } else {
+      const feed = await ownFeed(ctx, userId, args.feedId);
+      if (!feed) return [];
+      articles = await ctx.db
+        .query('articles')
+        .withIndex('by_feed_published', (q) => q.eq('feedId', feed._id))
+        .order('desc')
+        .take(ALL_LIMIT);
+    }
     const faces = await feedFaces(ctx, articles.map((a) => a.feedId));
     return articles.map((a) => {
       const face = faces.get(a.feedId);
       return {
         id: a._id,
+        feedId: a.feedId,
         title: a.title,
         subtitle: a.subtitle,
         imageUrl: a.imageUrl,
