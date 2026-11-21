@@ -50,3 +50,16 @@ export const vAddFeedReason = v.union(
 );
 
 export type AddFeedReason = Infer<typeof vAddFeedReason>;
+
+/** An Article as a fetch hands it to be stored: fields and its cleaned content. */
+export const vStoredArticle = v.object({
+  guid: v.string(),
+  title: v.string(),
+  link: v.optional(v.string()),
+  subtitle: v.optional(v.string()),
+  publishedAt: v.number(),
+  blocks: v.array(vBlock),
+  omitted: v.array(vOmittedKind),
+});
+
+export type StoredArticle = Infer<typeof vStoredArticle>;

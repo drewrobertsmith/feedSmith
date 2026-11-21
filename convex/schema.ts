@@ -13,7 +13,19 @@ export default defineSchema({
     userId: v.id('users'),
     url: v.string(),
     title: v.string(),
-  }).index('by_user_url', ['userId', 'url']),
+    /** Whether its last fetch worked (P15). Optional only for Feeds stored before FEE-24. */
+    status: v.optional(v.union(v.literal('working'), v.literal('failing'))),
+    /** Failed fetches in a row; each backs the next try off further (Q7). */
+    failures: v.optional(v.number()),
+    lastFetchedAt: v.optional(v.number()),
+    /** When it's next due (T19). Unset means due now. */
+    nextFetchAt: v.optional(v.number()),
+    /** What the Feed said about its version last time, sent back on the next check (T19). */
+    etag: v.optional(v.string()),
+    lastModified: v.optional(v.string()),
+  })
+    .index('by_user_url', ['userId', 'url'])
+    .index('by_next_fetch', ['nextFetchAt']),
   /** A User's Articles: what All lists. Their content lives in `articleBodies`. */
   articles: defineTable({
     userId: v.id('users'),
@@ -25,7 +37,9 @@ export default defineSchema({
     publishedAt: v.number(),
   })
     .index('by_user_published', ['userId', 'publishedAt'])
-    .index('by_feed_guid', ['feedId', 'guid']),
+    .index('by_feed_guid', ['feedId', 'guid'])
+    .index('by_feed_published', ['feedId', 'publishedAt'])
+    .index('by_published', ['publishedAt']),
   /**
    * An Article's content as cleaned blocks (T17), apart from the Article so All reads
    * only titles and dates, never the bodies.
