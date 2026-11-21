@@ -64,6 +64,7 @@ export const add = action({
       outcome = await fetchFeed(feedUrl);
     }
     if (outcome._tag === 'Failed') return { ok: false, reason: outcome.reason };
+    // A feed link that led to another page: links are followed one level only (T21).
     if (outcome._tag === 'Page') return { ok: false, reason: 'not-a-feed' };
     // Without validators of ours, a "not modified" answer is no answer at all.
     if (outcome._tag === 'NotModified') return { ok: false, reason: 'unreachable' };

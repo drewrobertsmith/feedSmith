@@ -41,7 +41,7 @@ function heads(html: string) {
   return { links, metas, title };
 }
 
-const rels = (el: Element) => (el.attribs.rel ?? '').toLowerCase().split(/\s+/);
+const rels = (el: Element) => new Set((el.attribs.rel ?? '').toLowerCase().split(/\s+/));
 
 /**
  * The feeds a page advertises with <link rel="alternate">, resolved against the page and
@@ -51,7 +51,7 @@ export function findFeedLinks(html: string, pageUrl: string): FeedLink[] {
   const found = new Map<string, FeedLink>();
   for (const link of heads(html).links) {
     if (found.size >= MAX_FEED_LINKS) break;
-    if (!rels(link).includes('alternate') || !FEED_TYPES.has((link.attribs.type ?? '').toLowerCase())) continue;
+    if (!rels(link).has('alternate') || !FEED_TYPES.has((link.attribs.type ?? '').toLowerCase())) continue;
     const url = safeUrl(link.attribs.href ?? '', pageUrl);
     if (!url || found.has(url.href)) continue;
     const title = plain(link.attribs.title, MAX_TITLE) ?? `${url.host}${url.pathname}`.slice(0, MAX_TITLE);
@@ -68,17 +68,11 @@ export function siteMeta(html: string, pageUrl: string): SiteMeta {
   const name = plain(meta('property', 'og:site_name'), MAX_TITLE) ?? plain(meta('name', 'application-name'), MAX_TITLE) ?? plain(title, MAX_TITLE);
 
   const iconHref =
-    links.find((l) => rels(l).includes('apple-touch-icon'))?.attribs.href ??
-    links.find((l) => rels(l).includes('icon'))?.attribs.href;
-  let iconUrl: string | undefined;
-  if (iconHref) {
-    try {
-      const url = new URL(iconHref.trim(), pageUrl);
-      if (url.protocol === 'https:' && url.href.length <= MAX_ICON_URL) iconUrl = url.href;
-    } catch {
-      // Not an address: no icon.
-    }
-  }
+    links.find((l) => rels(l).has('apple-touch-icon'))?.attribs.href ??
+    links.find((l) => rels(l).has('icon'))?.attribs.href;
+  // The phone loads the icon, so it meets the fetch policy too (T18): no local or IP hosts.
+  const icon = iconHref ? safeUrl(iconHref, pageUrl) : null;
+  const iconUrl = icon && icon.href.length <= MAX_ICON_URL ? icon.href : undefined;
 
   const out: SiteMeta = {};
   if (name) out.name = name;

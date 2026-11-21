@@ -69,6 +69,9 @@ describe("a site's name and icon (T21)", () => {
     expect(siteMeta(head('<link rel="shortcut icon" href="/favicon.png">'), PAGE).iconUrl).toBe('https://www.example.com/favicon.png');
     expect(siteMeta(head('<link rel="icon" href="http://www.example.com/i.png">'), PAGE).iconUrl).toBeUndefined();
     expect(siteMeta(head('<link rel="icon" href="data:image/png;base64,AAAA">'), PAGE).iconUrl).toBeUndefined();
+    // The phone loads it: never a local-network or IP address (T18).
+    expect(siteMeta(head('<link rel="icon" href="https://192.168.0.1/i.png">'), PAGE).iconUrl).toBeUndefined();
+    expect(siteMeta(head('<link rel="icon" href="https://localhost/i.png">'), PAGE).iconUrl).toBeUndefined();
   });
 
   test('a name is plain and capped', () => {
