@@ -5,5 +5,5 @@ export default defineSchema({
   users: defineTable({
     email: v.string(),
     name: v.optional(v.string()),
-  }).index('by_email', ['email']),
+  }),
 });
