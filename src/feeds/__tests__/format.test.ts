@@ -10,7 +10,7 @@ beforeAll(() => {
   delete Intl.RelativeTimeFormat;
 });
 afterAll(() => {
-  Intl.RelativeTimeFormat = original;
+  Object.defineProperty(Intl, 'RelativeTimeFormat', { value: original, configurable: true, writable: true });
 });
 
 const load = () => {

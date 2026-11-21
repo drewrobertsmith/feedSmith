@@ -11,7 +11,7 @@ const MAX_FEED_TITLE = 200;
 const MAX_TITLE = 300;
 const MAX_SUBTITLE = 500;
 const MAX_GUID = 500;
-const MAX_IMAGE_URL = 2048;
+export const MAX_IMAGE_URL = 2048;
 
 export type ParsedArticle = {
   guid: string;

@@ -59,7 +59,10 @@ export const forRefresh = internalQuery({
   returns: v.union(v.null(), v.object({ url: v.string(), ...vValidators })),
   handler: async (ctx, { feedId }) => {
     const feed = await ctx.db.get(feedId);
-    return feed ? { url: feed.url, etag: feed.etag, lastModified: feed.lastModified } : null;
+    if (!feed) return null;
+    // A Feed stored before it knew its site is fetched in full once, so it learns it (FEE-27).
+    if (!feed.siteUrl) return { url: feed.url };
+    return { url: feed.url, etag: feed.etag, lastModified: feed.lastModified };
   },
 });
 

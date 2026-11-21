@@ -32,6 +32,7 @@ function FeedMark({ title, faviconUrl }: { title: string; faviconUrl?: string })
       <Image
         testID="row-favicon"
         source={{ uri: faviconUrl }}
+        recyclingKey={faviconUrl}
         onError={() => setFailed(true)}
         accessible={false}
         className="rounded-sm"
@@ -64,7 +65,8 @@ function Row({ article }: { article: ArticleRow }) {
     >
       <View className="flex-1 gap-inside">
         <View className="flex-row items-center gap-related">
-          <FeedMark title={article.feedTitle} faviconUrl={article.faviconUrl} />
+          {/* Keyed by favicon, so a failed load never carries over to another Feed's row. */}
+          <FeedMark key={article.faviconUrl ?? article.feedTitle} title={article.feedTitle} faviconUrl={article.faviconUrl} />
           <AppText variant="label" className="shrink text-text-muted" numberOfLines={1}>
             {article.feedTitle}
           </AppText>

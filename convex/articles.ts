@@ -5,8 +5,8 @@ import { mutation, query, type QueryCtx } from './_generated/server';
 import { requireUserId } from './lib/currentUser';
 import { vBlock, vOmittedKind } from './lib/feed/validators';
 
-/** All shows a User's newest Articles, up to this many. */
-const ALL_LIMIT = 200;
+/** All shows a User's newest Articles, up to this many: the scrolling budget's 300 (FEE-27). */
+const ALL_LIMIT = 300;
 
 type FeedFace = { title: string; faviconUrl?: string };
 

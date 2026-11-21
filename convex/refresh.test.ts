@@ -23,7 +23,7 @@ const URL_A = 'https://a.example.com/feed';
 
 /** An RSS document with these Articles, `ago` milliseconds before now. */
 const rss = (items: { guid: string; ago: number; title?: string }[], now = Date.now()) =>
-  `<rss version="2.0"><channel><title>Example</title>${items
+  `<rss version="2.0"><channel><title>Example</title><link>https://a.example.com/</link>${items
     .map(
       ({ guid, ago, title }) =>
         `<item><title>${title ?? guid}</title><guid>${guid}</guid><pubDate>${new Date(now - ago).toUTCString()}</pubDate></item>`,
@@ -122,6 +122,36 @@ describe('conditional requests (T19)', () => {
     expect(headers.get('if-none-match')).toBe('"v1"');
     expect(await feedOf(s, feed._id)).toMatchObject({ status: 'working', lastFetchedAt: START + HOUR, etag: '"v1"' });
     expect(await s.a.query(api.articles.all, {})).toHaveLength(1);
+  });
+});
+
+describe('Feeds and Articles stored before rows were complete (FEE-27)', () => {
+  test("a Feed without its site is fetched in full, not asked for a 304, so it learns its site", async () => {
+    const s = await setup();
+    const feed = await follow(s, [{ guid: 'g1', ago: HOUR }], { etag: '"v1"' });
+    await s.t.run((ctx) => ctx.db.patch(feed._id, { siteUrl: undefined }));
+    network.mockImplementation(
+      async () =>
+        new Response(
+          `<rss version="2.0"><channel><title>T</title><link>https://site.example.com/</link><item><title>g1</title><guid>g1</guid></item></channel></rss>`,
+        ),
+    );
+    await refresh(s, feed._id);
+    expect(new Headers(network.mock.calls.at(-1)![1].headers).get('if-none-match')).toBeNull();
+    expect((await feedOf(s, feed._id))!.siteUrl).toBe('https://site.example.com');
+  });
+
+  test('an Article stored without a lead image gains one when its Feed has it', async () => {
+    const s = await setup();
+    const feed = await follow(s, [{ guid: 'g1', ago: HOUR }]);
+    network.mockImplementation(
+      async () =>
+        new Response(
+          `<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/"><channel><title>T</title><item><title>g1</title><guid>g1</guid><media:thumbnail url="https://cdn.example.com/g1.jpg"/></item></channel></rss>`,
+        ),
+    );
+    await refresh(s, feed._id);
+    expect((await s.a.query(api.articles.all, {}))[0].imageUrl).toBe('https://cdn.example.com/g1.jpg');
   });
 });
 
