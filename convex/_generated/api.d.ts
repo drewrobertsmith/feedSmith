@@ -10,6 +10,8 @@
 
 import type * as auth from "../auth.js";
 import type * as http from "../http.js";
+import type * as lib_appReturn from "../lib/appReturn.js";
+import type * as lib_authErrors from "../lib/authErrors.js";
 import type * as lib_currentUser from "../lib/currentUser.js";
 import type * as lib_signUp from "../lib/signUp.js";
 import type * as users from "../users.js";
@@ -23,6 +25,8 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   http: typeof http;
+  "lib/appReturn": typeof lib_appReturn;
+  "lib/authErrors": typeof lib_authErrors;
   "lib/currentUser": typeof lib_currentUser;
   "lib/signUp": typeof lib_signUp;
   users: typeof users;

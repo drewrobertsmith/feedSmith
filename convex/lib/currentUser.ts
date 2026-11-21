@@ -2,6 +2,7 @@ import { getAuthUserId } from '@convex-dev/auth/server';
 import { ConvexError } from 'convex/values';
 
 import type { Id } from '../_generated/dataModel';
+import { AUTH_ERRORS } from './authErrors';
 import type { QueryCtx } from '../_generated/server';
 
 /**
@@ -10,6 +11,6 @@ import type { QueryCtx } from '../_generated/server';
  */
 export async function requireUserId(ctx: QueryCtx): Promise<Id<'users'>> {
   const userId = await getAuthUserId(ctx);
-  if (userId === null) throw new ConvexError('SIGNED_OUT');
+  if (userId === null) throw new ConvexError(AUTH_ERRORS.signedOut);
   return userId;
 }

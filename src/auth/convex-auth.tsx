@@ -6,6 +6,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useState, type ReactNode } from 'react';
 
 import { api } from '../../convex/_generated/api';
+import { APP_RETURN } from '../../convex/lib/appReturn';
 import { AuthContext, type Auth } from '@/auth/auth-context';
 import { signInOutcome, type SignInView } from '@/auth/sign-in-outcome';
 
@@ -13,8 +14,7 @@ import { signInOutcome, type SignInView } from '@/auth/sign-in-outcome';
  * Convex Auth accepts only http(s) return addresses, so Google returns to this
  * deployment's site, which forwards to the app's return link (convex/http.ts).
  */
-const RETURN_VIA = `${process.env.EXPO_PUBLIC_CONVEX_SITE_URL}/auth/app`;
-const APP_RETURN = 'feedsmith://auth';
+const SIGN_IN_FORWARDER = `${process.env.EXPO_PUBLIC_CONVEX_SITE_URL}/auth/app`;
 
 /** Session tokens live in the phone's secure storage, never in plain storage (Q11). */
 const secureStorage = {
@@ -33,7 +33,7 @@ function ConvexAuthBridge({ children }: { children: ReactNode }) {
     signIn: view,
     startSignIn: async () => {
       setView({ status: 'busy' });
-      const start = await signIn({ redirectTo: RETURN_VIA });
+      const start = await signIn({ redirectTo: SIGN_IN_FORWARDER });
       if (start.status !== 'redirect') return setView(signInOutcome(start));
       const browser = await WebBrowser.openAuthSessionAsync(start.redirect.toString(), APP_RETURN);
       // On success the return link reaches the auth route, which finishes sign-in.

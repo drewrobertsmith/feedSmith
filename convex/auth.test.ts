@@ -3,7 +3,7 @@ import { convexTest } from 'convex-test';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { internal } from './_generated/api';
-import { canSignUp } from './lib/signUp';
+import { allowedSignUpEmail } from './lib/signUp';
 import { requireUserId } from './lib/currentUser';
 import schema from './schema';
 
@@ -33,7 +33,7 @@ describe('who may sign up (T15)', () => {
     ['the list is empty', 'reader@example.com', true, '', false],
     ['the list is not set', 'reader@example.com', true, undefined, false],
   ])('%s', (_case, email, emailVerified, allowlist, allowed) => {
-    expect(canSignUp({ email, emailVerified }, allowlist)).toBe(allowed);
+    expect(allowedSignUpEmail({ email, emailVerified }, allowlist)).toBe(allowed ? email!.trim().toLowerCase() : null);
   });
 });
 

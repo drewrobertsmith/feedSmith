@@ -7,6 +7,9 @@ import { AppText } from '@/components/app-text';
 import { GoogleSignInButton } from '@/screens/sign-in/google-button';
 import { spacing } from '@/theme/spacing';
 
+/** The mark, at the size of Android's launcher icon art. */
+const MARK_SIZE = 96;
+
 const ERRORS = {
   'not-allowed': 'This Google account can’t use feedSmith yet.',
   failed: 'Couldn’t sign in. Check your connection and try again.',
@@ -23,7 +26,7 @@ export function SignInScreen() {
       style={{ paddingTop: insets.top + spacing.section, paddingBottom: insets.bottom + spacing.section }}
     >
       <View className="flex-1 justify-center gap-group">
-        <Image source={require('../../../assets/images/splash-icon.png')} style={{ width: 96, height: 96 }} accessible={false} />
+        <Image source={require('../../../assets/images/splash-icon.png')} style={{ width: MARK_SIZE, height: MARK_SIZE }} accessible={false} />
         <View className="gap-related">
           <AppText variant="title">feedSmith</AppText>
           <AppText variant="reading" className="text-text-muted">

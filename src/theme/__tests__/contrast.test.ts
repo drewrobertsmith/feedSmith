@@ -1,3 +1,4 @@
+import { googleButton } from '@/theme/google';
 import { contrastRatio, palette, TEXT_ROLES, SURFACE_ROLES, themes } from '@/theme/tokens';
 
 describe('contrastRatio', () => {
@@ -35,4 +36,10 @@ test('Sage is never a text colour on Midnight', () => {
   for (const role of TEXT_ROLES) {
     expect(themes.dark[role]).not.toBe('#50716C');
   }
+});
+
+// Q14: Google's own button (D10) keeps its label readable in both themes.
+test.each(['dark', 'light'] as const)('the Google button label meets WCAG AA in %s', (scheme) => {
+  const { label, background } = googleButton[scheme];
+  expect(contrastRatio(label, background)).toBeGreaterThanOrEqual(4.5);
 });

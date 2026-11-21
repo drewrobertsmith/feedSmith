@@ -1,9 +1,8 @@
 import { httpRouter } from 'convex/server';
 
 import { httpAction } from './_generated/server';
+import { APP_RETURN } from './lib/appReturn';
 
-/** Where Google's sign-in hands back to the app. Fixed: never taken from the request. */
-const APP_RETURN = 'feedsmith://auth';
 /** The only parameters passed through: Convex Auth's one-time code, or its error. */
 const FORWARDED = ['convexAuthCode', 'convexAuthError'] as const;
 

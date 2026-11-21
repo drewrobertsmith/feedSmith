@@ -1,5 +1,7 @@
 import { ConvexError } from 'convex/values';
 
+import { AUTH_ERRORS } from '../../convex/lib/authErrors';
+
 /** What the sign-in screen shows. */
 export type SignInView =
   | { status: 'idle' }
@@ -19,6 +21,6 @@ export function signInOutcome(result: SignInResult): SignInView {
   if (result.status !== 'error') return { status: 'idle' };
   const { error, cause } = result.userError;
   if (error === 'ACCESS_DENIED') return { status: 'idle' };
-  if (cause instanceof ConvexError && cause.data === 'NOT_ALLOWED') return { status: 'error', kind: 'not-allowed' };
+  if (cause instanceof ConvexError && cause.data === AUTH_ERRORS.notAllowed) return { status: 'error', kind: 'not-allowed' };
   return { status: 'error', kind: 'failed' };
 }
