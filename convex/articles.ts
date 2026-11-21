@@ -9,9 +9,9 @@ import { vBlock, vOmittedKind } from './lib/feed/validators';
 const ALL_LIMIT = 200;
 
 async function feedTitles(ctx: QueryCtx, feedIds: Id<'feeds'>[]) {
-  const titles = new Map<Id<'feeds'>, string>();
-  for (const id of new Set(feedIds)) titles.set(id, (await ctx.db.get(id))?.title ?? '');
-  return titles;
+  const ids = [...new Set(feedIds)];
+  const feeds = await Promise.all(ids.map((id) => ctx.db.get(id)));
+  return new Map(ids.map((id, i) => [id, feeds[i]?.title ?? ''] as const));
 }
 
 /** All: every Article from the signed-in User's Feeds, newest first. Never a feed URL (Q9). */

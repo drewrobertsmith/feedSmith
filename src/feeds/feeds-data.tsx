@@ -42,3 +42,24 @@ export function useFeedsData(): FeedsData {
   if (!feeds) throw new Error('useFeedsData needs a feeds provider above it');
   return feeds;
 }
+
+// The adapters' hooks are chosen at runtime, which React Compiler can't follow; calling them
+// from these one-line hooks keeps the bail-out here instead of in every screen.
+
+/** All, from whichever Feeds the app or world provides. */
+export function useAll(): AllView {
+  const { useAll: read } = useFeedsData();
+  return read();
+}
+
+/** One Article for the Reading view. */
+export function useArticle(id: string): ArticleView {
+  const { useArticle: read } = useFeedsData();
+  return read(id);
+}
+
+/** Adding a Feed. */
+export function useAddFeed(): ReturnType<FeedsData['useAddFeed']> {
+  const { useAddFeed: read } = useFeedsData();
+  return read();
+}

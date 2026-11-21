@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/app-button';
 import { AppText } from '@/components/app-text';
-import { useFeedsData } from '@/feeds/feeds-data';
+import { useArticle } from '@/feeds/feeds-data';
 import { publishedDate } from '@/feeds/format';
 import { ArticleBlocks } from '@/screens/reading/article-blocks';
 import { spacing } from '@/theme/spacing';
@@ -26,7 +26,7 @@ export function ArticleMissing() {
 /** The Reading view: one Article's title, Feed, date and text (P13; polish comes in FEE-28). */
 export function ReadingScreen({ id }: { id: string }) {
   const insets = useSafeAreaInsets();
-  const view = useFeedsData().useArticle(id);
+  const view = useArticle(id);
 
   if (view.status === 'missing') return <ArticleMissing />;
   if (view.status === 'loading') return <View className="flex-1 bg-background" />;

@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppButton } from '@/components/app-button';
 import { AppText } from '@/components/app-text';
 import { useEnvironment } from '@/environment';
-import { useFeedsData, type AddFeedReason } from '@/feeds/feeds-data';
+import { useAddFeed, type AddFeedReason } from '@/feeds/feeds-data';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
 import { typeScale } from '@/theme/type';
@@ -25,7 +25,7 @@ const ERRORS: Record<AddFeedReason, string> = {
 export function AddFeedScreen() {
   const insets = useSafeAreaInsets();
   const { colorScheme, fontScale } = useEnvironment();
-  const { view, add } = useFeedsData().useAddFeed();
+  const { view, add } = useAddFeed();
   const [url, setUrl] = useState('');
   const busy = view.status === 'busy';
   const field = typeScale.reading;

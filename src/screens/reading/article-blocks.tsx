@@ -1,14 +1,9 @@
 import { Image } from 'expo-image';
-import * as WebBrowser from 'expo-web-browser';
 import { Text, View } from 'react-native';
 
 import { AppText } from '@/components/app-text';
 import type { Block, OmittedKind, Span } from '@/feeds/feeds-data';
-
-/** Opens a link in the browser, never inside the app (Q8). Only https links exist (T17). */
-export function openLink(url: string) {
-  if (url.startsWith('https://')) void WebBrowser.openBrowserAsync(url);
-}
+import { openLink } from '@/feeds/open-link';
 
 const OMITTED: Record<OmittedKind, string> = {
   video: 'A video isn’t shown here.',

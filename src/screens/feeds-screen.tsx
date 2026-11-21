@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/app-button';
 import { AppText } from '@/components/app-text';
-import { useFeedsData, type ArticleRow } from '@/feeds/feeds-data';
+import { useAll, type ArticleRow } from '@/feeds/feeds-data';
 import { publishedDate } from '@/feeds/format';
 import { useEnvironment } from '@/environment';
 import { spacing } from '@/theme/spacing';
@@ -39,7 +39,7 @@ function Row({ article }: { article: ArticleRow }) {
 /** The Feeds section: All, every Article newest first (Q1; titles only until FEE-27). */
 export function FeedsScreen() {
   const insets = useSafeAreaInsets();
-  const all = useFeedsData().useAll();
+  const all = useAll();
   const empty = all.status === 'ready' && all.articles.length === 0;
 
   const header = (

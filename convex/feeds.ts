@@ -101,7 +101,7 @@ export const store = internalMutation({
       .first();
     if (existing) return 'already-added' as const;
     const feedId = await ctx.db.insert('feeds', { userId, url, title });
-    for (const article of articles) await ctx.db.insert('articles', { userId, feedId, ...article });
+    await Promise.all(articles.map((article) => ctx.db.insert('articles', { userId, feedId, ...article })));
     return 'stored' as const;
   },
 });
