@@ -4,7 +4,9 @@ import { Uniwind } from 'uniwind';
 import TabsLayout from '@/app/(tabs)/_layout';
 import FeedsRoute from '@/app/(tabs)/index';
 import SavedRoute from '@/app/(tabs)/saved';
+import AuthReturnRoute from '@/app/auth';
 import GalleryRoute from '@/app/gallery';
+import SignInRoute from '@/app/sign-in';
 import { MotionConfig } from '@/environment/motion-config';
 import { AppRoot } from '@/navigation/app-root';
 import { SHELL_WORLDS, type ShellWorldId } from '@/worlds/catalog';
@@ -36,11 +38,13 @@ test.each(SHELL_WORLDS)('$label', async ({ id, spec }) => {
 
   await renderRouter(
     {
-      _layout: () => <AppRoot environment={world.environment} />,
+      _layout: () => <AppRoot environment={world.environment} auth={world.auth} />,
       '(tabs)/_layout': TabsLayout,
       '(tabs)/index': FeedsRoute,
       '(tabs)/saved': SavedRoute,
       gallery: GalleryRoute,
+      'sign-in': SignInRoute,
+      auth: AuthReturnRoute,
     },
     { initialUrl: world.initialUrl },
   );
