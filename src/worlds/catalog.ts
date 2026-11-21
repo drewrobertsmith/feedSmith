@@ -37,6 +37,7 @@ export type SignInWorldId = (typeof SIGN_IN_WORLDS)[number]['id'];
 export const ALL_WORLDS = [
   { id: 'all-dark', label: 'All, dark', spec: { colorScheme: 'dark', feeds: 'some' } },
   { id: 'all-light', label: 'All, light', spec: { colorScheme: 'light', feeds: 'some' } },
+  { id: 'all-read', label: 'All, everything Read', spec: { colorScheme: 'dark', feeds: 'read' } },
   { id: 'all-empty', label: 'No Feeds yet', spec: { colorScheme: 'dark', feeds: 'none' } },
   { id: 'all-loading', label: 'All, loading', spec: { colorScheme: 'dark', feeds: 'loading' } },
   { id: 'all-refreshing', label: 'All, refreshing', spec: { colorScheme: 'light', feeds: 'some', refreshing: true } },

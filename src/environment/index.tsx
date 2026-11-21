@@ -11,6 +11,8 @@ export type Environment = {
   reduceMotion: boolean;
   /** Multiplies the type scale. 1 in the app, where Android's own font size applies on top. */
   fontScale: number;
+  /** The clock: the phone's in the app, a fixed time in a world, so "2 hr. ago" can be tested. */
+  now: () => number;
 };
 
 const EnvironmentContext = createContext<Environment | null>(null);
@@ -43,7 +45,12 @@ function SystemEnvironment({ children }: { children: ReactNode }) {
   const scheme = useColorScheme();
   const reduceMotion = useSystemReduceMotion();
   // Dark is designed first (D3), so it's the fallback when the phone doesn't say.
-  const environment: Environment = { colorScheme: scheme === 'light' ? 'light' : 'dark', reduceMotion, fontScale: 1 };
+  const environment: Environment = {
+    colorScheme: scheme === 'light' ? 'light' : 'dark',
+    reduceMotion,
+    fontScale: 1,
+    now: Date.now,
+  };
   return <Provide environment={environment}>{children}</Provide>;
 }
 

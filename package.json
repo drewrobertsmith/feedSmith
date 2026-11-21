@@ -7,6 +7,7 @@
     "@expo-google-fonts/instrument-sans": "0.4.2",
     "@expo-google-fonts/literata": "0.4.3",
     "@expo/ui": "~58.0.29",
+    "@legendapp/list": "3.7.1",
     "@sentry/react-native": "8.28.0",
     "convex": "1.49.0",
     "domhandler": "6.0.1",

@@ -4,7 +4,7 @@ import type { Auth } from '@/auth/auth-context';
 import type { SignInView } from '@/auth/sign-in-outcome';
 import type { Environment } from '@/environment';
 import type { AddFeedReason, AddFeedView, ArticleView, FeedsData } from '@/feeds/feeds-data';
-import { FIXTURE_ARTICLE, FIXTURE_OMITTED_ARTICLE, FIXTURE_ROWS } from '@/worlds/fixtures';
+import { FIXTURE_ARTICLE, FIXTURE_NOW, FIXTURE_OMITTED_ARTICLE, FIXTURE_READ_ROWS, FIXTURE_ROWS } from '@/worlds/fixtures';
 import type { ThemeName } from '@/theme/tokens';
 
 /**
@@ -20,8 +20,8 @@ export type WorldSpec = {
   section?: 'feeds' | 'saved' | 'add-feed' | 'article';
   /** Where the User is in signing in. Defaults to signed in. */
   auth?: 'signed-in' | 'signed-out' | 'signing-in' | 'not-allowed' | 'failed';
-  /** What All holds. Defaults to no Feeds yet. */
-  feeds?: 'none' | 'loading' | 'some';
+  /** What All holds. Defaults to no Feeds yet. `read` is every Article already Read. */
+  feeds?: 'none' | 'loading' | 'some' | 'read';
   /** Where adding a Feed is up to. Defaults to idle, where adding succeeds. */
   addFeed?: 'idle' | 'busy' | AddFeedReason;
   /** Whether a pull-down refresh is under way. */
@@ -31,13 +31,13 @@ export type WorldSpec = {
 };
 
 /** What a world's fake Feeds were asked to do. */
-export type FeedsLog = { added: string[]; refreshes: number };
+export type FeedsLog = { added: string[]; refreshes: number; read: string[] };
 
 /** What a world's fake auth was asked to do. */
 export type SignInLog = { starts: number; completions: { code?: string; error?: string }[] };
 
 /** A world's Feeds and Articles: fixture data, and a log of what it's asked. */
-export function worldFeeds(spec: WorldSpec, log: FeedsLog = { added: [], refreshes: 0 }): FeedsData {
+export function worldFeeds(spec: WorldSpec, log: FeedsLog = { added: [], refreshes: 0, read: [] }): FeedsData {
   const feeds = spec.feeds ?? 'none';
   const addFeed = spec.addFeed ?? 'idle';
   const article = spec.article ?? 'full';
@@ -54,7 +54,7 @@ export function worldFeeds(spec: WorldSpec, log: FeedsLog = { added: [], refresh
     useAll: () =>
       feeds === 'loading'
         ? { status: 'loading' }
-        : { status: 'ready', articles: feeds === 'some' ? FIXTURE_ROWS : [] },
+        : { status: 'ready', articles: feeds === 'some' ? FIXTURE_ROWS : feeds === 'read' ? FIXTURE_READ_ROWS : [] },
     useArticle: () => articleView,
     useAddFeed: () => ({
       view: addView,
@@ -64,6 +64,9 @@ export function worldFeeds(spec: WorldSpec, log: FeedsLog = { added: [], refresh
         return addFeed === 'busy' ? new Promise(() => {}) : Promise.resolve(addFeed === 'idle');
       },
     }),
+    useMarkRead: () => (id) => {
+      log.read.push(id);
+    },
     useRefresh: () => ({
       refreshing: spec.refreshing ?? false,
       refresh: async () => {
@@ -90,7 +93,12 @@ export type World = {
 
 /** The environment a world gives the app, without applying anything. */
 export function worldEnvironment(spec: WorldSpec): Environment {
-  return { colorScheme: spec.colorScheme, reduceMotion: spec.reduceMotion ?? false, fontScale: spec.fontScale ?? 1 };
+  return {
+    colorScheme: spec.colorScheme,
+    reduceMotion: spec.reduceMotion ?? false,
+    fontScale: spec.fontScale ?? 1,
+    now: () => FIXTURE_NOW,
+  };
 }
 
 const SIGN_IN_VIEWS: Record<NonNullable<WorldSpec['auth']>, SignInView> = {
@@ -127,7 +135,7 @@ export function createWorld(spec: WorldSpec): World {
   Uniwind.setTheme(spec.colorScheme);
   const signInLog: SignInLog = { starts: 0, completions: [] };
   const signedIn = (spec.auth ?? 'signed-in') === 'signed-in';
-  const feedsLog: FeedsLog = { added: [], refreshes: 0 };
+  const feedsLog: FeedsLog = { added: [], refreshes: 0, read: [] };
 
   return {
     environment: worldEnvironment(spec),

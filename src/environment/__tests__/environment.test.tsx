@@ -54,7 +54,7 @@ test('a given environment replaces the phone', async () => {
   jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(false);
 
   await render(
-    <EnvironmentProvider environment={{ colorScheme: 'light', reduceMotion: true, fontScale: 2 }}>
+    <EnvironmentProvider environment={{ colorScheme: 'light', reduceMotion: true, fontScale: 2, now: Date.now }}>
       <Probe />
     </EnvironmentProvider>,
   );

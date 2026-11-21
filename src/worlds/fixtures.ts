@@ -5,18 +5,46 @@ const day = (d: number) => Date.UTC(2026, 10, d, 12);
 
 const VERGE = 'The Verge';
 
-/** All, as a few Feeds would fill it: newest first, one long title among them. */
+/** Two hours after the newest fixture Article: the "now" fixture rows are seen from. */
+export const FIXTURE_NOW = Date.UTC(2026, 10, 21, 14);
+
+const VERGE_FACE = { feedTitle: VERGE, faviconUrl: 'https://www.theverge.com/favicon.ico' };
+
+/**
+ * All, as a few Feeds would fill it: newest first, with every kind of row (P12): image and
+ * Subtitle, no image, no Subtitle, a long title, a Feed with no favicon, and one Read.
+ */
 export const FIXTURE_ROWS: ArticleRow[] = [
-  { id: 'a1', title: 'The UN fails to agree on rules regulating ‘killer robots’', feedTitle: VERGE, publishedAt: day(21) },
-  { id: 'a2', title: 'The FBI and USDA were reportedly hacked', feedTitle: VERGE, publishedAt: day(20) },
+  {
+    id: 'a1',
+    title: 'The UN fails to agree on rules regulating ‘killer robots’',
+    subtitle: 'Countries agree to ‘start discussing options’ for rules around autonomous weapons.',
+    imageUrl: 'https://platform.theverge.com/wp-content/uploads/sites/2/chorus/uploads/chorus_asset/file/13611631/503831564.jpg.jpg',
+    ...VERGE_FACE,
+    publishedAt: day(21),
+    read: false,
+  },
+  {
+    id: 'a2',
+    title: 'The FBI and USDA were reportedly hacked',
+    subtitle: 'Investigators say the intrusions began months ago and reached systems holding staff records.',
+    ...VERGE_FACE,
+    publishedAt: day(20),
+    read: true,
+  },
   {
     id: 'a3',
     title: 'Amazon’s first digital photo frame is up to 50 percent off for Black Friday, and it’s the cheapest it has ever been',
-    feedTitle: VERGE,
+    imageUrl: 'https://platform.theverge.com/wp-content/uploads/sites/2/2026/11/frame.jpg',
+    ...VERGE_FACE,
     publishedAt: day(19),
+    read: false,
   },
-  { id: 'a4', title: 'A quiet guide to slow reading', feedTitle: 'Calm Notes', publishedAt: day(17) },
+  { id: 'a4', title: 'A quiet guide to slow reading', feedTitle: 'Calm Notes', publishedAt: day(17), read: false },
 ];
+
+/** Every Article in All Read. */
+export const FIXTURE_READ_ROWS: ArticleRow[] = FIXTURE_ROWS.map((row) => ({ ...row, read: true }));
 
 /** An Article with every kind of block the Reading view draws (T17). */
 export const FIXTURE_ARTICLE: ReadingArticle = {
