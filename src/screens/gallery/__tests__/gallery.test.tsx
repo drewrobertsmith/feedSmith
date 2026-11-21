@@ -45,9 +45,9 @@ test('lists every shell world, and picking one shows it', async () => {
   const user = userEvent.setup();
   await renderRouter(routes, { initialUrl: '/gallery' });
 
-  await user.press(await screen.findByRole('button', { name: 'Largest font size' }));
+  await user.press(await screen.findByRole('radio', { name: 'Largest font size' }));
 
-  expect(screen.getByRole('button', { name: 'Largest font size' })).toBeSelected();
+  expect(screen.getByRole('radio', { name: 'Largest font size' })).toBeChecked();
   expect(screen.getByRole('heading', { name: 'Feeds' })).toHaveStyle({ fontSize: 48 });
 });
 
@@ -55,8 +55,8 @@ test('the light and dark toggle switches the world’s theme', async () => {
   const user = userEvent.setup();
   await renderRouter(routes, { initialUrl: '/gallery?world=dark' });
 
-  await user.press(await screen.findByRole('button', { name: 'Light' }));
+  await user.press(await screen.findByRole('radio', { name: 'Light' }));
 
-  expect(screen.getByRole('button', { name: 'Light' })).toBeSelected();
+  expect(screen.getByRole('radio', { name: 'Light' })).toBeChecked();
   expect(Uniwind.currentTheme).toBe('light');
 });
