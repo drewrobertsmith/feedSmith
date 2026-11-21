@@ -11,14 +11,20 @@ export const PACE_WINDOW = 14 * DAY;
 const BACKOFF_FIRST = 30 * MINUTE;
 const BACKOFF_MAX = DAY;
 
+/** The shortest span a pace is judged over, so one fresh Article doesn't look like a burst. */
+const MIN_SPAN = DAY;
+
 /**
  * How long until a working Feed's next check: about two checks per expected new Article,
- * judged from the Articles it published in the last 14 days (T19).
+ * judged from its Articles in the last 14 days. Many feeds list only their newest Articles,
+ * so the rate is taken over the span those Articles cover (at least a day), not the whole
+ * 14 days (T19).
  */
 export function nextCheckIn(publishedAts: number[], now: number): number {
-  const recent = publishedAts.filter((at) => at > now - PACE_WINDOW && at <= now).length;
-  if (recent === 0) return MAX_INTERVAL;
-  const gap = PACE_WINDOW / recent;
+  const recent = publishedAts.filter((at) => at >= now - PACE_WINDOW && at <= now);
+  if (recent.length === 0) return MAX_INTERVAL;
+  const span = Math.max(MIN_SPAN, now - Math.min(...recent));
+  const gap = span / recent.length;
   return Math.min(MAX_INTERVAL, Math.max(MIN_INTERVAL, Math.round(gap / 2)));
 }
 

@@ -39,7 +39,7 @@ export async function storeNewArticles(
 export async function markWorking(ctx: MutationCtx, feedId: Id<'feeds'>, now: number, validators?: Validators) {
   const recent = await ctx.db
     .query('articles')
-    .withIndex('by_feed_published', (q) => q.eq('feedId', feedId).gt('publishedAt', now - PACE_WINDOW))
+    .withIndex('by_feed_published', (q) => q.eq('feedId', feedId).gte('publishedAt', now - PACE_WINDOW))
     .take(PACE_SAMPLE);
   await ctx.db.patch(feedId, {
     status: 'working',

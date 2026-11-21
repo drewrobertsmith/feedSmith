@@ -67,7 +67,7 @@ describe('each Feed on its own pace (T19)', () => {
   test('a new Feed is working, with its next check set from its pace', async () => {
     const s = await setup();
     // 4 a day for two weeks: checked every 3 hours.
-    const items = Array.from({ length: 56 }, (_, i) => ({ guid: `g${i}`, ago: (i + 0.5) * 6 * HOUR }));
+    const items = Array.from({ length: 56 }, (_, i) => ({ guid: `g${i}`, ago: (i + 1) * 6 * HOUR }));
     const feed = await follow(s, items);
     expect(feed).toMatchObject({ status: 'working', failures: 0, lastFetchedAt: START, nextFetchAt: START + 3 * HOUR });
   });

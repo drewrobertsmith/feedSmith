@@ -9,7 +9,7 @@ const NOW = Date.UTC(2026, 10, 21, 12);
 
 /** `count` Articles evenly spread over the last `days`. */
 const published = (count: number, days = 14) =>
-  Array.from({ length: count }, (_, i) => NOW - ((i + 0.5) * days * DAY) / count);
+  Array.from({ length: count }, (_, i) => NOW - ((i + 1) * days * DAY) / count);
 
 describe('each Feed on its own pace (T19)', () => {
   test('a busy Feed is checked at most every 15 minutes', () => {
@@ -22,6 +22,16 @@ describe('each Feed on its own pace (T19)', () => {
   test('about two checks per expected new Article', () => {
     // 4 a day: one every 6 hours, so checked every 3 hours.
     expect(nextCheckIn(published(14 * 4), NOW)).toBe(3 * HOUR);
+  });
+
+  test("a Feed that only lists its newest Articles is judged by the span they cover, not the whole 14 days", () => {
+    // The Verge's feed holds its newest ~30, about a day's worth: 30 a day, so every 24 minutes.
+    expect(nextCheckIn(published(30, 1), NOW)).toBe(24 * MINUTE);
+  });
+
+  test('a single fresh Article is not a burst: the span is at least a day', () => {
+    expect(nextCheckIn([NOW - HOUR], NOW)).toBe(MAX_INTERVAL);
+    expect(nextCheckIn([NOW - HOUR, NOW - 2 * HOUR], NOW)).toBe(6 * HOUR);
   });
 
   test('a quiet Feed is still checked at least every 12 hours', () => {
