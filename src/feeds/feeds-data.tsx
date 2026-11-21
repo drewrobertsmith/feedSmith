@@ -33,7 +33,14 @@ export type ReadingArticle = {
 
 export type AllView = { status: 'loading' } | { status: 'ready'; articles: ArticleRow[] };
 export type ArticleView = { status: 'loading' } | { status: 'missing' } | { status: 'ready'; article: ReadingArticle };
-export type AddFeedView = { status: 'idle' } | { status: 'busy' } | { status: 'error'; reason: AddFeedReason };
+/** A feed a site advertises, to choose from (T21). */
+export type FeedChoice = { url: string; title: string };
+
+export type AddFeedView =
+  | { status: 'idle' }
+  | { status: 'busy' }
+  | { status: 'error'; reason: AddFeedReason }
+  | { status: 'choose'; choices: FeedChoice[] };
 
 /**
  * Everything the screens read and do with Feeds and Articles. Convex backs it in the app

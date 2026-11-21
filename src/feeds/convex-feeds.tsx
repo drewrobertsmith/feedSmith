@@ -23,7 +23,9 @@ function useAddFeed() {
     setView({ status: 'busy' });
     try {
       const result = await addFeed({ url: url.trim() });
-      setView(result.ok ? { status: 'idle' } : { status: 'error', reason: result.reason });
+      if (result.ok) setView({ status: 'idle' });
+      else if (result.reason === 'choose') setView({ status: 'choose', choices: result.choices });
+      else setView({ status: 'error', reason: result.reason });
       return result.ok;
     } catch {
       // The call itself failed (no connection, or the server is down).
