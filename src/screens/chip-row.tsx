@@ -1,14 +1,16 @@
-import { Image } from 'expo-image';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, ScrollView, ToastAndroid, View } from 'react-native';
 
 import { AppText } from '@/components/app-text';
+import { FeedIcon } from '@/components/feed-icon';
 import { useEnvironment } from '@/environment';
 import { useSetPinned, type FeedChip } from '@/feeds/feeds-data';
 import { motion } from '@/theme/motion';
 import { spacing } from '@/theme/spacing';
 
 const ICON = 16;
+/** A chip's name is one line at most this wide (×font size), so a long name can't run off the screen (Q16). */
+const CHIP_LABEL_MAX = 180;
 
 /** One chip: a tab in the row. Chosen, it's Gold on the indicator pill (D5) and springs into place (D7). */
 function Chip({
@@ -18,6 +20,7 @@ function Chip({
   icon,
   onPress,
   onLongPress,
+  pinLabel,
 }: {
   label: string;
   accessibleName: string;
@@ -25,8 +28,10 @@ function Chip({
   icon?: React.ReactNode;
   onPress: () => void;
   onLongPress?: () => void;
+  /** The long-press action's name, offered to TalkBack too (Q15). */
+  pinLabel?: string;
 }) {
-  const { reduceMotion } = useEnvironment();
+  const { reduceMotion, fontScale } = useEnvironment();
   const [scale] = useState(() => new Animated.Value(1));
   const wasSelected = useRef(selected);
 
@@ -44,6 +49,9 @@ function Chip({
     wasSelected.current = selected;
   }, [selected, reduceMotion, scale]);
 
+  // A chip that goes mid-spring stops it (Q20).
+  useEffect(() => () => scale.stopAnimation(), [scale]);
+
   return (
     <Animated.View style={{ transform: [{ scale }] }}>
       <Pressable
@@ -52,6 +60,11 @@ function Chip({
         aria-selected={selected}
         onPress={onPress}
         onLongPress={onLongPress}
+        // Long-press for touch, a named action for TalkBack: every action reachable without the gesture (Q15).
+        accessibilityActions={pinLabel ? [{ name: 'pin', label: pinLabel }] : undefined}
+        onAccessibilityAction={(event) => {
+          if (event.nativeEvent.actionName === 'pin') onLongPress?.();
+        }}
         className={
           selected
             ? 'flex-row items-center gap-inside rounded-full bg-indicator px-group py-related'
@@ -59,29 +72,13 @@ function Chip({
         }
       >
         {icon}
-        <AppText variant="label" className={selected ? 'text-accent' : 'text-text'} accessible={false}>
-          {label}
-        </AppText>
+        <View style={{ maxWidth: CHIP_LABEL_MAX * fontScale }}>
+          <AppText variant="label" className={selected ? 'text-accent' : 'text-text'} accessible={false} numberOfLines={1}>
+            {label}
+          </AppText>
+        </View>
       </Pressable>
     </Animated.View>
-  );
-}
-
-function ChipIcon({ chip }: { chip: FeedChip }) {
-  const { fontScale } = useEnvironment();
-  const [failed, setFailed] = useState(false);
-  const size = ICON * fontScale;
-  if (!chip.faviconUrl || failed) return null;
-  return (
-    <View className="overflow-hidden rounded-sm" style={{ width: size, height: size }}>
-      <Image
-        source={{ uri: chip.faviconUrl }}
-        recyclingKey={chip.faviconUrl}
-        onError={() => setFailed(true)}
-        accessible={false}
-        style={{ width: size, height: size }}
-      />
-    </View>
   );
 }
 
@@ -105,12 +102,12 @@ export function ChipRow({
 
   const togglePin = async (chip: FeedChip) => {
     const outcome = await setPinned(chip.id, !chip.pinned);
-    const note =
-      outcome === 'pins-full'
-        ? 'You can Pin up to 3 Feeds. Unpin one first.'
-        : outcome === 'ok'
-          ? `${chip.pinned ? 'Unpinned' : 'Pinned'} ${chip.title}.`
-          : null;
+    const notes: Record<typeof outcome, string | null> = {
+      ok: `${chip.pinned ? 'Unpinned' : 'Pinned'} ${chip.title}.`,
+      'pins-full': 'You can Pin up to 3 Feeds. Unpin one first.',
+      'not-found': null,
+    };
+    const note = notes[outcome];
     if (note) ToastAndroid.show(note, ToastAndroid.SHORT);
   };
 
@@ -130,9 +127,10 @@ export function ChipRow({
           label={chip.title}
           accessibleName={chip.pinned ? `${chip.title}, Pinned` : chip.title}
           selected={selected === chip.id}
-          icon={<ChipIcon key={chip.faviconUrl} chip={chip} />}
+          icon={<FeedIcon key={chip.faviconUrl} url={chip.faviconUrl} title={chip.title} size={ICON} fallback="none" />}
           onPress={() => onSelect(chip.id)}
           onLongPress={() => void togglePin(chip)}
+          pinLabel={chip.pinned ? 'Unpin' : 'Pin'}
         />
       ))}
       <Pressable

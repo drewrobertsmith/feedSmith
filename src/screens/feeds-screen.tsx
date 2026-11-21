@@ -1,12 +1,12 @@
 import { LegendList } from '@legendapp/list/react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { useState } from 'react';
 import { Pressable, RefreshControl, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/app-button';
 import { AppText } from '@/components/app-text';
+import { FeedIcon } from '@/components/feed-icon';
 import { useEnvironment } from '@/environment';
 import { useAll, useChips, useRefresh, type ArticleRow } from '@/feeds/feeds-data';
 import { publishedAgo } from '@/feeds/format';
@@ -22,35 +22,6 @@ const THUMBNAIL = 72;
 const FAVICON = 16;
 /** A row's usual height, for the list's first layout before rows measure themselves. */
 const ESTIMATED_ROW = 112;
-
-/** The Feed's favicon, or its initial when it has none or it won't load. */
-function FeedMark({ title, faviconUrl }: { title: string; faviconUrl?: string }) {
-  const { fontScale } = useEnvironment();
-  const [failed, setFailed] = useState(false);
-  const size = FAVICON * fontScale;
-  if (faviconUrl && !failed) {
-    return (
-      // The View clips the corners: expo-image doesn't take Uniwind's rounding classes.
-      <View className="overflow-hidden rounded-sm" style={{ width: size, height: size }}>
-        <Image
-          testID="row-favicon"
-          source={{ uri: faviconUrl }}
-          recyclingKey={faviconUrl}
-          onError={() => setFailed(true)}
-          accessible={false}
-          style={{ width: size, height: size }}
-        />
-      </View>
-    );
-  }
-  return (
-    <View className="items-center justify-center rounded-sm bg-surface" style={{ width: size, height: size }}>
-      <AppText variant="label" className="text-text-muted" accessible={false}>
-        {title.charAt(0).toUpperCase()}
-      </AppText>
-    </View>
-  );
-}
 
 function Row({ article }: { article: ArticleRow }) {
   const { colorScheme, fontScale, now } = useEnvironment();
@@ -69,7 +40,13 @@ function Row({ article }: { article: ArticleRow }) {
       <View className="flex-1 gap-inside">
         <View className="flex-row items-center gap-related">
           {/* Keyed by favicon, so a failed load never carries over to another Feed's row. */}
-          <FeedMark key={article.faviconUrl ?? article.feedTitle} title={article.feedTitle} faviconUrl={article.faviconUrl} />
+          <FeedIcon
+            key={article.faviconUrl ?? article.feedTitle}
+            url={article.faviconUrl}
+            title={article.feedTitle}
+            size={FAVICON}
+            testID="row-favicon"
+          />
           <AppText variant="label" className="shrink text-text-muted" numberOfLines={1}>
             {article.feedTitle}
           </AppText>

@@ -3,6 +3,7 @@ import { v } from 'convex/values';
 import type { Id } from './_generated/dataModel';
 import { mutation, query, type QueryCtx } from './_generated/server';
 import { requireUserId } from './lib/currentUser';
+import { ownFeed } from './feeds';
 import { faviconOf } from './lib/feed/face';
 import { vBlock, vOmittedKind } from './lib/feed/validators';
 
@@ -63,9 +64,8 @@ export const all = query({
         .order('desc')
         .take(ALL_LIMIT);
     } else {
-      const feedId = args.feedId.length <= 64 ? ctx.db.normalizeId('feeds', args.feedId) : null;
-      const feed = feedId ? await ctx.db.get(feedId) : null;
-      if (!feed || feed.userId !== userId) return [];
+      const feed = await ownFeed(ctx, userId, args.feedId);
+      if (!feed) return [];
       articles = await ctx.db
         .query('articles')
         .withIndex('by_feed_published', (q) => q.eq('feedId', feed._id))

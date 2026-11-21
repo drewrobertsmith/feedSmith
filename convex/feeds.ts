@@ -2,7 +2,7 @@ import { v } from 'convex/values';
 
 import { internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
-import { action, internalMutation, internalQuery, mutation, query } from './_generated/server';
+import { action, internalMutation, internalQuery, mutation, query, type QueryCtx } from './_generated/server';
 import { requireUserId } from './lib/currentUser';
 import { findFeedLinks, siteMeta, type FeedLink, type SiteMeta } from './lib/feed/discover';
 import { faviconOf } from './lib/feed/face';
@@ -174,6 +174,22 @@ export const store = internalMutation({
   },
 });
 
+/** A link's or caller's id as one of the signed-in User's Feeds, or null (Q25). */
+export async function ownFeed(ctx: QueryCtx, userId: Id<'users'>, rawId: string) {
+  // Convex ids are well under 64 characters; longer strings aren't worth normalising.
+  const feedId = rawId.length <= 64 ? ctx.db.normalizeId('feeds', rawId) : null;
+  const feed = feedId ? await ctx.db.get(feedId) : null;
+  return feed && feed.userId === userId ? feed : null;
+}
+
+/** The User's Pinned Feeds in their order, read straight from the Pin index. */
+function pinnedFeeds(ctx: QueryCtx, userId: Id<'users'>) {
+  return ctx.db
+    .query('feeds')
+    .withIndex('by_user_pin', (q) => q.eq('userId', userId).gte('pinOrder', 0))
+    .take(MAX_PINS + 1);
+}
+
 /** A User has at most this many Pinned Feeds (P9). */
 export const MAX_PINS = 3;
 /** Chips are a User's Feeds; more than this many isn't a reading list any more. */
@@ -190,10 +206,16 @@ export const chips = query({
   ),
   handler: async (ctx) => {
     const userId = await requireUserId(ctx);
-    const feeds = await ctx.db
-      .query('feeds')
-      .withIndex('by_user_url', (q) => q.eq('userId', userId))
-      .take(CHIP_LIMIT);
+    // Pinned Feeds come from their own index, so they're never lost among many Feeds.
+    const pinned = await pinnedFeeds(ctx, userId);
+    const pinnedIds = new Set(pinned.map((feed) => feed._id));
+    const others = (
+      await ctx.db
+        .query('feeds')
+        .withIndex('by_user_url', (q) => q.eq('userId', userId))
+        .take(CHIP_LIMIT)
+    ).filter((feed) => !pinnedIds.has(feed._id));
+    const feeds = [...pinned, ...others];
     const newest = await Promise.all(
       feeds.map(async (feed) => {
         const latest = await ctx.db
@@ -237,19 +259,14 @@ export const setPinned = mutation({
   ),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    const feedId = args.id.length <= 64 ? ctx.db.normalizeId('feeds', args.id) : null;
-    const feed = feedId ? await ctx.db.get(feedId) : null;
-    if (!feed || feed.userId !== userId) return { ok: false as const, reason: 'not-found' as const };
+    const feed = await ownFeed(ctx, userId, args.id);
+    if (!feed) return { ok: false as const, reason: 'not-found' as const };
     if (!args.pinned) {
       if (feed.pinOrder !== undefined) await ctx.db.patch(feed._id, { pinOrder: undefined });
       return { ok: true as const };
     }
     if (feed.pinOrder !== undefined) return { ok: true as const };
-    const feeds = await ctx.db
-      .query('feeds')
-      .withIndex('by_user_url', (q) => q.eq('userId', userId))
-      .take(CHIP_LIMIT);
-    const pins = feeds.map((f) => f.pinOrder).filter((order): order is number => order !== undefined);
+    const pins = (await pinnedFeeds(ctx, userId)).map((f) => f.pinOrder ?? 0);
     if (pins.length >= MAX_PINS) return { ok: false as const, reason: 'pins-full' as const };
     await ctx.db.patch(feed._id, { pinOrder: Math.max(0, ...pins) + 1 });
     return { ok: true as const };

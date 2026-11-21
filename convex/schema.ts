@@ -31,6 +31,7 @@ export default defineSchema({
     lastModified: v.optional(v.string()),
   })
     .index('by_user_url', ['userId', 'url'])
+    .index('by_user_pin', ['userId', 'pinOrder'])
     .index('by_next_fetch', ['nextFetchAt']),
   /** A User's Articles: what All lists. Their content lives in `articleBodies`. */
   articles: defineTable({

@@ -53,7 +53,6 @@ export function AddFeedScreen() {
   const addFrom = async (address: string) => {
     if (!address.trim() || busy) return;
     const outcome = await add(address);
-    // Already followed: back to All, with a quiet note naming it (a chip opens it once FEE-29 lands).
     if (outcome.kind === 'already') {
       // Already followed: back to Feeds with its chip chosen, and a quiet note naming it (T22).
       ToastAndroid.show(`You already follow ${outcome.title}.`, ToastAndroid.SHORT);

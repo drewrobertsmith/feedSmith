@@ -132,3 +132,28 @@ describe("one Feed's Articles (P5)", () => {
     expect((await s.a.query(api.articles.all, {})).map((r) => r.title)).toEqual(['A news', 'B news']);
   });
 });
+
+describe('more Feeds than the row shows (P9)', () => {
+  test('Pinned Feeds and the Pin limit hold past the first 200', async () => {
+    const s = await setup([]);
+    const ids = await s.t.run(async (ctx) => {
+      const user = (await ctx.db.query('users').first())!._id;
+      const out: Id<'feeds'>[] = [];
+      for (let i = 0; i < 210; i++)
+        out.push(await ctx.db.insert('feeds', { userId: user, url: `https://z${String(i).padStart(3, '0')}.example.com/feed`, title: `F${i}` }));
+      return out;
+    });
+    // The last three by URL order are Pinned: they sort after the first 200.
+    for (const id of ids.slice(-3)) expect(await s.a.mutation(api.feeds.setPinned, { id, pinned: true })).toEqual({ ok: true });
+    expect(await s.a.mutation(api.feeds.setPinned, { id: ids[0], pinned: true })).toEqual({ ok: false, reason: 'pins-full' });
+    expect((await s.a.query(api.feeds.chips, {})).slice(0, 3).map((c) => c.title)).toEqual(['F207', 'F208', 'F209']);
+  });
+});
+
+describe('icons', () => {
+  test("a site address ending in / still makes one favicon address", async () => {
+    const s = await setup([{ title: 'A', ago: HOUR }]);
+    await s.t.run((ctx) => ctx.db.patch(s.feedIds[0], { siteUrl: 'https://f0.example.com/' }));
+    expect((await s.a.query(api.feeds.chips, {}))[0].faviconUrl).toBe('https://f0.example.com/favicon.ico');
+  });
+});

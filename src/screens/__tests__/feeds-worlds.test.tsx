@@ -141,6 +141,12 @@ describe('All', () => {
     expect(screen.getAllByRole('link')).toHaveLength(FIXTURE_ROWS.length);
   });
 
+  test("a long Feed name stays on one line, so a chip can't run off the screen (Q16)", async () => {
+    await open({ colorScheme: 'dark', feeds: 'some', fontScale: 2 });
+    await screen.findAllByRole('tab');
+    expect(screen.getByText('Daring Fireball')).toHaveProp('numberOfLines', 1);
+  });
+
   test('a Feed with nothing new says so, by name', async () => {
     await open({ colorScheme: 'dark', feeds: 'some', feed: 'f3' });
     expect(await screen.findByText('No Articles from Daring Fireball in the last 30 days.')).toBeOnTheScreen();
@@ -178,6 +184,16 @@ describe('All', () => {
       await open({ colorScheme: 'dark', feeds: 'some', pins: 'full' });
       await user.longPress(await screen.findByRole('tab', { name: 'Calm Notes' }));
       expect(toast).toHaveBeenLastCalledWith('You can Pin up to 3 Feeds. Unpin one first.', ToastAndroid.SHORT);
+    });
+
+    test('TalkBack can Pin and unpin without a long-press (Q15)', async () => {
+      const w = await open({ colorScheme: 'dark', feeds: 'some' });
+      const calm = await screen.findByRole('tab', { name: 'Calm Notes' });
+      expect(calm.props.accessibilityActions).toEqual([{ name: 'pin', label: 'Pin' }]);
+      await act(async () => fireEvent(calm, 'accessibilityAction', { nativeEvent: { actionName: 'pin' } }));
+      expect(w.feedsLog.pins).toEqual([{ id: 'f2', pinned: true }]);
+      const verge = screen.getByRole('tab', { name: 'The Verge, Pinned' });
+      expect(verge.props.accessibilityActions).toEqual([{ name: 'pin', label: 'Unpin' }]);
     });
 
     test('All has nothing to Pin', async () => {
