@@ -7,6 +7,10 @@ import { safeUrl } from './http';
 export const MAX_FEED_LINKS = 10;
 const MAX_TITLE = 100;
 const MAX_ICON_URL = 2048;
+/** A Feed address longer than this isn't one (the same cap as a typed URL). */
+const MAX_FEED_URL = 2048;
+/** Only the head is read, and never more than this of the page. */
+const MAX_HEAD = 256 * 1024;
 /** The head is where these live; the walk stops this deep in hostile markup. */
 const MAX_DEPTH = 32;
 
@@ -37,7 +41,10 @@ function heads(html: string) {
       else if (name !== 'body') walk(node.children, depth + 1);
     }
   };
-  walk(parseDocument(html, { decodeEntities: true }).children, 0);
+  // Only the head matters: cut the page at <body> (and at MAX_HEAD) before building a tree.
+  const bodyAt = html.search(/<body[\s>]/i);
+  const head = html.slice(0, Math.min(bodyAt >= 0 ? bodyAt : html.length, MAX_HEAD));
+  walk(parseDocument(head, { decodeEntities: true }).children, 0);
   return { links, metas, title };
 }
 
@@ -53,7 +60,7 @@ export function findFeedLinks(html: string, pageUrl: string): FeedLink[] {
     if (found.size >= MAX_FEED_LINKS) break;
     if (!rels(link).has('alternate') || !FEED_TYPES.has((link.attribs.type ?? '').toLowerCase())) continue;
     const url = safeUrl(link.attribs.href ?? '', pageUrl);
-    if (!url || found.has(url.href)) continue;
+    if (!url || url.href.length > MAX_FEED_URL || found.has(url.href)) continue;
     const title = plain(link.attribs.title, MAX_TITLE) ?? `${url.host}${url.pathname}`.slice(0, MAX_TITLE);
     found.set(url.href, { url: url.href, title });
   }

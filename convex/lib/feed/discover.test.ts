@@ -48,6 +48,16 @@ describe("a page's feed links (T21)", () => {
     expect(link.title.startsWith('<b>')).toBe(true);
   });
 
+  test('a link too long to be a Feed address is never offered', () => {
+    const html = head(`<link rel="alternate" type="application/rss+xml" href="/${'a'.repeat(3000)}">`);
+    expect(findFeedLinks(html, PAGE)).toEqual([]);
+  });
+
+  test("only the page's head is read: links after <body> don't count", () => {
+    const html = `<html><head><title>T</title></head><body><link rel="alternate" type="application/rss+xml" href="/late"></body></html>`;
+    expect(findFeedLinks(html, PAGE)).toEqual([]);
+  });
+
   test('a page with no feed links has none', () => {
     expect(findFeedLinks(head('<title>Shop</title>'), PAGE)).toEqual([]);
     expect(findFeedLinks('not html at all', PAGE)).toEqual([]);
