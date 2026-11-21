@@ -73,3 +73,13 @@ These adapt `/expo-dev-loop:feature` to this app. Where they differ from the ski
   - **Standards** works as the skill describes, but without the quality bar. That belongs to the third axis.
   - **Quality bar** reads `docs/quality-bar.md`, picks the items whose "Applies to" column matches this ticket (`every change` items always apply), and gives each one a verdict: pass, fail, or "needs device check" when its "Checked by" column names a device check. Each verdict comes with `path:line` evidence or the test that proves it, and the report stays under 400 words.
   - Report the three axes side by side under `## Spec`, `## Standards` and `## Quality bar`, without merging or reranking them. Step 4.7 starts from the Quality bar report: fix each fail, and carry each "needs device check" item into Verify.
+
+## Learning more about Effect
+
+This repository uses the Effect Typescript library.
+
+Before writing any Effect code, first read `node_modules/effect/AGENTS.md`
+**completely**, and follow the links in the file when required.
+
+If you need to learn more about particular Effect apis and concepts that the
+guide doesn't cover, search through the source code in `node_modules/effect/src`.

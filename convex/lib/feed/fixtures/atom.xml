@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Example Atom Feed</title>
+  <link href="https://atom.example.com/"/>
+  <updated>2026-11-20T18:30:02Z</updated>
+  <id>urn:uuid:60a76c80-d399-11d9-b93C-0003939e0af6</id>
+  <entry>
+    <title>Older entry</title>
+    <link rel="alternate" href="https://atom.example.com/older"/>
+    <id>urn:uuid:1</id>
+    <published>2026-11-18T09:00:00Z</published>
+    <updated>2026-11-18T09:00:00Z</updated>
+    <summary>An older summary.</summary>
+    <content type="html">&lt;p&gt;Older &lt;em&gt;body&lt;/em&gt;.&lt;/p&gt;</content>
+  </entry>
+  <entry>
+    <title type="html">Newer &amp;amp; better</title>
+    <link rel="self" href="https://atom.example.com/self"/>
+    <link rel="alternate" type="text/html" href="https://atom.example.com/newer"/>
+    <id>urn:uuid:2</id>
+    <updated>2026-11-20T18:30:02Z</updated>
+    <summary type="html">&lt;b&gt;Newer&lt;/b&gt; summary.</summary>
+    <content type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><p>Newer <strong>xhtml</strong> body.</p></div></content>
+  </entry>
+</feed>

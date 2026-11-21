@@ -16,7 +16,7 @@ import { createWorld, type World } from '@/worlds/world';
 function renderWorld(world: World, initialUrl: string = world.initialUrl) {
   return renderRouter(
     {
-      _layout: () => <AppRoot environment={world.environment} auth={world.auth} />,
+      _layout: () => <AppRoot environment={world.environment} auth={world.auth} feeds={world.feeds} />,
       '(tabs)/_layout': TabsLayout,
       '(tabs)/index': FeedsRoute,
       '(tabs)/saved': SavedRoute,

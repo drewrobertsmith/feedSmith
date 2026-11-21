@@ -9,7 +9,8 @@ import { EnvironmentProvider } from '@/environment';
 import { GALLERY, type GalleryEntry } from '@/screens/gallery/registry';
 import { spacing } from '@/theme/spacing';
 import type { ThemeName } from '@/theme/tokens';
-import { createWorld, worldAuth, worldEnvironment, type CatalogWorld } from '@/worlds/world';
+import { FeedsContext } from '@/feeds/feeds-data';
+import { createWorld, worldAuth, worldEnvironment, worldFeeds, type CatalogWorld } from '@/worlds/world';
 
 const ALL = GALLERY.flatMap((entry) => entry.worlds.map((world) => ({ entry, world })));
 
@@ -45,7 +46,9 @@ function WorldPreview({ entry, world, theme }: { entry: GalleryEntry; world: Cat
   useEffect(() => createWorld({ ...world.spec, colorScheme: theme }).dispose, [world, theme]);
   return (
     <AuthContext value={worldAuth(spec)}>
-      <EnvironmentProvider environment={worldEnvironment(spec)}>{entry.render(spec)}</EnvironmentProvider>
+      <FeedsContext value={worldFeeds(spec)}>
+        <EnvironmentProvider environment={worldEnvironment(spec)}>{entry.render(spec)}</EnvironmentProvider>
+      </FeedsContext>
     </AuthContext>
   );
 }

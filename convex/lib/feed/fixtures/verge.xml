@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?><rss
+	version="2.0"
+	xmlns:media="http://search.yahoo.com/mrss/"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+>
+	<channel>
+
+		
+<title>The Verge - Full RSS for subscribers | The Verge</title>
+<link>https://www.theverge.com</link>
+<description>The Verge is about technology and how it makes us feel. Founded in 2011, we offer our audience everything from breaking news to reviews to award-winning features and investigations, on our site, in video, and in podcasts.</description>
+<pubDate>Sat, 21 Nov 2026 21:23:43 +0000</pubDate>
+
+	<lastBuildDate>Sat, 21 Nov 2026 21:23:43 +0000</lastBuildDate>
+
+
+			<image>
+			<url>https://platform.theverge.com/wp-content/uploads/sites/2/2025/01/verge-rss-large_80b47e.png</url>
+							<link>https://www.theverge.com</link>
+										<title>The Verge - Full RSS for subscribers | The Verge</title>
+					</image>
+		
+		
+			<item>
+				
+	<title>The UN fails to agree on rules regulating ‘killer robots’</title>
+
+<link>https://www.theverge.com/tech/1039554/un-regulations-killer-robots</link>
+<pubDate>Sat, 21 Nov 2026 15:03:37 -0500</pubDate>
+<guid isPermaLink="false">https://www.theverge.com/?p=1039554</guid>
+
+			<dc:creator>Terrence O’Brien</dc:creator>
+	
+
+
+	<media:keywords>killer, regulations, robots, tech, un</media:keywords>
+	
+	
+<description>
+	Countries agree to ‘start discussing options’ for rules around autonomous weapons.</description>
+
+
+				<content:encoded>
+
+																		<![CDATA[
+
+							
+<figure>
+
+<img alt="US Conducts Air War Against ISIL From Secret Base In Persian Gulf Region" data-caption="" data-portal-copyright="Photo by John Moore/Getty Images" data-has-syndication-rights="1" src="https://platform.theverge.com/wp-content/uploads/sites/2/chorus/uploads/chorus_asset/file/13611631/503831564.jpg.jpg?quality=90&#038;strip=all&#038;crop=0,0,100,100" />
+	<figcaption>
+		</figcaption>
+</figure>
+
+							<p class="wp-block-paragraph">One of the items on the agenda for UN diplomats meeting in Geneva this week was working towards rules regarding the use of autonomous weapons, or so-called “killer robots.” Eventually, representatives left the meetings agreeing to “start discussing options” after a largely fruitless week of negotiations. </p>
+
+<p class="wp-block-paragraph">According to <em><a href="https://www.npr.org/2026/11/21/nx-s1-6047916/killer-robots-un-drones">NPR</a></em>:</p>
+
+<blockquote class="wp-block-quote is-layout-flow wp-block-quote-is-layout-flow">
+<p class="wp-block-paragraph">Before the negotiations got underway, the International Committee of the Red Cross, the guardian of the Geneva Conventions, said it was urgent for legally binding rules to be drafted within a year. That call was backed by the U.N. secretary-general and by Pope Leo.</p>
+</blockquote>
+
+<p class="wp-block-paragraph">The compromise reached was that countries would instead have two years to propose regulations. Negotiations between countries on which regulations to adopt and how to enforce them will likely drag on well beyond that. Additionally, room was left for some of those yet-to-be-adopted regulations to remain “optional.” </p>
+
+<p class="wp-block-paragraph">Humanitarian organizations and some countries see a need to urgently adopt legally binding rules as semi-autonomous weapons and drones have been responsible for a significant number of civilian deaths in conflicts around the globe, including in <a href="https://www.theverge.com/news/1010424/yandex-drone-strike-outage-disinformation-zelenskyy">Ukraine</a>, <a href="https://www.theverge.com/ai-artificial-intelligence/656549/israel-ai-gaza-hamas">Gaza</a>, and Sudan. </p>
+
+<p class="wp-block-paragraph">According to <em>NPR</em>, Russia, Israel, and the US proved to be the primary obstructions:</p>
+
+<blockquote class="wp-block-quote is-layout-flow wp-block-quote-is-layout-flow">
+<p class="wp-block-paragraph">On day one, Russia delayed proceedings by objecting to the meeting&#8217;s agenda. Then the United States proposed a five-year window to discuss nonbinding, optional guidelines for autonomous weapons.</p>
+</blockquote>
+							]]>
+											
+				</content:encoded>
+			</item>
+<item>
+				
+	<title>The FBI and USDA were reportedly hacked</title>
+
+<link>https://www.theverge.com/tech/1039543/fbi-usda-hacked</link>
+<pubDate>Sat, 21 Nov 2026 12:42:27 -0500</pubDate>
+<guid isPermaLink="false">https://www.theverge.com/?p=1039543</guid>
+
+			<dc:creator>Terrence O’Brien</dc:creator>
+	
+
+
+	<media:keywords>fbi, hacked, tech, usda</media:keywords>
+	
+	
+<description>
+	The list of hacks hitting the US government over the last few months keeps growing.</description>
+
+
+				<content:encoded>
+
+																		<![CDATA[
+
+							
+<figure>
+
+<img alt="Digital photo illustration of a laptop displaying a black and green image of the Capitol building, with ones and zeroes falling in the background." data-caption="" data-portal-copyright="Photo by Amelia Holowaty Krales / The Verge" data-has-syndication-rights="1" src="https://platform.theverge.com/wp-content/uploads/sites/2/chorus/uploads/chorus_asset/file/23318430/akrales_220309_4977_0038.jpg?quality=90&#038;strip=all&#038;crop=0,0,100,100" />
+	<figcaption>
+		</figcaption>
+</figure>
+
+							<p class="wp-block-paragraph">Friday, it was reported that <a href="https://www.theguardian.com/us-news/2026/nov/21/usda-fbi-outages-cyber-attack">both</a> the US Department of Agriculture (USDA) and the FBI were hacked. In reporting on the FBI hack, <em><a href="https://www.cnn.com/2026/11/20/politics/fbi-hacked-again-target-crime-database">CNN</a></em> noted that this is the second such attack on the agency in the last few months, this time targeting the National Crime Information Center (NCIC), which federal, state, and local law enforcement use to share information, including warrants and missing persons. President Donald Trump later <a href="https://www.cnn.com/2026/11/20/politics/fbi-hacked-again-target-crime-database">confirmed the hack</a> in an interview with <em>Fox News</em>. <a href="https://www.nbcnews.com/politics/national-security/agriculture-department-breached-hackers-sources-say-rcna610497"><em>NBC</em></a> first reported the USDA hack on Friday. According to <em><a href="https://www.reuters.com/legal/litigation/us-department-agriculture-breached-by-hackers-this-week-nbc-news-reports-2026-11-20/">Reuters</a></em>:</p>
+
+<blockquote class="wp-block-quote is-layout-flow wp-block-quote-is-layout-flow">
+<p class="wp-block-paragraph">While the payments ​database is the known extent ​of the intrusion so far, the former ‌officials ⁠warned that the compromised system could provide a backdoor to more sensitive information, including food safety ​data and ​research on ⁠animal-borne illnesses, according to the report.</p>
+</blockquote>
+
+<p class="wp-block-paragraph">The breaches come following a week of <a href="https://www.theverge.com/tech/1035826/some-apple-services-are-down">major</a> <a href="https://www.theverge.com/tech/1035364/microsoft-outlook-outage-notepad">outages</a> across several sectors, including at the <a href="https://www.theverge.com/news/1033489/faa-ground-stop">FAA</a> and <a href="https://www.theverge.com/tech/1035409/the-nsas-classified-communications-network-is-reportedly-down">NSA</a>, which the government has sought to reassure the public were not the result of a cyberattack. </p>
+
+<p class="wp-block-paragraph">President Trump suggested that the breach of the FBI <a href="https://www.cnbc.com/2026/11/21/trump-fbi-database-hack.html">might not be an entirely bad thing</a>, telling <em>Fox News</em> that, “Maybe we’ll learn about the voter fraud, all the voter fraud that took place,” and “wouldn’t it be great to learn about Russia, Russia, Russia?” referring to investigations into his ties to Russia.</p>
+
+<p class="wp-block-paragraph">The FBI suffered a breach, reported in late September, that allegedly compromised personal records of “<a href="https://www.theverge.com/policy/998966/shinyhunters-fbi-hack">all FBI employees and applicants</a>.” This was followed by a hack of DHS, reported in October, comprising <a href="https://www.theverge.com/tech/1021528/ice-cbp-data-leak">40,000 employee records</a>. In the wake of these major outages, the White House national cyber director, Sean Cairncross, <a href="https://www.theverge.com/policy/1038376/the-white-house-national-cyber-director-is-stepping-down">stepped down this week</a>.</p>
+
+<p class="wp-block-paragraph"><em><strong>Update November 21st:</strong> Added President Trump’s comments.</em></p>
+							]]>
+											
+				</content:encoded>
+			</item>
+<item>
+				
+	<title>Amazon’s first digital photo frame is up to 50 percent off for Black Friday</title>
+
+<link>https://www.theverge.com/gadgets/1038762/amazon-alexa-photo-frame-black-friday-2026-deal-sale</link>
+<pubDate>Sat, 21 Nov 2026 11:00:00 -0500</pubDate>
+<guid isPermaLink="false">https://www.theverge.com/?p=1038762</guid>
+
+			<dc:creator>Sheena Vasani</dc:creator>
+	
+
+
+	<media:keywords>2026, alexa, amazon, black, deal, frame, friday, gadgets, photo, sale</media:keywords>
+	
+	
+<description>
+	The nifty frame lets you pull up specific photos using only your voice or attach voice recordings to individual shots.</description>
+
+
+				<content:encoded>
+
+																		<![CDATA[
+
+							
+<figure>
+
+<img alt="" data-caption="" data-portal-copyright="Photo: Jennifer Pattison Tuohy / The Verge" data-has-syndication-rights="1" src="https://platform.theverge.com/wp-content/uploads/sites/2/2026/10/268832_Amazon_Alexa_Frame_JTuohy_0011.jpg?quality=90&#038;strip=all&#038;crop=0,0,100,100" />
+	<figcaption>
+		</figcaption>
+</figure>
+
+							<p class="wp-block-paragraph">Amazon <a href="https://www.theverge.com/tech/1019626/amazon-alexa-plus-photo-digital-picture-frame-smart-speaker">only announced</a> its first digital photo frame less than a month ago, but it&#8217;s already getting a sizable discount for Black Friday. You can currently grab the <strong>Alexa Photo Frame</strong> at <a href="https://www.amazon.com/dp/B0G7MCTDNP/">Amazon</a> and <a href="https://www.bestbuy.com/product/amazon-alexa-photo-frame-all-new-gift-it-with-a-personal-voice-note-smart-curation-10-display-designed-for-alexa-birch/J39TLSR37J">Best Buy</a> starting at $114 ($115 off), making it a great holiday gift for anyone who loves displaying family photos. If you prefer the walnut trim over the birch or standard black models, it’s also on sale at <a href="https://www.bestbuy.com/product/amazon-alexa-photo-frame-all-new-gift-it-with-a-personal-voice-note-smart-curation-10-display-designed-for-alexa-walnut/J39TLSPCSP">Best Buy</a> for $134.99 ($95 off) — which, like with the others, is the first discount we’ve seen.</p>
+<div class="product-block"><h3>Amazon Alexa Photo Frame</h3>
+<figure class="product-image"><img loading="lazy" width="300" height="200" src="https://platform.theverge.com/wp-content/uploads/sites/2/2026/10/268832_Amazon_Alexa_Frame_JTuohy_0006.jpg?w=300" class="attachment-medium size-medium" alt="" /></figure>
+<h3>Where to Buy:</h3><ul><li><a href="https://www.amazon.com/dp/B0G7MCTDNP"> <strike>$229.99</strike> $114.99 at <strong>Amazon (birch)</strong></a></li><li><a href="https://www.bestbuy.com/product/amazon-alexa-photo-frame-all-new-gift-it-with-a-personal-voice-note-smart-curation-10-display-designed-for-alexa-black/J39TLSSFWW/sku/6692362"> <strike>$199.99</strike> $114.99 at <strong>Best Buy (black)</strong></a></li><li><a href="https://www.bestbuy.com/product/amazon-alexa-photo-frame-all-new-gift-it-with-a-personal-voice-note-smart-curation-10-display-designed-for-alexa-walnut/J39TLSPCSP"> <strike>$229.99</strike> $134.99 at <strong>Best Buy (walnut)</strong></a></li></ul></div>
+<p class="wp-block-paragraph">The Alexa Photo Frame features a 10-inch, semi-matte touchscreen that’s designed to make digital photos look more natural, with built-in light sensors that automatically adjust brightness throughout the day. It displays images from Amazon Photos, which supports uploads from both iOS and Android devices, including photos stored in iCloud. You can choose which people or albums to display, or let Alexa Plus do the work, which often results in photos based on your facial expression, the season, and even the lighting. You can also search for specific photos with voice commands, letting you easily pull up images of your first dog, your child as a baby, and other shots without having to scroll endlessly through years of photos yourself.</p>
+
+
+
+
+
+
+
+<p class="wp-block-paragraph">If you want to add a more personal touch, Amazon also lets you attach voice notes to individual photos via the Amazon Photos app. For example, you can add a recording of your kid explaining their Halloween costume to a trick-or-treating photo. Plus, you can preload the frame with photos and recordings before gifting it, so your loved one won&#8217;t have to spend time setting it up.</p>
+
+<p class="wp-block-paragraph">We’re still testing Amazon’s answer to the Aura frame, but it looks like a particularly good option if you’re already an Amazon Prime member. A Prime subscription grants you unlimited full-resolution photo storage and access to Alexa Plus at no additional cost, and unlike Amazon’s smart displays, the frame doesn’t serve up annoying ads. That said, you don’t need a subscription to use it, and new users can always access a limited-time trial of Alexa Plus.</p>
+							]]>
+											
+				</content:encoded>
+			</item>
+	</channel>
+</rss>
