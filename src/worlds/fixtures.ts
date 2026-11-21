@@ -100,3 +100,10 @@ export const FIXTURE_OMITTED_ARTICLE: ReadingArticle = {
     { type: 'omitted', kind: 'table' },
   ],
 };
+
+/** The feeds a site like The Verge advertises, to choose from (T21). */
+export const FIXTURE_CHOICES = [
+  { url: 'https://www.theverge.com/rss/index.xml', title: 'The Verge' },
+  { url: 'https://www.theverge.com/rss/reviews/index.xml', title: 'The Verge – Reviews' },
+  { url: 'https://www.theverge.com/rss/policy/index.xml', title: 'The Verge – Policy' },
+];

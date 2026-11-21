@@ -4,7 +4,14 @@ import type { Auth } from '@/auth/auth-context';
 import type { SignInView } from '@/auth/sign-in-outcome';
 import type { Environment } from '@/environment';
 import type { AddFeedReason, AddFeedView, ArticleView, FeedsData } from '@/feeds/feeds-data';
-import { FIXTURE_ARTICLE, FIXTURE_NOW, FIXTURE_OMITTED_ARTICLE, FIXTURE_READ_ROWS, FIXTURE_ROWS } from '@/worlds/fixtures';
+import {
+  FIXTURE_ARTICLE,
+  FIXTURE_CHOICES,
+  FIXTURE_NOW,
+  FIXTURE_OMITTED_ARTICLE,
+  FIXTURE_READ_ROWS,
+  FIXTURE_ROWS,
+} from '@/worlds/fixtures';
 import type { ThemeName } from '@/theme/tokens';
 
 /**
@@ -22,8 +29,11 @@ export type WorldSpec = {
   auth?: 'signed-in' | 'signed-out' | 'signing-in' | 'not-allowed' | 'failed';
   /** What All holds. Defaults to no Feeds yet. `read` is every Article already Read. */
   feeds?: 'none' | 'loading' | 'some' | 'read';
-  /** Where adding a Feed is up to. Defaults to idle, where adding succeeds. */
-  addFeed?: 'idle' | 'busy' | AddFeedReason;
+  /**
+   * Where adding a Feed is up to. Defaults to idle, where adding succeeds. `choose`: a site with
+   * several feeds. `already`: adding finds The Verge, already followed.
+   */
+  addFeed?: 'idle' | 'busy' | 'choose' | 'already' | AddFeedReason;
   /** Whether a pull-down refresh is under way. */
   refreshing?: boolean;
   /** The Article the Reading view opens. Defaults to one with every kind of block. */
@@ -42,7 +52,13 @@ export function worldFeeds(spec: WorldSpec, log: FeedsLog = { added: [], refresh
   const addFeed = spec.addFeed ?? 'idle';
   const article = spec.article ?? 'full';
   const addView: AddFeedView =
-    addFeed === 'idle' ? { status: 'idle' } : addFeed === 'busy' ? { status: 'busy' } : { status: 'error', reason: addFeed };
+    addFeed === 'idle' || addFeed === 'already'
+      ? { status: 'idle' }
+      : addFeed === 'busy'
+        ? { status: 'busy' }
+        : addFeed === 'choose'
+          ? { status: 'choose', choices: FIXTURE_CHOICES }
+          : { status: 'error', reason: addFeed };
   const articleView: ArticleView =
     article === 'loading'
       ? { status: 'loading' }
@@ -61,7 +77,10 @@ export function worldFeeds(spec: WorldSpec, log: FeedsLog = { added: [], refresh
       add: (url) => {
         log.added.push(url);
         // Busy stays busy; an error stays on the screen; idle adds the Feed.
-        return addFeed === 'busy' ? new Promise(() => {}) : Promise.resolve(addFeed === 'idle');
+        if (addFeed === 'busy') return new Promise(() => {});
+        if (addFeed === 'idle') return Promise.resolve({ kind: 'added' });
+        if (addFeed === 'already') return Promise.resolve({ kind: 'already', title: 'The Verge' });
+        return Promise.resolve({ kind: 'stay' });
       },
     }),
     useMarkRead: () => (id) => {

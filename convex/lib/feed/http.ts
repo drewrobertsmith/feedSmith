@@ -12,7 +12,8 @@ export const MAX_VALIDATOR = 256;
 /** What a Feed said about its version last time, sent back so it can answer "not modified" (T19). */
 export type Validators = { etag?: string; lastModified?: string };
 
-export type FetchResult = ({ _tag: 'Fetched'; body: string } & Validators) | { _tag: 'NotModified' };
+/** `url` is the address finally read, after redirects; relative links on it resolve against it. */
+export type FetchResult = ({ _tag: 'Fetched'; body: string; url: string } & Validators) | { _tag: 'NotModified' };
 
 /** A validator worth keeping: short, printable, no control characters. */
 function cleanValidator(value: string | null | undefined): string | undefined {
@@ -125,7 +126,7 @@ export class FeedHttp extends Context.Service<
         if (!response.ok) return yield* new Unreachable();
         const body = yield* Effect.tryPromise({ try: () => readCapped(response), catch: () => new Unreachable() });
         if (body === null) return yield* new TooLarge();
-        const result: FetchResult = { _tag: 'Fetched', body };
+        const result: FetchResult = { _tag: 'Fetched', body, url: url.href };
         const newEtag = cleanValidator(response.headers.get('etag'));
         const newLastModified = cleanValidator(response.headers.get('last-modified'));
         if (newEtag) result.etag = newEtag;

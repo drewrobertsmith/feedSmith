@@ -1,5 +1,6 @@
 import { act, fireEvent, userEvent } from '@testing-library/react-native';
 import { renderRouter, screen } from 'expo-router/testing-library';
+import { ToastAndroid } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { Uniwind } from 'uniwind';
 
@@ -21,7 +22,7 @@ import {
   type AllWorldId,
   type ReadingWorldId,
 } from '@/worlds/catalog';
-import { FIXTURE_ARTICLE, FIXTURE_NOW, FIXTURE_ROWS } from '@/worlds/fixtures';
+import { FIXTURE_ARTICLE, FIXTURE_CHOICES, FIXTURE_NOW, FIXTURE_ROWS } from '@/worlds/fixtures';
 import { createWorld, type World, type WorldSpec } from '@/worlds/world';
 
 jest.mock('expo-web-browser', () => ({ openBrowserAsync: jest.fn() }));
@@ -165,23 +166,26 @@ describe('All', () => {
 describe('Add a Feed', () => {
   const ERRORS = {
     'not-a-feed': 'That address isn’t an RSS or Atom feed. Try the site’s feed URL.',
-    unreachable: 'Couldn’t reach that address. Check the URL and your connection, then try again.',
-    'invalid-url': 'Enter a feed URL that starts with https://.',
+    unreachable: 'Couldn’t reach that address. Check it, or enter the site’s feed URL.',
+    'invalid-url': 'Enter a website or feed URL, like theverge.com.',
+    'no-feed-found': 'No feed found at that address. Try the site’s feed URL.',
   };
-  type Shows = { busy: boolean; error: string | null; titleSize: number; theme: 'dark' | 'light' };
+  type Shows = { busy: boolean; error: string | null; choices: number; titleSize: number; theme: 'dark' | 'light' };
   const SHOWS: Record<AddFeedWorldId, Shows> = {
-    'add-idle': { busy: false, error: null, titleSize: 24, theme: 'dark' },
-    'add-busy': { busy: true, error: null, titleSize: 24, theme: 'dark' },
-    'add-not-a-feed': { busy: false, error: ERRORS['not-a-feed'], titleSize: 24, theme: 'dark' },
-    'add-unreachable': { busy: false, error: ERRORS.unreachable, titleSize: 24, theme: 'light' },
-    'add-largest-font': { busy: false, error: ERRORS['invalid-url'], titleSize: 48, theme: 'dark' },
+    'add-idle': { busy: false, error: null, choices: 0, titleSize: 24, theme: 'dark' },
+    'add-busy': { busy: true, error: null, choices: 0, titleSize: 24, theme: 'dark' },
+    'add-choose': { busy: false, error: null, choices: FIXTURE_CHOICES.length, titleSize: 24, theme: 'dark' },
+    'add-no-feed': { busy: false, error: ERRORS['no-feed-found'], choices: 0, titleSize: 24, theme: 'light' },
+    'add-not-a-feed': { busy: false, error: ERRORS['not-a-feed'], choices: 0, titleSize: 24, theme: 'dark' },
+    'add-unreachable': { busy: false, error: ERRORS.unreachable, choices: 0, titleSize: 24, theme: 'light' },
+    'add-largest-font': { busy: false, error: null, choices: FIXTURE_CHOICES.length, titleSize: 48, theme: 'dark' },
   };
 
   test.each(ADD_FEED_WORLDS)('$label', async ({ id, spec }) => {
     const shows = SHOWS[id];
     await open(spec);
     expect(await screen.findByRole('heading', { name: 'Add a Feed' })).toHaveStyle({ fontSize: shows.titleSize });
-    const field = screen.getByLabelText('Feed URL');
+    const field = screen.getByLabelText('Website or feed URL');
     if (shows.busy) {
       expect(screen.getByRole('button', { name: 'Adding…' })).toBeDisabled();
       expect(field).toHaveProp('editable', false);
@@ -190,7 +194,17 @@ describe('Add a Feed', () => {
     }
     if (shows.error) expect(screen.getByRole('alert')).toHaveTextContent(shows.error);
     else expect(screen.queryByRole('alert')).not.toBeOnTheScreen();
+    expect(screen.queryAllByRole('button', { name: /, theverge\.com$/ })).toHaveLength(shows.choices);
     expect(Uniwind.currentTheme).toBe(shows.theme);
+  });
+
+  test('a site with several feeds lists them, each named and placed for TalkBack, and choosing one adds it', async () => {
+    const user = userEvent.setup();
+    const w = await open({ colorScheme: 'dark', section: 'add-feed', addFeed: 'choose' });
+    expect(await screen.findByText('This site has more than one feed. Choose one.')).toBeOnTheScreen();
+    const [first] = FIXTURE_CHOICES;
+    await user.press(screen.getByRole('button', { name: `${first.title}, theverge.com` }));
+    expect(w.feedsLog.added).toEqual([first.url]);
   });
 
   test('Add Feed waits for a URL', async () => {
@@ -202,20 +216,33 @@ describe('Add a Feed', () => {
     const user = userEvent.setup();
     const w = await open({ colorScheme: 'dark', feeds: 'some' });
     await user.press(await screen.findByRole('button', { name: 'Add a Feed' }));
-    await user.type(await screen.findByLabelText('Feed URL'), 'https://www.theverge.com/rss/index.xml');
+    await user.type(await screen.findByLabelText('Website or feed URL'), 'https://www.theverge.com/rss/index.xml');
     await user.press(screen.getByRole('button', { name: 'Add Feed' }));
     expect(w.feedsLog.added).toEqual(['https://www.theverge.com/rss/index.xml']);
     expect(await screen.findByRole('heading', { name: 'Feeds' })).toBeOnTheScreen();
   });
 
+  test('a Feed you already follow takes you back to All, with a quiet note naming it', async () => {
+    const toast = jest.spyOn(ToastAndroid, 'show').mockImplementation(() => {});
+    const user = userEvent.setup();
+    await open({ colorScheme: 'dark', feeds: 'some', addFeed: 'already' });
+    await user.press(await screen.findByRole('button', { name: 'Add a Feed' }));
+    await user.type(await screen.findByLabelText('Website or feed URL'), 'theverge.com');
+    await user.press(screen.getByRole('button', { name: 'Add Feed' }));
+    expect(await screen.findByRole('heading', { name: 'Feeds' })).toBeOnTheScreen();
+    expect(toast).toHaveBeenCalledWith('You already follow The Verge.', ToastAndroid.SHORT);
+    expect(screen.queryByRole('alert')).not.toBeOnTheScreen();
+    toast.mockRestore();
+  });
+
   test('a failed add stays on the screen with the URL kept', async () => {
     const user = userEvent.setup();
     const w = await open({ colorScheme: 'dark', section: 'add-feed', addFeed: 'not-a-feed' });
-    await user.type(await screen.findByLabelText('Feed URL'), 'https://example.com/');
+    await user.type(await screen.findByLabelText('Website or feed URL'), 'https://example.com/');
     await user.press(screen.getByRole('button', { name: 'Add Feed' }));
     expect(w.feedsLog.added).toEqual(['https://example.com/']);
     expect(screen.getByRole('heading', { name: 'Add a Feed' })).toBeOnTheScreen();
-    expect(screen.getByLabelText('Feed URL')).toHaveDisplayValue('https://example.com/');
+    expect(screen.getByLabelText('Website or feed URL')).toHaveDisplayValue('https://example.com/');
   });
 });
 
@@ -303,7 +330,7 @@ describe('links into Feeds screens (Q25)', () => {
     await open({ colorScheme: 'dark', auth: 'signed-out' }, url);
     expect(await screen.findByRole('heading', { name: 'feedSmith' })).toBeOnTheScreen();
     expect(screen.queryByText('Talks resume next year.')).not.toBeOnTheScreen();
-    expect(screen.queryByLabelText('Feed URL')).not.toBeOnTheScreen();
+    expect(screen.queryByLabelText('Website or feed URL')).not.toBeOnTheScreen();
   });
 });
 

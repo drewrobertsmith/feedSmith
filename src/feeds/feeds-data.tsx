@@ -33,7 +33,20 @@ export type ReadingArticle = {
 
 export type AllView = { status: 'loading' } | { status: 'ready'; articles: ArticleRow[] };
 export type ArticleView = { status: 'loading' } | { status: 'missing' } | { status: 'ready'; article: ReadingArticle };
-export type AddFeedView = { status: 'idle' } | { status: 'busy' } | { status: 'error'; reason: AddFeedReason };
+/**
+ * What adding a Feed came to: added; already followed at that URL (by its name), which takes
+ * the User back to it; or stay, with the view saying why (an error, or feeds to choose from).
+ */
+export type AddOutcome = { kind: 'added' } | { kind: 'already'; title: string } | { kind: 'stay' };
+
+/** A feed a site advertises, to choose from (T21). */
+export type FeedChoice = { url: string; title: string };
+
+export type AddFeedView =
+  | { status: 'idle' }
+  | { status: 'busy' }
+  | { status: 'error'; reason: AddFeedReason }
+  | { status: 'choose'; choices: FeedChoice[] };
 
 /**
  * Everything the screens read and do with Feeds and Articles. Convex backs it in the app
@@ -43,8 +56,8 @@ export type AddFeedView = { status: 'idle' } | { status: 'busy' } | { status: 'e
 export type FeedsData = {
   useAll: () => AllView;
   useArticle: (id: string) => ArticleView;
-  /** Adding a Feed: where it's up to, and `add`, which resolves true once the Feed is added. */
-  useAddFeed: () => { view: AddFeedView; add: (url: string) => Promise<boolean> };
+  /** Adding a Feed: where it's up to, and `add`, which resolves to what happened. */
+  useAddFeed: () => { view: AddFeedView; add: (url: string) => Promise<AddOutcome> };
   /** Pulling down: fetches every Feed now, on the server (P15, Q21). */
   useRefresh: () => { refreshing: boolean; refresh: () => Promise<void> };
   /** Marks an Article Read (P7), for the Reading view to call when it opens one. */

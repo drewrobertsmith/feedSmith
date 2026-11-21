@@ -99,14 +99,14 @@ describe('responses are bounded', () => {
 
 test('returns the body as text, asking for feeds', async () => {
   const { exit, fetch } = await get('https://example.com/feed', ok('<rss version="2.0"/>'));
-  expect(Exit.isSuccess(exit) && exit.value).toEqual({ _tag: 'Fetched', body: '<rss version="2.0"/>' });
+  expect(Exit.isSuccess(exit) && exit.value).toEqual({ _tag: 'Fetched', body: '<rss version="2.0"/>', url: 'https://example.com/feed' });
   const [, init] = fetch.mock.calls[0];
   expect(new Headers(init.headers).get('accept')).toContain('application/rss+xml');
 });
 
 test('a body that happens to read "too-large" is just a body', async () => {
   const { exit } = await get('https://example.com/feed', ok('too-large'));
-  expect(Exit.isSuccess(exit) && exit.value).toEqual({ _tag: 'Fetched', body: 'too-large' });
+  expect(Exit.isSuccess(exit) && exit.value).toEqual({ _tag: 'Fetched', body: 'too-large', url: 'https://example.com/feed' });
 });
 
 describe('conditional requests (T19)', () => {
@@ -118,6 +118,7 @@ describe('conditional requests (T19)', () => {
     expect(Exit.isSuccess(exit) && exit.value).toEqual({
       _tag: 'Fetched',
       body: '<rss/>',
+      url: 'https://example.com/feed',
       etag: '"abc"',
       lastModified: 'Sat, 21 Nov 2026 12:00:00 GMT',
     });
@@ -137,7 +138,7 @@ describe('conditional requests (T19)', () => {
   test(`a validator over ${MAX_VALIDATOR} characters, or with control characters, is never kept or sent`, async () => {
     const huge = `"${'x'.repeat(MAX_VALIDATOR)}"`;
     const kept = await get('https://example.com/feed', ok('<rss/>', { etag: huge }));
-    expect(Exit.isSuccess(kept.exit) && kept.exit.value).toEqual({ _tag: 'Fetched', body: '<rss/>' });
+    expect(Exit.isSuccess(kept.exit) && kept.exit.value).toEqual({ _tag: 'Fetched', body: '<rss/>', url: 'https://example.com/feed' });
 
     const sent = await get('https://example.com/feed', ok(), 1000, { etag: '"a"\r\nX-Evil: 1', lastModified: huge });
     const headers = new Headers(sent.fetch.mock.calls[0][1].headers);
@@ -149,4 +150,11 @@ describe('conditional requests (T19)', () => {
     const { tag } = await get('https://example.com/feed', async () => new Response(null, { status: 304 }));
     expect(tag).toBe('Unreachable');
   });
+});
+
+test('reports the address it finally read, after redirects (T21)', async () => {
+  const { exit } = await get('https://example.com/', async (url) =>
+    url === 'https://example.com/' ? redirect('https://www.example.com/') : new Response('<html/>'),
+  );
+  expect(Exit.isSuccess(exit) && exit.value).toEqual({ _tag: 'Fetched', body: '<html/>', url: 'https://www.example.com/' });
 });

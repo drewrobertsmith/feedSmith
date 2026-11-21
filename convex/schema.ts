@@ -15,6 +15,8 @@ export default defineSchema({
     title: v.string(),
     /** The site's origin, from the Feed's own link (not the secret feed URL); its favicon lives there. */
     siteUrl: v.optional(v.string()),
+    /** The icon the site names for itself (T21); else `/favicon.ico` on `siteUrl`. */
+    iconUrl: v.optional(v.string()),
     /** Whether its last fetch worked (P15). Optional only for Feeds stored before FEE-24. */
     status: v.optional(v.union(v.literal('working'), v.literal('failing'))),
     /** Failed fetches in a row; each backs the next try off further (Q7). */

@@ -50,12 +50,14 @@ export type AllWorldId = (typeof ALL_WORLDS)[number]['id'];
 export const ADD_FEED_WORLDS = [
   { id: 'add-idle', label: 'Add a Feed', spec: { colorScheme: 'dark', section: 'add-feed' } },
   { id: 'add-busy', label: 'Adding', spec: { colorScheme: 'dark', section: 'add-feed', addFeed: 'busy' } },
+  { id: 'add-choose', label: 'Choose a feed', spec: { colorScheme: 'dark', section: 'add-feed', addFeed: 'choose' } },
+  { id: 'add-no-feed', label: 'No feed found', spec: { colorScheme: 'light', section: 'add-feed', addFeed: 'no-feed-found' } },
   { id: 'add-not-a-feed', label: 'Not a feed', spec: { colorScheme: 'dark', section: 'add-feed', addFeed: 'not-a-feed' } },
   { id: 'add-unreachable', label: 'Unreachable', spec: { colorScheme: 'light', section: 'add-feed', addFeed: 'unreachable' } },
   {
     id: 'add-largest-font',
     label: 'Add a Feed, largest font size',
-    spec: { colorScheme: 'dark', section: 'add-feed', addFeed: 'invalid-url', fontScale: 2 },
+    spec: { colorScheme: 'dark', section: 'add-feed', addFeed: 'choose', fontScale: 2 },
   },
 ] as const satisfies readonly CatalogWorld[];
 
