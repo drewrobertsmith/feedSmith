@@ -5,35 +5,51 @@ import type { Id } from './_generated/dataModel';
 import { internalAction, internalMutation, internalQuery, type ActionCtx } from './_generated/server';
 import { fetchFeed } from './lib/feed/fetch';
 import { markFailing, markWorking, RETENTION, storeNewArticles } from './lib/feed/record';
-import { vStoredArticle } from './lib/feed/validators';
+import { vStoredArticle, vValidators } from './lib/feed/validators';
 
 /** How long a Feed handed to a fetch stays out of the next tick, so a slow fetch isn't doubled. */
 const LEASE = 10 * 60_000;
 /** Feeds started per tick; the rest wait for the next one. */
 const PER_TICK = 50;
-/** Articles deleted per cleanup run; a backlog continues in a follow-up run. */
-const CLEANUP_BATCH = 250;
-
-const vValidators = { etag: v.optional(v.string()), lastModified: v.optional(v.string()) };
+/**
+ * Articles deleted per cleanup run; a backlog continues in a follow-up run. Small, because each
+ * brings its body, and one fetch's bodies can be megabytes (Convex reads 16 MiB per mutation).
+ */
+const CLEANUP_BATCH = 50;
 
 /** Fetches one Feed and records what happened. Shared by the cron and pulling down. */
 export async function refreshOne(ctx: ActionCtx, feedId: Id<'feeds'>) {
   const feed = await ctx.runQuery(internal.refresh.forRefresh, { feedId });
   if (!feed) return;
-  const outcome = await fetchFeed(feed.url, { etag: feed.etag, lastModified: feed.lastModified });
-  const now = Date.now();
-  if (outcome._tag === 'Fetched') {
-    await ctx.runMutation(internal.refresh.recordFetch, {
-      feedId,
-      now,
-      articles: outcome.articles,
-      ...outcome.validators,
-    });
-  } else if (outcome._tag === 'NotModified') {
-    await ctx.runMutation(internal.refresh.recordNotModified, { feedId, now });
-  } else {
-    await ctx.runMutation(internal.refresh.recordFailure, { feedId, now });
+  try {
+    const outcome = await fetchFeed(feed.url, { etag: feed.etag, lastModified: feed.lastModified });
+    const now = Date.now();
+    if (outcome._tag === 'Fetched') {
+      await ctx.runMutation(internal.refresh.recordFetch, {
+        feedId,
+        now,
+        articles: outcome.articles,
+        ...outcome.validators,
+      });
+    } else if (outcome._tag === 'NotModified') {
+      await ctx.runMutation(internal.refresh.recordNotModified, { feedId, now });
+    } else {
+      await ctx.runMutation(internal.refresh.recordFailure, { feedId, now });
+    }
+  } catch {
+    // Anything unexpected (a limit hit while storing) still counts as a failure, so the Feed
+    // backs off instead of retrying when its lease ends. The error isn't logged: it may carry the URL (Q9).
+    await ctx.runMutation(internal.refresh.recordFailure, { feedId, now: Date.now() });
   }
+}
+
+/** Runs `work` over `items`, at most `limit` at a time. */
+export async function inBatches<T>(items: T[], limit: number, work: (item: T) => Promise<void>) {
+  let next = 0;
+  const lane = async () => {
+    while (next < items.length) await work(items[next++]);
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, lane));
 }
 
 /** What a fetch needs to know about a Feed. Internal: the URL never leaves the server (Q9). */
@@ -51,7 +67,8 @@ export const recordFetch = internalMutation({
   returns: v.null(),
   handler: async (ctx, { feedId, now, articles, etag, lastModified }) => {
     const feed = await ctx.db.get(feedId);
-    if (!feed) return null;
+    // Gone, or a newer fetch already finished: an older result never overwrites it.
+    if (!feed || (feed.lastFetchedAt ?? 0) > now) return null;
     await storeNewArticles(ctx, feed.userId, feedId, articles, now);
     await markWorking(ctx, feedId, now, { etag, lastModified });
     return null;
@@ -62,7 +79,8 @@ export const recordNotModified = internalMutation({
   args: { feedId: v.id('feeds'), now: v.number() },
   returns: v.null(),
   handler: async (ctx, { feedId, now }) => {
-    if (await ctx.db.get(feedId)) await markWorking(ctx, feedId, now);
+    const feed = await ctx.db.get(feedId);
+    if (feed && (feed.lastFetchedAt ?? 0) <= now) await markWorking(ctx, feedId, now);
     return null;
   },
 });
@@ -101,6 +119,8 @@ export const scheduleDue = internalMutation({
         await ctx.scheduler.runAfter(0, internal.refresh.refreshFeed, { feedId: feed._id });
       }),
     );
+    // More were due than one tick starts: come straight back for the rest.
+    if (due.length === PER_TICK) await ctx.scheduler.runAfter(0, internal.refresh.scheduleDue, {});
     return null;
   },
 });

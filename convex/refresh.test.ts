@@ -168,6 +168,36 @@ describe('a Feed that stops working (Q7)', () => {
   });
 });
 
+describe('fetches that overlap or misbehave', () => {
+  test('an older result never overwrites a newer one', async () => {
+    const s = await setup();
+    const feed = await follow(s, [{ guid: 'g1', ago: HOUR }]);
+    await s.t.mutation(internal.refresh.recordFailure, { feedId: feed._id, now: START - MINUTE });
+    expect(await feedOf(s, feed._id)).toMatchObject({ status: 'working', failures: 0, lastFetchedAt: START });
+  });
+
+  test('a fetch that throws is recorded as a failure, so it backs off', async () => {
+    const s = await setup();
+    const feed = await follow(s, [{ guid: 'g1', ago: HOUR }]);
+    network.mockImplementation(() => {
+      throw new Error('not even a rejected promise');
+    });
+    await refresh(s, feed._id);
+    expect(await feedOf(s, feed._id)).toMatchObject({ status: 'failing', failures: 1 });
+  });
+
+  test('a tick with more due Feeds than it starts at once comes back for the rest', async () => {
+    const s = await setup();
+    await s.t.run(async (ctx) => {
+      for (let i = 0; i < 60; i++) await ctx.db.insert('feeds', { userId: s.userA, url: `https://f${i}.example.com/feed`, title: `F${i}` });
+    });
+    network.mockImplementation(async () => new Response(rss([])));
+    await s.t.mutation(internal.refresh.scheduleDue, {});
+    await s.t.finishAllScheduledFunctions(vi.runAllTimers);
+    expect(network).toHaveBeenCalledTimes(60);
+  });
+});
+
 describe('pulling down fetches every Feed now', () => {
   test("fetches the User's own Feeds, and no one else's", async () => {
     const s = await setup();
@@ -179,6 +209,28 @@ describe('pulling down fetches every Feed now', () => {
     expect(network).not.toHaveBeenCalled();
     await s.a.action(api.feeds.refreshAll, {});
     expect(network).toHaveBeenCalledTimes(1);
+  });
+
+  test('a pull fetches at most a few Feeds at a time', async () => {
+    const s = await setup();
+    await s.t.run(async (ctx) => {
+      for (let i = 0; i < 12; i++) await ctx.db.insert('feeds', { userId: s.userA, url: `https://f${i}.example.com/feed`, title: `F${i}` });
+    });
+    // Answers are held open until released, so overlapping fetches pile up here.
+    const waiting: (() => void)[] = [];
+    network.mockImplementation(() => new Promise((resolve) => waiting.push(() => resolve(new Response(rss([]))))));
+    let done = false;
+    const pull = s.a.action(api.feeds.refreshAll, {}).finally(() => (done = true));
+    let most = 0;
+    for (let i = 0; i < 500 && !done; i++) {
+      await vi.advanceTimersByTimeAsync(1);
+      most = Math.max(most, waiting.length);
+      waiting.splice(0).forEach((release) => release());
+    }
+    await pull;
+    expect(network).toHaveBeenCalledTimes(12);
+    expect(most).toBeGreaterThan(1);
+    expect(most).toBeLessThanOrEqual(4);
   });
 
   test("repeated pulls don't refetch a Feed fetched in the last two minutes", async () => {

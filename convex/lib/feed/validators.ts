@@ -51,6 +51,9 @@ export const vAddFeedReason = v.union(
 
 export type AddFeedReason = Infer<typeof vAddFeedReason>;
 
+/** What a Feed said about its version last time (T19). */
+export const vValidators = { etag: v.optional(v.string()), lastModified: v.optional(v.string()) };
+
 /** An Article as a fetch hands it to be stored: fields and its cleaned content. */
 export const vStoredArticle = v.object({
   guid: v.string(),

@@ -6,14 +6,16 @@ import { requireUserId } from './lib/currentUser';
 import { fetchFeed } from './lib/feed/fetch';
 import { safeUrl } from './lib/feed/http';
 import { markWorking, storeNewArticles } from './lib/feed/record';
-import { vAddFeedReason, vStoredArticle, type AddFeedReason } from './lib/feed/validators';
-import { refreshOne } from './refresh';
+import { vAddFeedReason, vStoredArticle, vValidators, type AddFeedReason } from './lib/feed/validators';
+import { inBatches, refreshOne } from './refresh';
 
 const MAX_URL = 2048;
 /** Pulling down skips a Feed fetched this recently, so repeated pulls can't hammer a site. */
 const PULL_GAP = 2 * 60_000;
 /** Feeds one pull fetches at most. */
 const PULL_LIMIT = 200;
+/** Fetches one pull runs at once: each can hold a couple of megabytes while it parses. */
+const PULL_CONCURRENCY = 4;
 
 const vAddResult = v.union(
   v.object({ ok: v.literal(true) }),
@@ -58,7 +60,7 @@ export const refreshAll = action({
   handler: async (ctx): Promise<null> => {
     const userId = await ctx.runQuery(internal.feeds.viewer, {});
     const feedIds = await ctx.runQuery(internal.feeds.toRefresh, { userId, now: Date.now() });
-    await Promise.all(feedIds.map((feedId) => refreshOne(ctx, feedId)));
+    await inBatches(feedIds, PULL_CONCURRENCY, (feedId) => refreshOne(ctx, feedId));
     return null;
   },
 });
@@ -91,8 +93,7 @@ export const store = internalMutation({
     title: v.string(),
     articles: v.array(vStoredArticle),
     now: v.number(),
-    etag: v.optional(v.string()),
-    lastModified: v.optional(v.string()),
+    ...vValidators,
   },
   returns: v.union(v.literal('stored'), v.literal('already-added')),
   handler: async (ctx, { userId, url, title, articles, now, etag, lastModified }) => {

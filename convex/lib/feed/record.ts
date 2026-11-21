@@ -7,9 +7,13 @@ import type { StoredArticle } from './validators';
 /** Articles that aren't Saved are kept this long after publication (P14). */
 export const RETENTION = 30 * 24 * 60 * 60_000;
 /** Enough of a Feed's recent Articles to judge its pace; busier Feeds sit at the floor anyway. */
-const PACE_SAMPLE = 2000;
+const PACE_SAMPLE = 700;
 
-/** Stores the Articles the Feed doesn't have yet, by guid, skipping any already past retention. */
+/**
+ * Stores the Articles the Feed doesn't have yet, by guid, skipping any already past retention.
+ * Expects each guid once in `articles` (`articlesToStore` guarantees it): the check is against
+ * what's already stored, not within the batch.
+ */
 export async function storeNewArticles(
   ctx: MutationCtx,
   userId: Id<'users'>,
@@ -49,7 +53,8 @@ export async function markWorking(ctx: MutationCtx, feedId: Id<'feeds'>, now: nu
 /** Marks a Feed failing and backs its next try off (Q7). Its Articles stay. */
 export async function markFailing(ctx: MutationCtx, feedId: Id<'feeds'>, now: number) {
   const feed = await ctx.db.get(feedId);
-  if (!feed) return;
+  // Gone, or a newer fetch already finished: an older failure never overwrites it.
+  if (!feed || (feed.lastFetchedAt ?? 0) > now) return;
   const failures = (feed.failures ?? 0) + 1;
   await ctx.db.patch(feedId, { status: 'failing', failures, lastFetchedAt: now, nextFetchAt: now + backoff(failures) });
 }
