@@ -1,0 +1,55 @@
+{
+  "appDir": ".",
+  "git": {
+    "mainBranch": "main",
+    "developBranch": "develop",
+    "prefixes": {
+      "feature": "feature/",
+      "fix": "fix/",
+      "hotfix": "hotfix/",
+      "chore": "chore/"
+    },
+    "tagPrefix": "v",
+    "guard": true
+  },
+  "decisions": "docs/decisions.md",
+  "glossary": "GLOSSARY.md",
+  "qualityBar": "docs/quality-bar.md",
+  "gates": [
+    {
+      "name": "typecheck",
+      "run": "bun run typecheck"
+    },
+    {
+      "name": "lint",
+      "run": "bun run lint"
+    },
+    {
+      "name": "test",
+      "run": "bun run test"
+    },
+    {
+      "name": "doctor",
+      "run": "bun run doctor"
+    },
+    {
+      "name": "security",
+      "run": "bun run security"
+    }
+  ],
+  "fullScans": [
+    {
+      "name": "security:full",
+      "run": "bun run security:full"
+    }
+  ],
+  "requiredReviewSkills": [
+    "vercel-composition-patterns",
+    "react-native-best-practices",
+    "react-doctor",
+    "security-and-hardening"
+  ],
+  "sourceFiles": "\\.(ts|tsx|js|jsx|mjs|cjs|kt|swift|m|mm)$",
+  "ignoredPaths": "^(docs/|\\.claude/|\\.agents/|scripts/|example/)",
+  "stateGallery": null
+}

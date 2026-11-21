@@ -52,4 +52,8 @@ Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-
 
 ### Domain docs
 
-Single-context: root `GLOSSARY.md` + `docs/adr/`. See `docs/agents/domain.md`.
+Single-context: root `GLOSSARY.md` + one decision log, `docs/decisions.md`. See `docs/agents/domain.md`.
+
+## Dev loop (expo-dev-loop)
+
+This project uses the expo-dev-loop plugin: `/expo-dev-loop:feature` for every change, gates and required review skills in `.claude/expo-dev-loop.json`, enforced by its Stop hook. Decisions live in `docs/decisions.md`. What the app must never get wrong lives in `docs/quality-bar.md`, built and revised with `/expo-dev-loop:quality-bar`.
