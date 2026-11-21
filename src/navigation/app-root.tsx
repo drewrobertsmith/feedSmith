@@ -33,7 +33,9 @@ function ThemedStack() {
         {/* The state gallery exists only in development builds (T13). */}
         <Stack.Protected guard={__DEV__}>
           <Stack.Screen name="gallery" />
+          <Stack.Screen name="spike-auth" />
         </Stack.Protected>
+        <Stack.Screen name="auth" />
       </Stack>
     </ThemeProvider>
   );
