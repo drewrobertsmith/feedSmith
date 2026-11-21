@@ -26,7 +26,12 @@ export function AppButton({
       aria-busy={busy}
       disabled={off}
       onPress={onPress}
-      className={off ? 'self-start rounded-full bg-surface px-group py-related opacity-60' : 'self-start rounded-full bg-surface px-group py-related'}
+      // The border is the boundary (Q14: 3:1); the surface fill alone is too faint on cream.
+      className={
+        off
+          ? 'self-start rounded-full border border-text-muted bg-surface px-group py-related opacity-60'
+          : 'self-start rounded-full border border-text-muted bg-surface px-group py-related'
+      }
     >
       <AppText variant="label" className="text-text">
         {label}

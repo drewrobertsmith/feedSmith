@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { htmlToBlocks, MAX_BLOCKS, MAX_SPANS, MAX_TEXT } from './blocks';
+import { htmlToBlocks, MAX_BLOCKS, MAX_DEPTH, MAX_ENTRIES, MAX_SIZE, MAX_SPANS } from './blocks';
 
 const BASE = 'https://example.com/posts/1';
 
@@ -73,12 +73,29 @@ describe('hostile HTML never reaches the stored blocks (Q8)', () => {
     expect(block.spans.map((s) => s.text).join('')).toBe('xy'.repeat(5000));
   });
 
-  test(`keeps at most ${MAX_TEXT} characters of text`, () => {
-    const html = `<p>${'a'.repeat(MAX_TEXT)}</p><p>${'b'.repeat(1000)}</p>`;
+  test(`keeps an Article's blocks under ${MAX_SIZE} characters of stored JSON, overhead included`, () => {
+    const html = `<p>${'<b>x</b><i>y</i>'.repeat(200_000)}</p><p>${'b'.repeat(1000)}</p>`;
     const { blocks } = htmlToBlocks(html, BASE);
-    const text = JSON.stringify(blocks);
-    expect(text).not.toContain('b');
+    expect(JSON.stringify(blocks).length).toBeLessThanOrEqual(MAX_SIZE + 100);
     expect(blocks.at(-1)).toEqual({ type: 'omitted', kind: 'other' });
+  });
+
+  test(`a list keeps at most ${MAX_ENTRIES} entries, and a quote as many paragraphs`, () => {
+    const list = htmlToBlocks(`<ul>${'<li>x</li>'.repeat(10_000)}</ul>`, BASE).blocks;
+    expect(list[0].type === 'list' && list[0].items.length).toBe(MAX_ENTRIES);
+    expect(list.at(-1)).toEqual({ type: 'omitted', kind: 'other' });
+    const quote = htmlToBlocks(`<blockquote>${'<p>x</p>'.repeat(10_000)}</blockquote>`, BASE).blocks;
+    expect(quote[0].type === 'quote' && quote[0].paragraphs.length).toBe(MAX_ENTRIES);
+  });
+
+  test(`markup nested deeper than ${MAX_DEPTH} levels doesn't overflow the stack`, () => {
+    const deep = (tag: string) => `${`<${tag}>`.repeat(50_000)}deep${`</${tag}>`.repeat(50_000)}`;
+    expect(() => htmlToBlocks(deep('div'), BASE)).not.toThrow();
+    expect(() => htmlToBlocks(`<p>${deep('span')}</p>`, BASE)).not.toThrow();
+  });
+
+  test.each(['constructor', 'toString', 'hasOwnProperty'])('a <%s> tag is just a container', (tag) => {
+    expect(htmlToBlocks(`<${tag}>Hi</${tag}>`, BASE).blocks).toEqual([{ type: 'paragraph', spans: [{ text: 'Hi' }] }]);
   });
 });
 

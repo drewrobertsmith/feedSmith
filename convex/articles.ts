@@ -56,17 +56,24 @@ export const get = query({
   ),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
+    // Convex ids are well under 64 characters; longer strings aren't worth normalising.
     const id = args.id.length <= 64 ? ctx.db.normalizeId('articles', args.id) : null;
     const article = id ? await ctx.db.get(id) : null;
     if (!article || article.userId !== userId) return null;
-    const feed = await ctx.db.get(article.feedId);
+    const [feed, body] = await Promise.all([
+      ctx.db.get(article.feedId),
+      ctx.db
+        .query('articleBodies')
+        .withIndex('by_article', (q) => q.eq('articleId', article._id))
+        .unique(),
+    ]);
     return {
       title: article.title,
       feedTitle: feed?.title ?? '',
       publishedAt: article.publishedAt,
       link: article.link,
-      blocks: article.blocks,
-      omitted: article.omitted,
+      blocks: body?.blocks ?? [],
+      omitted: body?.omitted ?? [],
     };
   },
 });

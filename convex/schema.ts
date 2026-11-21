@@ -13,10 +13,8 @@ export default defineSchema({
     userId: v.id('users'),
     url: v.string(),
     title: v.string(),
-  })
-    .index('by_user', ['userId'])
-    .index('by_user_url', ['userId', 'url']),
-  /** A User's Articles, with their content as cleaned blocks (T17). */
+  }).index('by_user_url', ['userId', 'url']),
+  /** A User's Articles: what All lists. Their content lives in `articleBodies`. */
   articles: defineTable({
     userId: v.id('users'),
     feedId: v.id('feeds'),
@@ -25,9 +23,17 @@ export default defineSchema({
     link: v.optional(v.string()),
     subtitle: v.optional(v.string()),
     publishedAt: v.number(),
-    blocks: v.array(vBlock),
-    omitted: v.array(vOmittedKind),
   })
     .index('by_user_published', ['userId', 'publishedAt'])
     .index('by_feed_guid', ['feedId', 'guid']),
+  /**
+   * An Article's content as cleaned blocks (T17), apart from the Article so All reads
+   * only titles and dates, never the bodies.
+   */
+  articleBodies: defineTable({
+    userId: v.id('users'),
+    articleId: v.id('articles'),
+    blocks: v.array(vBlock),
+    omitted: v.array(vOmittedKind),
+  }).index('by_article', ['articleId']),
 });

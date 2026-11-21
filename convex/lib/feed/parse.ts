@@ -2,7 +2,7 @@ import { isTag, type Element } from 'domhandler';
 import { Effect } from 'effect';
 import { DomUtils, parseDocument } from 'htmlparser2';
 
-import { httpsUrl } from './blocks';
+import { httpsUrl, NO_BASE } from './blocks';
 import { NotAFeed } from './errors';
 
 /** A fetch keeps a Feed's newest Articles, up to this many (T18). */
@@ -123,14 +123,14 @@ export const parseFeed = Effect.fnUntraced(function* (xml: string, now: number) 
   if (root && name === 'rss') {
     const channel = child(root, 'channel');
     if (!channel) return yield* new NotAFeed();
-    const base = httpsUrl(text(child(channel, 'link')), 'https://invalid.invalid/') ?? 'https://invalid.invalid/';
+    const base = httpsUrl(text(child(channel, 'link')), NO_BASE) ?? NO_BASE;
     feed = {
       title: clip(plain(text(child(channel, 'title'))), MAX_FEED_TITLE),
       articles: children(channel, 'item').flatMap((item) => rssArticle(item, base, now) ?? []),
     };
   } else if (root && name === 'feed') {
     const self = children(root, 'link').find((l) => !l.attribs.rel || l.attribs.rel === 'alternate');
-    const base = httpsUrl(self?.attribs.href, 'https://invalid.invalid/') ?? 'https://invalid.invalid/';
+    const base = httpsUrl(self?.attribs.href, NO_BASE) ?? NO_BASE;
     feed = {
       title: clip(atomText(child(root, 'title')), MAX_FEED_TITLE),
       articles: children(root, 'entry').flatMap((entry) => atomArticle(entry, base, now) ?? []),

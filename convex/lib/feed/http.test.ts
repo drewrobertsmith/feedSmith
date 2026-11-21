@@ -103,3 +103,8 @@ test('returns the body as text, asking for feeds', async () => {
   const [, init] = fetch.mock.calls[0];
   expect(new Headers(init.headers).get('accept')).toContain('application/rss+xml');
 });
+
+test('a body that happens to read "too-large" is just a body', async () => {
+  const { exit } = await get('https://example.com/feed', ok('too-large'));
+  expect(Exit.isSuccess(exit) && exit.value).toBe('too-large');
+});

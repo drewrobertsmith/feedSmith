@@ -43,3 +43,11 @@ test.each(['dark', 'light'] as const)('the Google button label meets WCAG AA in 
   const { label, background } = googleButton[scheme];
   expect(contrastRatio(label, background)).toBeGreaterThanOrEqual(4.5);
 });
+
+// Q14: a control's boundary reaches 3:1 against what's around it. The Add Feed field and
+// AppButton draw theirs in textMuted, on the background and on a surface.
+test.each(['dark', 'light'] as const)('control boundaries reach 3:1 in %s', (scheme) => {
+  const theme = themes[scheme];
+  expect(contrastRatio(theme.textMuted, theme.background)).toBeGreaterThanOrEqual(3);
+  expect(contrastRatio(theme.textMuted, theme.surface)).toBeGreaterThanOrEqual(3);
+});

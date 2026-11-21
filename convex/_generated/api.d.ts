@@ -19,6 +19,7 @@ import type * as lib_feed_blocks from "../lib/feed/blocks.js";
 import type * as lib_feed_errors from "../lib/feed/errors.js";
 import type * as lib_feed_http from "../lib/feed/http.js";
 import type * as lib_feed_parse from "../lib/feed/parse.js";
+import type * as lib_feed_store from "../lib/feed/store.js";
 import type * as lib_feed_validators from "../lib/feed/validators.js";
 import type * as lib_signUp from "../lib/signUp.js";
 import type * as users from "../users.js";
@@ -41,6 +42,7 @@ declare const fullApi: ApiFromModules<{
   "lib/feed/errors": typeof lib_feed_errors;
   "lib/feed/http": typeof lib_feed_http;
   "lib/feed/parse": typeof lib_feed_parse;
+  "lib/feed/store": typeof lib_feed_store;
   "lib/feed/validators": typeof lib_feed_validators;
   "lib/signUp": typeof lib_signUp;
   users: typeof users;

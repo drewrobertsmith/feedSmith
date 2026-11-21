@@ -37,11 +37,12 @@ const HEADERS = {
   'user-agent': 'feedSmith/1.0',
 };
 
-async function readCapped(response: Response): Promise<string | 'too-large'> {
+/** The body as text, or null when it's over the cap. */
+async function readCapped(response: Response): Promise<string | null> {
   const declared = Number(response.headers.get('content-length'));
   if (Number.isFinite(declared) && declared > MAX_BYTES) {
     await response.body?.cancel();
-    return 'too-large';
+    return null;
   }
   if (!response.body) return '';
   const reader = response.body.getReader();
@@ -53,7 +54,7 @@ async function readCapped(response: Response): Promise<string | 'too-large'> {
     size += value.byteLength;
     if (size > MAX_BYTES) {
       await reader.cancel();
-      return 'too-large';
+      return null;
     }
     chunks.push(value);
   }
@@ -97,7 +98,7 @@ export class FeedHttp extends Context.Service<
         }
         if (!response.ok) return yield* new Unreachable();
         const body = yield* Effect.tryPromise({ try: () => readCapped(response), catch: () => new Unreachable() });
-        if (body === 'too-large') return yield* new TooLarge();
+        if (body === null) return yield* new TooLarge();
         return body;
       }
     });

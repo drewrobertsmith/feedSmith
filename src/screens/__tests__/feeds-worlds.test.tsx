@@ -215,10 +215,25 @@ describe('the Reading view', () => {
     ['a too-long id', `/article/${'a'.repeat(200)}`],
     ['an id with symbols', '/article/..%2F..%2Fgallery'],
     ['an id with spaces', '/article/a%20b'],
+    ['an upper-case id', '/article/A1'],
   ])('a link with %s shows nothing of any Article (Q25)', async (_case, url) => {
     await open({ colorScheme: 'dark', section: 'article' }, url);
     expect(await screen.findByRole('heading', { name: 'This Article isn’t available.' })).toBeOnTheScreen();
     expect(screen.queryByText('Talks resume next year.')).not.toBeOnTheScreen();
+  });
+});
+
+describe('links into Feeds screens (Q25)', () => {
+  test('unexpected parameters are ignored', async () => {
+    await open({ colorScheme: 'dark', section: 'article' }, '/article/a1?id=../gallery&extra=%3Cscript%3E');
+    expect(await screen.findByRole('heading', { name: FIXTURE_ARTICLE.title })).toBeOnTheScreen();
+  });
+
+  test.each(['/article/a1', '/add-feed'])('signed out, %s opens sign-in instead', async (url) => {
+    await open({ colorScheme: 'dark', auth: 'signed-out' }, url);
+    expect(await screen.findByRole('heading', { name: 'feedSmith' })).toBeOnTheScreen();
+    expect(screen.queryByText('Talks resume next year.')).not.toBeOnTheScreen();
+    expect(screen.queryByLabelText('Feed URL')).not.toBeOnTheScreen();
   });
 });
 

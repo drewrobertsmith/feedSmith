@@ -4,9 +4,9 @@ import { Effect } from 'effect';
 import { internal } from './_generated/api';
 import { action, internalMutation, internalQuery } from './_generated/server';
 import { requireUserId } from './lib/currentUser';
-import { htmlToBlocks, type Block } from './lib/feed/blocks';
-import { FeedHttp } from './lib/feed/http';
-import { parseFeed, type ParsedArticle } from './lib/feed/parse';
+import { FeedHttp, safeUrl } from './lib/feed/http';
+import { parseFeed } from './lib/feed/parse';
+import { articlesToStore } from './lib/feed/store';
 import { vAddFeedReason, vBlock, vOmittedKind, type AddFeedReason } from './lib/feed/validators';
 
 const MAX_URL = 2048;
@@ -35,14 +35,6 @@ const vStoredArticle = v.object({
   omitted: v.array(vOmittedKind),
 });
 
-/** An Article's content: the Feed's full text when it has it (T8), else its Subtitle. */
-function content(article: ParsedArticle) {
-  const base = article.link ?? 'https://invalid.invalid/';
-  if (article.html) return htmlToBlocks(article.html, base);
-  const blocks: Block[] = article.subtitle ? [{ type: 'paragraph', spans: [{ text: article.subtitle }] }] : [];
-  return { blocks, omitted: [] };
-}
-
 /**
  * Adds a Feed for the signed-in User: fetches it at once under the fetch policy (T18),
  * and only a working feed becomes a Feed. The URL is never logged (Q9).
@@ -52,12 +44,14 @@ export const add = action({
   returns: vAddResult,
   handler: async (ctx, { url }): Promise<AddResult> => {
     const userId = await ctx.runQuery(internal.feeds.viewer, {});
-    if (url.length > MAX_URL) return { ok: false as const, reason: 'invalid-url' as const };
+    // One spelling per Feed: the parsed URL, its host lower-cased and its spaces trimmed.
+    const feedUrl = url.length <= MAX_URL ? safeUrl(url)?.href : undefined;
+    if (!feedUrl) return { ok: false, reason: 'invalid-url' };
 
     const fetched = await Effect.runPromise(
       Effect.gen(function* () {
         const http = yield* FeedHttp;
-        const body = yield* http.get(url);
+        const body = yield* http.get(feedUrl);
         return yield* parseFeed(body, Date.now());
       }).pipe(
         Effect.provide(FeedHttp.layer),
@@ -69,15 +63,11 @@ export const add = action({
     );
     if (!fetched.ok) return fetched;
 
-    const articles = fetched.feed.articles.map((article) => {
-      const { html: _html, ...fields } = article;
-      return { ...fields, ...content(article) };
-    });
     const stored = await ctx.runMutation(internal.feeds.store, {
       userId,
-      url: url.trim(),
+      url: feedUrl,
       title: fetched.feed.title,
-      articles,
+      articles: articlesToStore(fetched.feed.articles),
     });
     return stored === 'stored' ? { ok: true as const } : { ok: false as const, reason: stored };
   },
@@ -101,7 +91,12 @@ export const store = internalMutation({
       .first();
     if (existing) return 'already-added' as const;
     const feedId = await ctx.db.insert('feeds', { userId, url, title });
-    await Promise.all(articles.map((article) => ctx.db.insert('articles', { userId, feedId, ...article })));
+    await Promise.all(
+      articles.map(async ({ blocks, omitted, ...fields }) => {
+        const articleId = await ctx.db.insert('articles', { userId, feedId, ...fields });
+        await ctx.db.insert('articleBodies', { userId, articleId, blocks, omitted });
+      }),
+    );
     return 'stored' as const;
   },
 });

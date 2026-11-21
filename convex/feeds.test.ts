@@ -93,6 +93,23 @@ describe('adding a Feed', () => {
   });
 });
 
+describe('what a fetch stores', () => {
+  test('repeated guids in one fetch are stored once', async () => {
+    const { a } = await setup();
+    const item = '<item><title>Same</title><guid>g1</guid><pubDate>Sat, 21 Nov 2026 12:00:00 GMT</pubDate></item>';
+    network.mockImplementation(async () => new Response(`<rss version="2.0"><channel><title>T</title>${item}${item}</channel></rss>`));
+    await a.action(api.feeds.add, { url: FEED_URL });
+    expect(await a.query(api.articles.all, {})).toHaveLength(1);
+  });
+
+  test('the same Feed written differently is still the same Feed', async () => {
+    const { a } = await setup();
+    await a.action(api.feeds.add, { url: FEED_URL });
+    const shouted = FEED_URL.replace('www.theverge.com', 'WWW.TheVerge.com');
+    expect(await a.action(api.feeds.add, { url: `  ${shouted} ` })).toEqual({ ok: false, reason: 'already-added' });
+  });
+});
+
 describe('the feed URL is a secret (Q9)', () => {
   test('no query returns it', async () => {
     const { a } = await setup();
