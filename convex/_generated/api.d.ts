@@ -19,6 +19,7 @@ import type * as lib_currentUser from "../lib/currentUser.js";
 import type * as lib_feed_blocks from "../lib/feed/blocks.js";
 import type * as lib_feed_discover from "../lib/feed/discover.js";
 import type * as lib_feed_errors from "../lib/feed/errors.js";
+import type * as lib_feed_face from "../lib/feed/face.js";
 import type * as lib_feed_fetch from "../lib/feed/fetch.js";
 import type * as lib_feed_http from "../lib/feed/http.js";
 import type * as lib_feed_pace from "../lib/feed/pace.js";
@@ -48,6 +49,7 @@ declare const fullApi: ApiFromModules<{
   "lib/feed/blocks": typeof lib_feed_blocks;
   "lib/feed/discover": typeof lib_feed_discover;
   "lib/feed/errors": typeof lib_feed_errors;
+  "lib/feed/face": typeof lib_feed_face;
   "lib/feed/fetch": typeof lib_feed_fetch;
   "lib/feed/http": typeof lib_feed_http;
   "lib/feed/pace": typeof lib_feed_pace;

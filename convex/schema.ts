@@ -17,6 +17,8 @@ export default defineSchema({
     siteUrl: v.optional(v.string()),
     /** The icon the site names for itself (T21); else `/favicon.ico` on `siteUrl`. */
     iconUrl: v.optional(v.string()),
+    /** Set when Pinned (P9): Pinned chips follow All in this order, at most three. */
+    pinOrder: v.optional(v.number()),
     /** Whether its last fetch worked (P15). Optional only for Feeds stored before FEE-24. */
     status: v.optional(v.union(v.literal('working'), v.literal('failing'))),
     /** Failed fetches in a row; each backs the next try off further (Q7). */
