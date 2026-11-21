@@ -91,7 +91,8 @@ export function httpsUrl(value: string | undefined, base: string): string | unde
   if (!value) return undefined;
   try {
     const url = new URL(value.trim(), base);
-    return url.protocol === 'https:' ? url.href : undefined;
+    // A relative address in a Feed with no address of its own resolves to nothing real.
+    return url.protocol === 'https:' && !url.href.startsWith(NO_BASE) ? url.href : undefined;
   } catch {
     return undefined;
   }

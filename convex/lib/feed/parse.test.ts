@@ -113,3 +113,43 @@ describe('untrusted feeds', () => {
     expect(feed.articles[0].subtitle!.length).toBeLessThanOrEqual(500);
   });
 });
+
+describe('lead images and the site (FEE-27)', () => {
+  const item = (inner: string) =>
+    `<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/"><channel><title>T</title><link>https://site.example.com/</link><item><title>A</title><guid>1</guid>${inner}</item></channel></rss>`;
+
+  test.each([
+    ['media:content', '<media:content url="https://cdn.example.com/a.jpg" medium="image"/>'],
+    ['media:content by type', '<media:content url="https://cdn.example.com/a.jpg" type="image/jpeg"/>'],
+    ['media:thumbnail', '<media:thumbnail url="https://cdn.example.com/a.jpg"/>'],
+    ['an image enclosure', '<enclosure url="https://cdn.example.com/a.jpg" type="image/jpeg" length="1"/>'],
+  ])('an RSS Article takes its lead image from %s', (_case, inner) => {
+    expect(parse(item(inner)).articles[0].imageUrl).toBe('https://cdn.example.com/a.jpg');
+  });
+
+  test.each([
+    ['an http image', '<media:thumbnail url="http://cdn.example.com/a.jpg"/>'],
+    ['a javascript: URL', '<media:thumbnail url="javascript:alert(1)"/>'],
+    ['a data: URL', '<media:thumbnail url="data:image/png;base64,AAAA"/>'],
+    ['a video enclosure', '<enclosure url="https://cdn.example.com/a.mp4" type="video/mp4" length="1"/>'],
+    ['an oversized URL', `<media:thumbnail url="https://cdn.example.com/${'a'.repeat(3000)}.jpg"/>`],
+  ])('%s is never a lead image', (_case, inner) => {
+    expect(parse(item(inner)).articles[0].imageUrl).toBeUndefined();
+  });
+
+  test("an Atom entry takes its lead image from an image enclosure", () => {
+    const xml = `<feed xmlns="http://www.w3.org/2005/Atom"><title>T</title><link href="https://atom.example.com/"/>
+      <entry><title>A</title><id>1</id><link rel="enclosure" type="image/png" href="https://cdn.example.com/b.png"/></entry></feed>`;
+    expect(parse(xml).articles[0].imageUrl).toBe('https://cdn.example.com/b.png');
+  });
+
+  test("the Feed's site comes from its own link: https only, origin only", () => {
+    expect(parse(item('')).siteUrl).toBe('https://site.example.com');
+    expect(parse(verge).siteUrl).toBe('https://www.theverge.com');
+    expect(parse(atom).siteUrl).toBe('https://atom.example.com');
+    expect(parse(item('').replace('https://site.example.com/', 'http://site.example.com/')).siteUrl).toBeUndefined();
+    expect(parse(item('').replace('https://site.example.com/', 'https://site.example.com/path?key=1')).siteUrl).toBe(
+      'https://site.example.com',
+    );
+  });
+});

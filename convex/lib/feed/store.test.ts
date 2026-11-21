@@ -33,3 +33,24 @@ describe('what one fetch stores', () => {
     expect('html' in stored).toBe(false);
   });
 });
+
+describe('lead images (FEE-27)', () => {
+  test("an Article without a lead image of its own takes its first image", () => {
+    const html = '<p>x</p><img src="https://cdn.example.com/first.jpg" alt="a"><img src="https://cdn.example.com/second.jpg">';
+    expect(articlesToStore([article(0, html)])[0].imageUrl).toBe('https://cdn.example.com/first.jpg');
+  });
+
+  test('its own lead image wins', () => {
+    const own = { ...article(0, '<img src="https://cdn.example.com/body.jpg">'), imageUrl: 'https://cdn.example.com/own.jpg' };
+    expect(articlesToStore([own])[0].imageUrl).toBe('https://cdn.example.com/own.jpg');
+  });
+
+  test('an oversized first image is not a lead image', () => {
+    const html = `<img src="https://cdn.example.com/${'a'.repeat(3000)}.jpg">`;
+    expect(articlesToStore([article(0, html)])[0].imageUrl).toBeUndefined();
+  });
+
+  test('no image anywhere means no lead image', () => {
+    expect(articlesToStore([article(0, '<p>just words</p>')])[0].imageUrl).toBeUndefined();
+  });
+});

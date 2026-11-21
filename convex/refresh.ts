@@ -28,6 +28,7 @@ export async function refreshOne(ctx: ActionCtx, feedId: Id<'feeds'>) {
       await ctx.runMutation(internal.refresh.recordFetch, {
         feedId,
         now,
+        siteUrl: outcome.siteUrl,
         articles: outcome.articles,
         ...outcome.validators,
       });
@@ -58,17 +59,27 @@ export const forRefresh = internalQuery({
   returns: v.union(v.null(), v.object({ url: v.string(), ...vValidators })),
   handler: async (ctx, { feedId }) => {
     const feed = await ctx.db.get(feedId);
-    return feed ? { url: feed.url, etag: feed.etag, lastModified: feed.lastModified } : null;
+    if (!feed) return null;
+    // A Feed stored before it knew its site is fetched in full once, so it learns it (FEE-27).
+    if (!feed.siteUrl) return { url: feed.url };
+    return { url: feed.url, etag: feed.etag, lastModified: feed.lastModified };
   },
 });
 
 export const recordFetch = internalMutation({
-  args: { feedId: v.id('feeds'), now: v.number(), articles: v.array(vStoredArticle), ...vValidators },
+  args: {
+    feedId: v.id('feeds'),
+    now: v.number(),
+    siteUrl: v.optional(v.string()),
+    articles: v.array(vStoredArticle),
+    ...vValidators,
+  },
   returns: v.null(),
-  handler: async (ctx, { feedId, now, articles, etag, lastModified }) => {
+  handler: async (ctx, { feedId, now, siteUrl, articles, etag, lastModified }) => {
     const feed = await ctx.db.get(feedId);
     // Gone, or a newer fetch already finished: an older result never overwrites it.
     if (!feed || (feed.lastFetchedAt ?? 0) > now) return null;
+    if (siteUrl && siteUrl !== feed.siteUrl) await ctx.db.patch(feedId, { siteUrl });
     await storeNewArticles(ctx, feed.userId, feedId, articles, now);
     await markWorking(ctx, feedId, now, { etag, lastModified });
     return null;

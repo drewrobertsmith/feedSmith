@@ -1,10 +1,11 @@
 import { router } from 'expo-router';
+import { useEffect, useEffectEvent } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/app-button';
 import { AppText } from '@/components/app-text';
-import { useArticle } from '@/feeds/feeds-data';
+import { useArticle, useMarkRead } from '@/feeds/feeds-data';
 import { publishedDate } from '@/feeds/format';
 import { ArticleBlocks } from '@/screens/reading/article-blocks';
 import { spacing } from '@/theme/spacing';
@@ -27,6 +28,13 @@ export function ArticleMissing() {
 export function ReadingScreen({ id }: { id: string }) {
   const insets = useSafeAreaInsets();
   const view = useArticle(id);
+  const markRead = useMarkRead();
+  const ready = view.status === 'ready';
+  // Opening an Article marks it Read (P7): once per Article shown, not on every render.
+  const markOpened = useEffectEvent(() => markRead(id));
+  useEffect(() => {
+    if (ready) markOpened();
+  }, [ready, id]);
 
   if (view.status === 'missing') return <ArticleMissing />;
   if (view.status === 'loading') return <View className="flex-1 bg-background" />;

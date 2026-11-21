@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { htmlToBlocks, MAX_BLOCKS, MAX_DEPTH, MAX_ENTRIES, MAX_SIZE, MAX_SPANS } from './blocks';
+import { htmlToBlocks, MAX_BLOCKS, MAX_DEPTH, MAX_ENTRIES, MAX_SIZE, MAX_SPANS, NO_BASE } from './blocks';
 
 const BASE = 'https://example.com/posts/1';
 
@@ -51,6 +51,11 @@ describe('hostile HTML never reaches the stored blocks (Q8)', () => {
     ['an image with no source', '<img alt="x">'],
   ])('%s is dropped', (_case, html) => {
     expect(htmlToBlocks(html, BASE)).toEqual({ blocks: [], omitted: [] });
+  });
+
+  test("relative links and images in a Feed with no address resolve to nothing, never a placeholder", () => {
+    const { blocks } = htmlToBlocks('<p><a href="/x">x</a></p><img src="/i.jpg">', NO_BASE);
+    expect(blocks).toEqual([{ type: 'paragraph', spans: [{ text: 'x' }] }]);
   });
 
   test('forms and inputs are dropped', () => {

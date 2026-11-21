@@ -5,8 +5,20 @@ import type { AddFeedReason } from '../../convex/lib/feed/validators';
 
 export type { AddFeedReason, Block, OmittedKind, Span };
 
-/** One Article in All. Never carries a feed URL (Q9). */
-export type ArticleRow = { id: string; title: string; feedTitle: string; publishedAt: number };
+/** One Article in All (P12). Never carries a feed URL (Q9). */
+export type ArticleRow = {
+  id: string;
+  title: string;
+  subtitle?: string;
+  /** The lead image beside it, when there is one. */
+  imageUrl?: string;
+  feedTitle: string;
+  /** From the Feed's site; absent when the Feed gave no site. */
+  faviconUrl?: string;
+  publishedAt: number;
+  /** Opened before (P7): dimmed, never hidden. */
+  read: boolean;
+};
 
 /** One Article as the Reading view shows it. */
 export type ReadingArticle = {
@@ -35,6 +47,8 @@ export type FeedsData = {
   useAddFeed: () => { view: AddFeedView; add: (url: string) => Promise<boolean> };
   /** Pulling down: fetches every Feed now, on the server (P15, Q21). */
   useRefresh: () => { refreshing: boolean; refresh: () => Promise<void> };
+  /** Marks an Article Read (P7), for the Reading view to call when it opens one. */
+  useMarkRead: () => (id: string) => void;
 };
 
 export const FeedsContext = createContext<FeedsData | null>(null);
@@ -63,6 +77,12 @@ export function useArticle(id: string): ArticleView {
 /** Adding a Feed. */
 export function useAddFeed(): ReturnType<FeedsData['useAddFeed']> {
   const { useAddFeed: read } = useFeedsData();
+  return read();
+}
+
+/** Marking an Article Read. */
+export function useMarkRead(): ReturnType<FeedsData['useMarkRead']> {
+  const { useMarkRead: read } = useFeedsData();
   return read();
 }
 

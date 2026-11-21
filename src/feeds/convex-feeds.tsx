@@ -1,4 +1,4 @@
-import { useAction, useQuery } from 'convex/react';
+import { useAction, useMutation, useQuery } from 'convex/react';
 import { useState, type ReactNode } from 'react';
 
 import { api } from '../../convex/_generated/api';
@@ -49,7 +49,15 @@ function useRefresh() {
   return { refreshing, refresh };
 }
 
-const convexFeeds: FeedsData = { useAll, useArticle, useAddFeed, useRefresh };
+function useMarkRead() {
+  const markRead = useMutation(api.articles.markRead);
+  return (id: string) => {
+    // Read is best-effort: a dropped call leaves the Article undimmed, nothing worse.
+    void markRead({ id }).catch(() => null);
+  };
+}
+
+const convexFeeds: FeedsData = { useAll, useArticle, useAddFeed, useRefresh, useMarkRead };
 
 /** The app's Feeds and Articles, from Convex. Sits inside `ConvexAuth`, which owns the client. */
 export function ConvexFeeds({ children }: { children: ReactNode }) {

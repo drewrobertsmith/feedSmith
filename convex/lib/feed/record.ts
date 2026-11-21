@@ -28,7 +28,11 @@ export async function storeNewArticles(
         .query('articles')
         .withIndex('by_feed_guid', (q) => q.eq('feedId', feedId).eq('guid', fields.guid))
         .first();
-      if (existing) return;
+      if (existing) {
+        // Stored before lead images were kept: fill it in, and nothing else changes.
+        if (!existing.imageUrl && fields.imageUrl) await ctx.db.patch(existing._id, { imageUrl: fields.imageUrl });
+        return;
+      }
       const articleId = await ctx.db.insert('articles', { userId, feedId, ...fields });
       await ctx.db.insert('articleBodies', { userId, articleId, blocks, omitted });
     }),

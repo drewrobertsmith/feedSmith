@@ -1,4 +1,4 @@
-import { act, userEvent } from '@testing-library/react-native';
+import { act, fireEvent, userEvent } from '@testing-library/react-native';
 import { renderRouter, screen } from 'expo-router/testing-library';
 import * as WebBrowser from 'expo-web-browser';
 import { Uniwind } from 'uniwind';
@@ -11,7 +11,7 @@ import ArticleRoute from '@/app/article/[id]';
 import AuthReturnRoute from '@/app/auth';
 import GalleryRoute from '@/app/gallery';
 import SignInRoute from '@/app/sign-in';
-import { publishedDate } from '@/feeds/format';
+import { publishedAgo } from '@/feeds/format';
 import { AppRoot } from '@/navigation/app-root';
 import {
   ADD_FEED_WORLDS,
@@ -21,7 +21,7 @@ import {
   type AllWorldId,
   type ReadingWorldId,
 } from '@/worlds/catalog';
-import { FIXTURE_ARTICLE, FIXTURE_ROWS } from '@/worlds/fixtures';
+import { FIXTURE_ARTICLE, FIXTURE_NOW, FIXTURE_ROWS } from '@/worlds/fixtures';
 import { createWorld, type World, type WorldSpec } from '@/worlds/world';
 
 jest.mock('expo-web-browser', () => ({ openBrowserAsync: jest.fn() }));
@@ -43,10 +43,27 @@ function renderWorld(world: World, initialUrl: string = world.initialUrl) {
   );
 }
 
+/**
+ * Legend List shows its rows once its scroll view and each row report a size, as they do at
+ * once on a phone; Jest has no layout, so the test reports them.
+ */
+async function layOutAll() {
+  const list = screen.queryByTestId('all-list');
+  if (!list) return;
+  const layout = (height: number) => ({ nativeEvent: { layout: { x: 0, y: 0, width: 412, height } } });
+  await act(async () => fireEvent(list, 'layout', layout(915)));
+  for (const row of screen.queryAllByRole('link')) {
+    let node = row.parent;
+    while (node && !node.props.onLayout) node = node.parent;
+    if (node) await act(async () => fireEvent(node!, 'layout', layout(112)));
+  }
+}
+
 let world: World | undefined;
 const open = async (spec: WorldSpec, initialUrl?: string) => {
   world = createWorld(spec);
   await renderWorld(world, initialUrl);
+  await layOutAll();
   return world;
 };
 afterEach(() => {
@@ -56,14 +73,17 @@ afterEach(() => {
 });
 
 describe('All', () => {
-  type Shows = { rows: number; empty: boolean; refreshing: boolean; theme: 'dark' | 'light'; titleSize: number };
+  type Shows = { rows: number; read: number; empty: boolean; refreshing: boolean; theme: 'dark' | 'light'; titleSize: number };
+  const ROWS = FIXTURE_ROWS.length;
+  const READ = FIXTURE_ROWS.filter((r) => r.read).length;
   const SHOWS: Record<AllWorldId, Shows> = {
-    'all-dark': { rows: FIXTURE_ROWS.length, empty: false, refreshing: false, theme: 'dark', titleSize: 24 },
-    'all-light': { rows: FIXTURE_ROWS.length, empty: false, refreshing: false, theme: 'light', titleSize: 24 },
-    'all-empty': { rows: 0, empty: true, refreshing: false, theme: 'dark', titleSize: 24 },
-    'all-loading': { rows: 0, empty: false, refreshing: false, theme: 'dark', titleSize: 24 },
-    'all-refreshing': { rows: FIXTURE_ROWS.length, empty: false, refreshing: true, theme: 'light', titleSize: 24 },
-    'all-largest-font': { rows: FIXTURE_ROWS.length, empty: false, refreshing: false, theme: 'dark', titleSize: 48 },
+    'all-dark': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 24 },
+    'all-light': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'light', titleSize: 24 },
+    'all-read': { rows: ROWS, read: ROWS, empty: false, refreshing: false, theme: 'dark', titleSize: 24 },
+    'all-empty': { rows: 0, read: 0, empty: true, refreshing: false, theme: 'dark', titleSize: 24 },
+    'all-loading': { rows: 0, read: 0, empty: false, refreshing: false, theme: 'dark', titleSize: 24 },
+    'all-refreshing': { rows: ROWS, read: READ, empty: false, refreshing: true, theme: 'light', titleSize: 24 },
+    'all-largest-font': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 48 },
   };
 
   test.each(ALL_WORLDS)('$label', async ({ id, spec }) => {
@@ -71,6 +91,7 @@ describe('All', () => {
     await open(spec);
     expect(await screen.findByRole('heading', { name: 'Feeds' })).toHaveStyle({ fontSize: shows.titleSize });
     expect(screen.queryAllByRole('link')).toHaveLength(shows.rows);
+    expect(screen.queryAllByRole('link', { name: /, Read$/ })).toHaveLength(shows.read);
     if (shows.empty) {
       expect(screen.getByText('Add a Feed to see its Articles here.')).toBeOnTheScreen();
       expect(screen.getByRole('button', { name: 'Add a Feed' })).toBeEnabled();
@@ -90,11 +111,37 @@ describe('All', () => {
     expect(w.feedsLog.refreshes).toBe(1);
   });
 
-  test('each Article reads its title, Feed and date to TalkBack, newest first (Q15)', async () => {
+  test('each Article reads its title, Feed, when it was published and Read to TalkBack, newest first (Q15)', async () => {
     await open({ colorScheme: 'dark', feeds: 'some' });
     const rows = await screen.findAllByRole('link');
-    const [first] = FIXTURE_ROWS;
-    expect(rows[0]).toHaveAccessibleName(`${first.title}, The Verge, ${publishedDate(first.publishedAt)}`);
+    const [first, second] = FIXTURE_ROWS;
+    expect(rows[0]).toHaveAccessibleName(`${first.title}, The Verge, ${publishedAgo(first.publishedAt, FIXTURE_NOW)}`);
+    expect(rows[1]).toHaveAccessibleName(`${second.title}, The Verge, ${publishedAgo(second.publishedAt, FIXTURE_NOW)}, Read`);
+  });
+
+  test('a row shows its Subtitle and lead image when it has them, and leaves them out when not (P12)', async () => {
+    await open({ colorScheme: 'dark', feeds: 'some' });
+    await screen.findAllByRole('link');
+    expect(screen.getByText(FIXTURE_ROWS[0].subtitle!)).toBeOnTheScreen();
+    expect(screen.getByText(FIXTURE_ROWS[1].subtitle!)).toBeOnTheScreen();
+    // Rows 1 and 3 have lead images; 2 and 4 don't.
+    expect(screen.getAllByTestId('row-image')).toHaveLength(2);
+    // A Feed without a favicon shows its initial instead.
+    expect(screen.getAllByTestId('row-favicon')).toHaveLength(3);
+    expect(screen.getByText('C')).toBeOnTheScreen();
+  });
+
+  test('a Subtitle is two lines at most', async () => {
+    await open({ colorScheme: 'dark', feeds: 'some' });
+    expect(await screen.findByText(FIXTURE_ROWS[0].subtitle!)).toHaveProp('numberOfLines', 2);
+  });
+
+  test('Read rows are dimmed, never hidden, and nothing counts them (P7)', async () => {
+    await open({ colorScheme: 'dark', feeds: 'some' });
+    await screen.findAllByRole('link');
+    expect(screen.getByText(FIXTURE_ROWS[1].title)).toHaveProp('className', expect.stringContaining('text-text-muted'));
+    expect(screen.getByText(FIXTURE_ROWS[0].title)).not.toHaveProp('className', expect.stringContaining('text-text-muted'));
+    expect(screen.queryByText(/unread|\b\d+ new\b/i)).not.toBeOnTheScreen();
   });
 
   test('tapping an Article opens its Reading view', async () => {
@@ -202,6 +249,18 @@ describe('the Reading view', () => {
     expect(screen.getByText(/A ban on weapons that pick targets/)).toBeOnTheScreen();
     expect(screen.getByText('The window for preventive regulation is closing.')).toBeOnTheScreen();
     expect(screen.getByText(/The Verge/)).toBeOnTheScreen();
+  });
+
+  test('opening an Article marks it Read (P7)', async () => {
+    const w = await open({ colorScheme: 'dark', section: 'article' });
+    await screen.findByRole('heading', { name: FIXTURE_ARTICLE.title });
+    expect(w.feedsLog.read).toEqual([FIXTURE_ROWS[0].id]);
+  });
+
+  test('a missing Article marks nothing Read', async () => {
+    const w = await open({ colorScheme: 'dark', section: 'article', article: 'missing' });
+    await screen.findByRole('heading', { name: 'This Article isn’t available.' });
+    expect(w.feedsLog.read).toEqual([]);
   });
 
   test('links and Open original open in the browser (Q8)', async () => {

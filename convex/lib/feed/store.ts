@@ -1,5 +1,5 @@
 import { htmlToBlocks, NO_BASE, type Block, type Content } from './blocks';
-import type { ParsedArticle } from './parse';
+import { MAX_IMAGE_URL, type ParsedArticle } from './parse';
 
 /**
  * The stored JSON of one fetch's Article bodies, in characters. At most three bytes a
@@ -33,9 +33,13 @@ export function articlesToStore(articles: ParsedArticle[], budget = MAX_FETCH_SI
     if (seen.has(fields.guid)) return [];
     seen.add(fields.guid);
     let body = content(articles[i]);
+    // The Article's own lead image, else the first image in its text.
+    const firstImage = body.blocks.find((block) => block.type === 'image');
+    const fallback = firstImage?.type === 'image' && firstImage.src.length <= MAX_IMAGE_URL ? firstImage.src : undefined;
+    const imageUrl = fields.imageUrl ?? fallback;
     const bodySize = JSON.stringify(body).length;
     if (size + bodySize > budget) body = subtitleOnly(articles[i]);
     else size += bodySize;
-    return [{ ...fields, ...body }];
+    return [{ ...fields, ...(imageUrl ? { imageUrl } : {}), ...body }];
   });
 }

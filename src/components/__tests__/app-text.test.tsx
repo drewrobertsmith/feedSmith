@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react-native';
 import { AppText } from '@/components/app-text';
 import { EnvironmentProvider, type Environment } from '@/environment';
 
-const env = (fontScale: number): Environment => ({ colorScheme: 'dark', reduceMotion: false, fontScale });
+const env = (fontScale: number): Environment => ({ colorScheme: 'dark', reduceMotion: false, fontScale, now: Date.now });
 
 test('sets each variant in its typeface, never Roboto', async () => {
   await render(

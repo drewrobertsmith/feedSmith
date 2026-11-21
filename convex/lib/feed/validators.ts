@@ -61,6 +61,7 @@ export const vStoredArticle = v.object({
   link: v.optional(v.string()),
   subtitle: v.optional(v.string()),
   publishedAt: v.number(),
+  imageUrl: v.optional(v.string()),
   blocks: v.array(vBlock),
   omitted: v.array(vOmittedKind),
 });

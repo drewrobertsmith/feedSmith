@@ -45,6 +45,7 @@ export const add = action({
       userId,
       url: feedUrl,
       title: outcome.title,
+      siteUrl: outcome.siteUrl,
       articles: outcome.articles,
       now: Date.now(),
       ...outcome.validators,
@@ -91,18 +92,19 @@ export const store = internalMutation({
     userId: v.id('users'),
     url: v.string(),
     title: v.string(),
+    siteUrl: v.optional(v.string()),
     articles: v.array(vStoredArticle),
     now: v.number(),
     ...vValidators,
   },
   returns: v.union(v.literal('stored'), v.literal('already-added')),
-  handler: async (ctx, { userId, url, title, articles, now, etag, lastModified }) => {
+  handler: async (ctx, { userId, url, title, siteUrl, articles, now, etag, lastModified }) => {
     const existing = await ctx.db
       .query('feeds')
       .withIndex('by_user_url', (q) => q.eq('userId', userId).eq('url', url))
       .first();
     if (existing) return 'already-added' as const;
-    const feedId = await ctx.db.insert('feeds', { userId, url, title });
+    const feedId = await ctx.db.insert('feeds', { userId, url, title, siteUrl });
     await storeNewArticles(ctx, userId, feedId, articles, now);
     await markWorking(ctx, feedId, now, { etag, lastModified });
     return 'stored' as const;
