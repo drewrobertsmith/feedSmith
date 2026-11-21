@@ -1,0 +1,61 @@
+# Quality bar
+
+What this app must never get wrong. `/expo-dev-loop:feature` plans, reviews and verifies every change against the items that apply to it; `/expo-dev-loop:pre-release` walks all of them. Built and revised with `/expo-dev-loop:quality-bar`.
+
+**The app:** feedSmith is read by its one owner on an Android phone (a Pixel 10 on Android 17), one-handed, often in the evening or in transit. Sessions are studied reading, from a few minutes to half an hour.
+
+## Items
+
+| ID | Rule | Why | Applies to | Checked by |
+|---|---|---|---|---|
+| Q1 | Opening the app shows All: recent Articles from every Feed, newest first, with their images. | Core flow 1: the first thing every session does. | UI, data | `convex-test` on the All query (every Feed, newest first, owner only); screen test of the Feeds section; device check in Verify. |
+| Q2 | An Article's Reading view shows its full text and images correctly, never raw HTML or a broken page. It uses the Feed's full text when present and extracted page text otherwise (T8). | Core flow 2: reading is the product. | UI, data | `convex-test` on Reading view building with fixture feeds (including a copy of The Verge's full-text feed and a summary-only feed); screen test of the Reading view; device check. |
+| Q3 | Saving an Article puts it in Saved at once, and marking it Done removes it at once. Both survive an app restart. | Core flow 3: Saved is half the app. | UI, data | `convex-test` on the Save and Done mutations; screen test of the swipe and the button; device check across a restart. |
+| Q4 | After backgrounding, or the system killing the app, you return to the same section, chip and scroll position, in the list and in the Reading view. | Losing your place mid-Article is the worst thing a reading app can do. | lifecycle | Test of the state-restoration seam; device check with "Don't keep activities" on and with `adb shell am kill`. |
+| Q5 | When the network drops, what's on screen stays readable, a calm notice appears, and the app reconnects by itself. No screen is ever blank or shows a raw error. | Reading happens in transit, on patchy networks. | lifecycle, UI | Tests with fake network events (Wi-Fi to cellular, airplane mode, slow network); device check in airplane mode. |
+| Q6 | When a page can't be extracted, the Reading view shows the Subtitle and image with "Open original". | A failed extraction must still leave a way to read. | data, UI | `convex-test` with an unextractable fixture page; screen test of the fallback. |
+| Q7 | A Feed that stops working keeps its Articles and shows a quiet notice in Manage Feeds only (P15). Failing Feeds are retried with backoff, never in a tight loop. | Failures must never clutter reading. | data, UI | `convex-test` on fetch failures (timeout, 404, invalid XML) and their backoff; screen test of Manage Feeds. |
+| Q8 | Feed and page content is untrusted. The server cleans it to an allowlist of tags and attributes and caps its size before storing it. Every fetch has a timeout and is HTTPS only. The Reading view never runs scripts or loads anything except images, and links open in the browser. | It's the app's main trust boundary: other people's HTML. | trust boundary | `convex-test` on the cleaner with hostile fixtures (`<script>`, `<iframe>`, event handlers, `javascript:` links, tracking pixels, oversized payloads); screen test that links open externally. |
+| Q9 | Feed URLs are secrets. They're stored only on the server, never logged, never returned to the app in full, and never sent in crash reports (T9). | Subscriber feeds can carry a personal key in the URL. | trust boundary, data | `convex-test` that no public query returns a full feed URL; review of every log line touching Feeds. |
+| Q10 | Every Convex function refuses anyone but the owner, and sign-ups stay closed after the owner's account exists (T7). | The backend has a public address. | trust boundary | `convex-test` negative cases: signed out, and a second account, are both refused. |
+| Q11 | No secrets in the repo, the app bundle or `EXPO_PUBLIC_*` variables. | Anything shipped in the app is public. | every change | `security` gate; review of the diff and of `EXPO_PUBLIC_*` names. |
+| Q12 | A crash report holds only the stack trace, app version, device model, Android version and current screen. It has no feed URLs, Article text, Google identity or IP address, and no Session Replay or screenshots. | Crash reports must not reveal what you read or how to reach your Feeds. | data | Test of the Sentry `beforeSend` scrubber with an event carrying a feed URL and Article text; review of the Sentry config (`sendDefaultPii` off, replay off). |
+| Q13 | Sentry is the only third-party SDK that sends data. There are no analytics, tracking or advertising SDKs. | Single-user, private reading. | every change | Review of every new dependency. |
+| Q14 | All text and icons meet WCAG 2.2 AA contrast in both themes. Gold is never text or an icon colour on light backgrounds (light mode uses a darker gold), and Sage is never text on Midnight. | Readable in every theme. | UI | Unit test over the theme's text and background token pairs; device check in light and dark. |
+| Q15 | Every control has a TalkBack label and role. Save and Done have accessible actions as well as the swipes. | Every action reachable without sight or gestures. | UI | RNTL queries by role and label; device check with TalkBack on. |
+| Q16 | Layouts hold at Android's largest font size and display size, with nothing clipped or overlapping. | Reading comfort includes big text. | UI | Device check at the largest font and display size. |
+| Q17 | With "Remove animations" on, expressive motion is reduced to simple fades or none. | Motion must never be forced on anyone. | UI | Test of the reduced-motion seam; device check with the setting on. |
+| Q18 | The app behaves natively: predictive back on, edge-to-edge, haptics on Save and Done. Row swipes never fight the system back gesture at the screen edges. | D8: native behaviour, own identity. | UI | Device check of back, edges and swipes. `app.json` must set `predictiveBackGestureEnabled: true`. |
+| Q19 | Colours and type come only from the theme's tokens (D2–D6): no hard-coded colours, and no Roboto in the interface. | The brand holds across every screen. | UI | Review, and a grep for hex colours outside the theme. |
+| Q20 | Every subscription, listener, timer and native event has a cleanup path, and no cache or list grows without limit over a session. | Sessions run up to half an hour, and the app stays alive in the background. | lifecycle | Tests that cleanup runs on unmount; memory check in the pre-release soak. |
+| Q21 | Nothing runs on the JS thread while the app is in the background, and the phone never polls: fetching is the server's job (T5). | Battery, and the phone never does the fetching. | lifecycle | Review; device check of background CPU. |
+| Q22 | Without the owner's explicit say-so, the agent never touches the production Convex deployment (deploys, data, environment variables), uploads to the Play Store or runs EAS submit, uses the owner's real Google account, or turns on a paid service. Development uses a separate dev deployment with test data. | Real data and real releases are the owner's call. | every change | Review of every command that targets a deployment or store. |
+
+## Budgets
+
+| Budget | Limit | Measured on | How |
+|---|---|---|---|
+| Cold start to All showing Articles | 2 s | Pixel 10, Android 17, release build | Timed launch (`adb shell am start -W`), three runs, median. |
+| Tap an Article to its text on screen | 300 ms | Pixel 10, release build | Argent profiling of the tap-to-render interaction. |
+| Scrolling All with 300 Articles | No dropped frames at the screen's refresh rate | Pixel 10, release build | Argent profiling while flinging the full list. |
+| Swipe to Save or Done | Visible response and haptic within 100 ms | Pixel 10, release build | Argent profiling of the swipe interaction. |
+
+## Release blockers
+
+Q1, Q2, Q3, Q4, Q8, Q9, Q10, Q11, Q12, Q14, Q15, Q22. Any other failure, including a missed budget, becomes a ticket.
+
+## Deferred
+
+- **Offline reading** (T6): settled when the owner wants Saved Articles readable without a connection.
+- **Tablets, foldables and landscape:** settled when the owner wants a second layout.
+- **Launch metrics with EAS Observe:** settled if the manual cold-start timing proves too laborious to run each release.
+- **Wallpaper (Material You) colours** (D4): settled when the owner wants them; Uniwind themes keep the door open.
+- **iOS** (T3): settled when the owner wants it.
+
+## Not in the bar
+
+- **VoiceOver and Dynamic Type** (stability baseline): v1 is Android only, so TalkBack and Android's font size replace them (Q15, Q16).
+
+## Superseded
+
+None yet.
