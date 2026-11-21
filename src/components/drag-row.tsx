@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { View, type LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
@@ -33,23 +33,29 @@ export function DragRow({
   const offset = useSharedValue(0);
   const lifted = useSharedValue(0);
 
+  // Dropped, the row waits in its new slot; once the list re-orders, that slot is its own.
+  useEffect(() => {
+    offset.set(0);
+  }, [index, offset]);
+
+  // Springs follow the system's "Remove animations" (Reanimated's ReduceMotion.System default, Q17).
   const pan = Gesture.Pan()
     .onBegin(() => {
-      lifted.value = withSpring(1, motion.rowLift);
+      lifted.set(withSpring(1, motion.rowLift));
     })
     .onUpdate((event) => {
-      offset.value = event.translationY;
+      offset.set(event.translationY);
     })
     .onFinalize(() => {
-      const to = Math.max(0, Math.min(count - 1, index + Math.round(offset.value / height)));
-      offset.value = withSpring(0, motion.rowLift);
-      lifted.value = withSpring(0, motion.rowLift);
+      const to = Math.max(0, Math.min(count - 1, index + Math.round(offset.get() / height)));
+      offset.set(withSpring((to - index) * height, motion.rowLift));
+      lifted.set(withSpring(0, motion.rowLift));
       if (to !== index) scheduleOnRN(onDrop, to);
     });
 
   const style = useAnimatedStyle(() => ({
-    transform: [{ translateY: offset.value }, { scale: 1 + lifted.value * 0.02 }],
-    zIndex: lifted.value > 0 ? 1 : 0,
+    transform: [{ translateY: offset.get() }, { scale: 1 + lifted.get() * 0.02 }],
+    zIndex: lifted.get() > 0 ? 1 : 0,
   }));
 
   return (

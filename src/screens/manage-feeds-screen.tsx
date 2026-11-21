@@ -15,10 +15,10 @@ import { typeScale } from '@/theme/type';
 const ICON = 20;
 const HANDLE = 24;
 
-/** A small text action on a Feed's row, named for TalkBack with the Feed (Q15). */
-function Action({ label, name, onPress }: { label: string; name: string; onPress: () => void }) {
+/** A small text action on a Feed's row; TalkBack hears its full name, e.g. "Rename The Verge" (Q15). */
+function Action({ label, accessibleName, onPress }: { label: string; accessibleName: string; onPress: () => void }) {
   return (
-    <Pressable role="button" aria-label={`${label} ${name}`} onPress={onPress} hitSlop={spacing.inside} className="py-inside">
+    <Pressable role="button" aria-label={accessibleName} onPress={onPress} hitSlop={spacing.inside} className="py-inside">
       <AppText variant="label" className="text-text underline" accessible={false}>
         {label}
       </AppText>
@@ -56,8 +56,8 @@ function RenameField({ feed, onDone }: { feed: ManagedFeed; onDone: () => void }
         </AppText>
       ) : null}
       <View className="flex-row gap-group">
-        <Action label="Save" name="name" onPress={save} />
-        <Action label="Cancel" name="renaming" onPress={onDone} />
+        <Action label="Save" accessibleName="Save name" onPress={save} />
+        <Action label="Cancel" accessibleName="Cancel renaming" onPress={onDone} />
       </View>
     </View>
   );
@@ -106,9 +106,13 @@ function FeedRow({ feed, accessibleName, moves }: { feed: ManagedFeed; accessibl
         <RenameField feed={feed} onDone={() => setRenaming(false)} />
       ) : (
         <View className="flex-row flex-wrap gap-group">
-          <Action label="Rename" name={feed.title} onPress={() => setRenaming(true)} />
-          <Action label={feed.pinned ? 'Unpin' : 'Pin'} name={feed.title} onPress={() => void togglePin()} />
-          <Action label="Remove" name={feed.title} onPress={confirmRemove} />
+          <Action label="Rename" accessibleName={`Rename ${feed.title}`} onPress={() => setRenaming(true)} />
+          <Action
+            label={feed.pinned ? 'Unpin' : 'Pin'}
+            accessibleName={`${feed.pinned ? 'Unpin' : 'Pin'} ${feed.title}`}
+            onPress={() => void togglePin()}
+          />
+          <Action label="Remove" accessibleName={`Remove ${feed.title}`} onPress={confirmRemove} />
         </View>
       )}
     </View>

@@ -99,7 +99,14 @@ function useManage(): ManageView {
 function useManageActions(): ManageActions {
   const rename = useMutation(api.feeds.rename);
   const remove = useMutation(api.feeds.remove);
-  const orderPins = useMutation(api.feeds.orderPins);
+  // The new order shows at once, so a dropped row settles where it was let go; a refusal rolls it back.
+  const orderPins = useMutation(api.feeds.orderPins).withOptimisticUpdate((store, { ids }) => {
+    const feeds = store.getQuery(api.feeds.manage, {});
+    if (!feeds) return;
+    const rank = new Map(ids.map((id, i) => [id, i]));
+    const pinned = feeds.filter((feed) => feed.pinned).sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
+    store.setQuery(api.feeds.manage, {}, [...pinned, ...feeds.filter((feed) => !feed.pinned)]);
+  });
   return {
     rename: async (id, title) => {
       const result = await rename({ id, title }).catch(() => null);
