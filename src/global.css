@@ -1,0 +1,50 @@
+@import 'tailwindcss';
+@import 'uniwind';
+
+/*
+ * Mirrors src/theme/tokens.ts, the single source for colours.
+ * src/theme/__tests__/global-css.test.ts fails if the two drift apart.
+ */
+@layer theme {
+  :root {
+    @variant dark {
+      --color-background: #1D2532;
+      --color-surface: #333D5F;
+      --color-indicator: #333D5F;
+      --color-text: #F3ECDD;
+      --color-text-muted: #B9B2A4;
+      --color-accent: #CBB07B;
+      --color-decor: #50716C;
+    }
+
+    @variant light {
+      --color-background: #F3ECDD;
+      --color-surface: #E8DECA;
+      --color-indicator: #E8DECA;
+      --color-text: #1D2532;
+      --color-text-muted: #4A5468;
+      --color-accent: #6F5626;
+      --color-decor: #50716C;
+    }
+  }
+}
+
+/* Android XML font families embedded by the expo-font plugin (app.json). */
+@theme {
+  --font-sans: 'InstrumentSans';
+  --font-serif: 'Literata';
+}
+
+/*
+ * The spacing scale (D9), mirroring src/theme/spacing.ts: an 8-point grid named by
+ * relationship, used as gap-related, px-edge, py-inside… Tailwind's numeric steps
+ * (gap-3, px-5…) still compile, because Uniwind needs the base --spacing, so
+ * src/theme/__tests__/spacing.test.ts fails on any of them instead (Q24).
+ */
+@theme {
+  --spacing-inside: 4px;
+  --spacing-related: 8px;
+  --spacing-group: 16px;
+  --spacing-section: 32px;
+  --spacing-edge: 16px;
+}

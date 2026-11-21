@@ -1,0 +1,63 @@
+/**
+ * feedSmith's colour tokens (D2–D5). The single source for every colour in the app:
+ * `src/global.css` mirrors these as Uniwind themes, and a test keeps the two in step.
+ */
+export const palette = {
+  midnight: '#1D2532',
+  navy: '#333D5F',
+  forest: '#2D423E',
+  sage: '#50716C',
+  gold: '#CBB07B',
+  /** Gold fails contrast on cream (1.8:1), so light mode uses this deeper gold. */
+  goldDeep: '#6F5626',
+  cream: '#F3ECDD',
+  creamMuted: '#B9B2A4',
+  sand: '#E8DECA',
+  slate: '#4A5468',
+} as const;
+
+export const TEXT_ROLES = ['text', 'textMuted', 'accent'] as const;
+export const SURFACE_ROLES = ['background', 'surface', 'indicator'] as const;
+
+type TextRole = (typeof TEXT_ROLES)[number];
+type SurfaceRole = (typeof SURFACE_ROLES)[number];
+/** Never used for text: hairlines and decoration only. */
+type DecorRole = 'decor';
+
+export type Theme = Record<TextRole | SurfaceRole | DecorRole, string>;
+export type ThemeName = 'dark' | 'light';
+
+export const themes: Record<ThemeName, Theme> = {
+  dark: {
+    background: palette.midnight,
+    surface: palette.navy,
+    indicator: palette.navy,
+    text: palette.cream,
+    textMuted: palette.creamMuted,
+    accent: palette.gold,
+    decor: palette.sage,
+  },
+  light: {
+    background: palette.cream,
+    surface: palette.sand,
+    indicator: palette.sand,
+    text: palette.midnight,
+    textMuted: palette.slate,
+    accent: palette.goldDeep,
+    decor: palette.sage,
+  },
+};
+
+function relativeLuminance(hex: string): number {
+  const [r, g, b] = [1, 3, 5].map((i) => {
+    const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** WCAG 2.x contrast ratio between two `#RRGGBB` colours. */
+export function contrastRatio(a: string, b: string): number {
+  const [hi, lo] = [relativeLuminance(a), relativeLuminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
