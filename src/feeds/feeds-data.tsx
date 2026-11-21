@@ -41,8 +41,10 @@ export type ChipsView = { status: 'loading' } | { status: 'ready'; chips: FeedCh
 export type ManagedFeed = { id: string; title: string; faviconUrl?: string; host: string; pinned: boolean; working: boolean };
 export type ManageView = { status: 'loading' } | { status: 'ready'; feeds: ManagedFeed[] };
 export type ManageActions = {
-  rename: (id: string, title: string) => Promise<'ok' | 'invalid-name' | 'not-found'>;
-  remove: (id: string) => Promise<void>;
+  /** `failed`: it didn't reach the server (offline, or an error), so the name can be tried again (Q5). */
+  rename: (id: string, title: string) => Promise<'ok' | 'invalid-name' | 'not-found' | 'failed'>;
+  /** `ok` once the Feed is gone (or already was); `failed` when it didn't reach the server. */
+  remove: (id: string) => Promise<'ok' | 'failed'>;
   /** The Pinned Feeds' ids in their new order. */
   orderPins: (ids: string[]) => Promise<void>;
 };

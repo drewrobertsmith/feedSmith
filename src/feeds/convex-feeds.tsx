@@ -110,12 +110,10 @@ function useManageActions(): ManageActions {
   return {
     rename: async (id, title) => {
       const result = await rename({ id, title }).catch(() => null);
-      if (!result) return 'not-found';
+      if (!result) return 'failed';
       return result.ok ? 'ok' : result.reason;
     },
-    remove: async (id) => {
-      await remove({ id }).catch(() => null);
-    },
+    remove: async (id) => ((await remove({ id }).catch(() => null)) ? 'ok' : 'failed'),
     orderPins: async (ids) => {
       await orderPins({ ids }).catch(() => null);
     },

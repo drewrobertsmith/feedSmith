@@ -54,7 +54,7 @@ describe('Manage Feeds worlds', () => {
     expect(await screen.findByRole('heading', { name: 'Manage Feeds' })).toHaveStyle({ fontSize: shows.titleSize });
     expect(screen.queryAllByRole('button', { name: /^Rename / })).toHaveLength(shows.feeds);
     expect(screen.queryAllByRole('button', { name: /^Unpin / })).toHaveLength(shows.pinned);
-    expect(screen.queryAllByLabelText(/^Drag to reorder /)).toHaveLength(shows.handles);
+    expect(screen.queryAllByRole('adjustable', { name: /^Reorder / })).toHaveLength(shows.handles);
     if (shows.empty) expect(screen.getByText('No Feeds yet. Add one from the + on Feeds.')).toBeOnTheScreen();
     expect(Uniwind.currentTheme).toBe(shows.theme);
   });
@@ -127,25 +127,64 @@ describe('Manage Feeds', () => {
     toast.mockRestore();
   });
 
-  test('TalkBack orders the Pinned Feeds with Move up and Move down (Q15)', async () => {
+  test('TalkBack orders the Pinned Feeds from their handles: Move up and Move down (Q15)', async () => {
     const w = await open({ colorScheme: 'dark', section: 'manage', manage: 'pinned' });
     const [first, second, third] = FIXTURE_MANAGE_PINNED;
-    const middle = await screen.findByLabelText(`${second.title}, Pinned, 2 of 3`);
+    const middle = await screen.findByRole('adjustable', { name: `Reorder ${second.title}` });
+    expect(middle).toHaveAccessibilityValue({ text: '2 of 3' });
     expect(middle.props.accessibilityActions).toEqual([
-      { name: 'moveUp', label: 'Move up' },
-      { name: 'moveDown', label: 'Move down' },
+      { name: 'increment', label: 'Move up' },
+      { name: 'decrement', label: 'Move down' },
     ]);
-    await act(async () => fireEvent(middle, 'accessibilityAction', { nativeEvent: { actionName: 'moveUp' } }));
+    await act(async () => fireEvent(middle, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } }));
     expect(w.feedsLog.pinOrders).toEqual([[second.id, first.id, third.id]]);
-    const top = screen.getByLabelText(`${first.title}, Pinned, 1 of 3`);
-    expect(top.props.accessibilityActions).toEqual([{ name: 'moveDown', label: 'Move down' }]);
+    const top = screen.getByRole('adjustable', { name: `Reorder ${first.title}` });
+    expect(top.props.accessibilityActions).toEqual([{ name: 'decrement', label: 'Move down' }]);
+  });
+
+  test("a row's actions each stay reachable on their own, not folded into the row (Q15)", async () => {
+    await open({ colorScheme: 'dark', section: 'manage', manage: 'pinned' });
+    const rename = await screen.findByRole('button', { name: 'Rename The Verge' });
+    // No ancestor groups the row into one TalkBack stop that would swallow its buttons.
+    for (let node = rename.parent; node; node = node.parent) expect(node.props.accessible).not.toBe(true);
+  });
+
+  test("a rename that doesn't reach the server says so, and keeps the name to try again (Q5)", async () => {
+    const user = userEvent.setup();
+    await open({ colorScheme: 'dark', section: 'manage', manageWrites: 'fail' });
+    await user.press(await screen.findByRole('button', { name: 'Rename Calm Notes' }));
+    await user.type(screen.getByLabelText('New name for Calm Notes'), ' Daily');
+    await user.press(screen.getByRole('button', { name: 'Save name' }));
+    expect(await screen.findByText("Couldn't save the name. Check your connection and try again.")).toBeOnTheScreen();
+    expect(screen.getByLabelText('New name for Calm Notes')).toHaveDisplayValue('Calm Notes Daily');
+  });
+
+  test("a remove that doesn't reach the server says so (Q5)", async () => {
+    const alert = jest.spyOn(Alert, 'alert');
+    const toast = jest.spyOn(ToastAndroid, 'show').mockImplementation(() => {});
+    const user = userEvent.setup();
+    await open({ colorScheme: 'dark', section: 'manage', manageWrites: 'fail' });
+    await user.press(await screen.findByRole('button', { name: 'Remove Calm Notes' }));
+    const remove = alert.mock.calls[0][2]!.find((b) => b.text === 'Remove')!;
+    await act(async () => remove.onPress!());
+    expect(toast).toHaveBeenLastCalledWith("Couldn't remove Calm Notes. Try again.", ToastAndroid.SHORT);
+    alert.mockRestore();
+    toast.mockRestore();
+  });
+
+  test('a name past the limit is refused, saying the limit', async () => {
+    const user = userEvent.setup();
+    await open({ colorScheme: 'dark', section: 'manage', manageWrites: 'invalid' });
+    await user.press(await screen.findByRole('button', { name: 'Rename Calm Notes' }));
+    await user.press(screen.getByRole('button', { name: 'Save name' }));
+    expect(await screen.findByText('Give the Feed a name of up to 100 characters.')).toBeOnTheScreen();
   });
 
   test("dragging a Pinned Feed's handle reorders it", async () => {
     const w = await open({ colorScheme: 'dark', section: 'manage', manage: 'pinned' });
     const [first, second, third] = FIXTURE_MANAGE_PINNED;
     // The drag adapter reports where a row was dropped; the screen turns that into the new order.
-    const handle = await screen.findByLabelText(`Drag to reorder ${third.title}`);
+    const handle = await screen.findByRole('adjustable', { name: `Reorder ${third.title}` });
     await act(async () => handle.props.onDrop(0));
     expect(w.feedsLog.pinOrders).toEqual([[third.id, first.id, second.id]]);
   });

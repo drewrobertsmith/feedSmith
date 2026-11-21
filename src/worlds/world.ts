@@ -45,6 +45,8 @@ export type WorldSpec = {
   pins?: 'full';
   /** What Manage Feeds lists. Defaults to `some`: one Pinned Feed, one not working. */
   manage?: 'some' | 'pinned' | 'none' | 'loading';
+  /** Manage Feeds' writes don't reach the server, or the server refuses the name. */
+  manageWrites?: 'fail' | 'invalid';
   /** The Article the Reading view opens. Defaults to one with every kind of block. */
   article?: 'full' | 'omitted' | 'missing' | 'loading';
 };
@@ -103,11 +105,15 @@ export function worldFeeds(
         : { status: 'ready', feeds: manage === 'none' ? [] : manage === 'pinned' ? FIXTURE_MANAGE_PINNED : FIXTURE_MANAGE },
     useManageActions: () => ({
       rename: async (id, title) => {
+        if (spec.manageWrites === 'fail') return 'failed';
+        if (spec.manageWrites === 'invalid') return 'invalid-name';
         log.renames.push({ id, title });
         return 'ok';
       },
       remove: async (id) => {
+        if (spec.manageWrites === 'fail') return 'failed';
         log.removed.push(id);
+        return 'ok';
       },
       orderPins: async (ids) => {
         log.pinOrders.push(ids);

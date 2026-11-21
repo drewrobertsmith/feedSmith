@@ -17,12 +17,14 @@ async function feedFaces(ctx: QueryCtx, feedIds: Id<'feeds'>[]) {
   const ids = [...new Set(feedIds)];
   const feeds = await Promise.all(ids.map((id) => ctx.db.get(id)));
   return new Map<Id<'feeds'>, FeedFace>(
-    ids.map((id, i) => {
+    // A Feed that's gone has no face.
+    ids.flatMap((id, i) => {
       const feed = feeds[i];
-      const face: FeedFace = { title: feed?.title ?? '' };
-      const faviconUrl = feed ? faviconOf(feed) : undefined;
+      if (!feed) return [];
+      const face: FeedFace = { title: feed.title };
+      const faviconUrl = faviconOf(feed);
       if (faviconUrl) face.faviconUrl = faviconUrl;
-      return [id, face];
+      return [[id, face] as const];
     }),
   );
 }
@@ -74,7 +76,7 @@ export const all = query({
     }
     const faces = await feedFaces(ctx, articles.map((a) => a.feedId));
     // A removed Feed's Articles are deleted in batches after it; they're never shown meanwhile.
-    return articles.filter((a) => faces.get(a.feedId)?.title).map((a) => {
+    return articles.filter((a) => faces.has(a.feedId)).map((a) => {
       const face = faces.get(a.feedId);
       return {
         id: a._id,
@@ -119,9 +121,11 @@ export const get = query({
         .withIndex('by_article', (q) => q.eq('articleId', article._id))
         .unique(),
     ]);
+    // A removed Feed's Articles are on their way out (T23); a link to one opens nothing.
+    if (!feed) return null;
     return {
       title: article.title,
-      feedTitle: feed?.title ?? '',
+      feedTitle: feed.title,
       publishedAt: article.publishedAt,
       link: article.link,
       blocks: body?.blocks ?? [],

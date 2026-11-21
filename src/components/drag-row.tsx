@@ -4,6 +4,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
+import { reorderHandleProps } from '@/components/reorder-handle';
 import { motion } from '@/theme/motion';
 
 /**
@@ -11,7 +12,7 @@ import { motion } from '@/theme/motion';
  * drag gesture lives: React Native Reanimated can't run under Jest yet (FEE-33), so tests
  * replace it (test/jest-setup.js) and drive `onDrop` directly. On release it reports the
  * index the row was dropped at; the list re-orders, and the row springs home.
- * TalkBack users order with the row's own actions instead (Q15).
+ * TalkBack users order from the same handle, with its Move up and Move down actions (Q15).
  */
 export function DragRow({
   index,
@@ -62,7 +63,7 @@ export function DragRow({
     <Animated.View style={style} onLayout={(e: LayoutChangeEvent) => setHeight(e.nativeEvent.layout.height || 1)}>
       <View className="flex-row items-center">
         <GestureDetector gesture={pan}>
-          <View aria-label={handleLabel} accessible={false} hitSlop={8}>
+          <View {...reorderHandleProps({ index, count, label: handleLabel, onDrop })} hitSlop={8}>
             {handle}
           </View>
         </GestureDetector>

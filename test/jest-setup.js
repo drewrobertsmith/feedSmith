@@ -8,9 +8,10 @@ jest.mock('@/environment/motion-config', () => ({ MotionConfig: jest.fn(() => nu
 jest.mock('@/components/drag-row', () => {
   const { View } = require('react-native');
   return {
-    DragRow: ({ handle, handleLabel, onDrop, children }) => (
+    // The gesture can't run here (FEE-33); the handle keeps its TalkBack props, and `onDrop` stands in for a drag.
+    DragRow: ({ index, count, handle, handleLabel, onDrop, children }) => (
       <View style={{ flexDirection: 'row' }}>
-        <View aria-label={handleLabel} onDrop={onDrop}>
+        <View {...require('@/components/reorder-handle').reorderHandleProps({ index, count, label: handleLabel, onDrop })} onDrop={onDrop}>
           {handle}
         </View>
         <View style={{ flex: 1 }}>{children}</View>

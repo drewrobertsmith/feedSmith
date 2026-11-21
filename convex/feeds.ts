@@ -1,6 +1,8 @@
 import { v } from 'convex/values';
 
 import { internal } from './_generated/api';
+import { DELETE_BATCH } from './lib/feed/blocks';
+import { MAX_FEED_NAME } from './lib/feedName';
 import type { Id } from './_generated/dataModel';
 import { action, internalMutation, internalQuery, mutation, query, type QueryCtx } from './_generated/server';
 import { requireUserId } from './lib/currentUser';
@@ -273,10 +275,6 @@ export const setPinned = mutation({
   },
 });
 
-/** A Feed's name: what the User sees on its chip and in Manage Feeds. */
-const MAX_NAME = 100;
-/** Articles (with their bodies) deleted per batch after a Feed is removed. */
-const REMOVE_BATCH = 50;
 
 /**
  * Manage Feeds (D13): every one of the signed-in User's Feeds, Pinned first in their order,
@@ -342,7 +340,7 @@ export const rename = mutation({
     const feed = await ownFeed(ctx, userId, args.id);
     if (!feed) return { ok: false as const, reason: 'not-found' as const };
     const title = args.title.replace(/\s+/g, ' ').trim();
-    if (!title || title.length > MAX_NAME) return { ok: false as const, reason: 'invalid-name' as const };
+    if (!title || title.length > MAX_FEED_NAME) return { ok: false as const, reason: 'invalid-name' as const };
     await ctx.db.patch(feed._id, { title });
     return { ok: true as const };
   },
@@ -373,7 +371,7 @@ export const removeArticles = internalMutation({
     const articles = await ctx.db
       .query('articles')
       .withIndex('by_feed_published', (q) => q.eq('feedId', feedId))
-      .take(REMOVE_BATCH);
+      .take(DELETE_BATCH);
     await Promise.all(
       articles.map(async (article) => {
         const bodies = await ctx.db
@@ -384,7 +382,7 @@ export const removeArticles = internalMutation({
         await ctx.db.delete(article._id);
       }),
     );
-    if (articles.length === REMOVE_BATCH) await ctx.scheduler.runAfter(0, internal.feeds.removeArticles, { feedId });
+    if (articles.length === DELETE_BATCH) await ctx.scheduler.runAfter(0, internal.feeds.removeArticles, { feedId });
     return null;
   },
 });

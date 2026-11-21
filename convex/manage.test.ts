@@ -101,6 +101,19 @@ describe('removing a Feed (T23)', () => {
     expect(await s.a.query(api.articles.all, {})).toEqual([]);
   });
 
+  test("a Feed with no name still shows its Articles; only a removed Feed's are hidden", async () => {
+    const s = await setup(['', 'Gone'], 1);
+    await s.a.mutation(api.feeds.remove, { id: s.feedIds[1] });
+    expect((await s.a.query(api.articles.all, {})).map((row) => row.title)).toEqual([' 0']);
+  });
+
+  test("a link to a removed Feed's Article opens nothing, even before it's deleted", async () => {
+    const s = await setup(['Gone'], 1);
+    const [articleId] = await s.t.run(async (ctx) => (await ctx.db.query('articles').take(1)).map((a) => a._id));
+    await s.a.mutation(api.feeds.remove, { id: s.feedIds[0] });
+    expect(await s.a.query(api.articles.get, { id: articleId })).toBeNull();
+  });
+
   test('a large Feed is removed in batches', async () => {
     const s = await setup(['Big'], 230);
     await s.a.mutation(api.feeds.remove, { id: s.feedIds[0] });

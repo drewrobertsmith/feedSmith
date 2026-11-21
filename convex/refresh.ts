@@ -3,6 +3,7 @@ import { v } from 'convex/values';
 import { internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { internalAction, internalMutation, internalQuery, type ActionCtx } from './_generated/server';
+import { DELETE_BATCH } from './lib/feed/blocks';
 import { fetchFeed } from './lib/feed/fetch';
 import { markFailing, markWorking, RETENTION, storeNewArticles } from './lib/feed/record';
 import { vStoredArticle, vValidators } from './lib/feed/validators';
@@ -11,12 +12,6 @@ import { vStoredArticle, vValidators } from './lib/feed/validators';
 const LEASE = 10 * 60_000;
 /** Feeds started per tick; the rest wait for the next one. */
 const PER_TICK = 50;
-/**
- * Articles deleted per cleanup run; a backlog continues in a follow-up run. Small, because each
- * brings its body, and one fetch's bodies can be megabytes (Convex reads 16 MiB per mutation).
- */
-const CLEANUP_BATCH = 50;
-
 /** Fetches one Feed and records what happened. Shared by the cron and pulling down. */
 export async function refreshOne(ctx: ActionCtx, feedId: Id<'feeds'>) {
   const feed = await ctx.runQuery(internal.refresh.forRefresh, { feedId });
@@ -145,7 +140,7 @@ export const cleanup = internalMutation({
     const old = await ctx.db
       .query('articles')
       .withIndex('by_published', (q) => q.lt('publishedAt', Date.now() - RETENTION))
-      .take(CLEANUP_BATCH);
+      .take(DELETE_BATCH);
     await Promise.all(
       old.map(async (article) => {
         const bodies = await ctx.db
@@ -156,7 +151,7 @@ export const cleanup = internalMutation({
         await ctx.db.delete(article._id);
       }),
     );
-    if (old.length === CLEANUP_BATCH) await ctx.scheduler.runAfter(0, internal.refresh.cleanup, {});
+    if (old.length === DELETE_BATCH) await ctx.scheduler.runAfter(0, internal.refresh.cleanup, {});
     return null;
   },
 });

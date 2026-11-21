@@ -11,12 +11,13 @@ import { useManage, useManageActions, useSetPinned, type ManagedFeed } from '@/f
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
 import { typeScale } from '@/theme/type';
+import { MAX_FEED_NAME } from '../../convex/lib/feedName';
 
 const ICON = 20;
 const HANDLE = 24;
 
 /** A small text action on a Feed's row; TalkBack hears its full name, e.g. "Rename The Verge" (Q15). */
-function Action({ label, accessibleName, onPress }: { label: string; accessibleName: string; onPress: () => void }) {
+function RowAction({ label, accessibleName, onPress }: { label: string; accessibleName: string; onPress: () => void }) {
   return (
     <Pressable role="button" aria-label={accessibleName} onPress={onPress} hitSlop={spacing.inside} className="py-inside">
       <AppText variant="label" className="text-text underline" accessible={false}>
@@ -30,10 +31,16 @@ function RenameField({ feed, onDone }: { feed: ManagedFeed; onDone: () => void }
   const { colorScheme, fontScale } = useEnvironment();
   const { rename } = useManageActions();
   const [name, setName] = useState(feed.title);
-  const [invalid, setInvalid] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
   const save = async () => {
     const outcome = await rename(feed.id, name);
-    if (outcome === 'invalid-name') setInvalid(true);
+    const problems: Record<typeof outcome, string | null> = {
+      ok: null,
+      'not-found': null,
+      'invalid-name': `Give the Feed a name of up to ${MAX_FEED_NAME} characters.`,
+      failed: "Couldn't save the name. Check your connection and try again.",
+    };
+    if (problems[outcome]) setProblem(problems[outcome]);
     else onDone();
   };
   return (
@@ -44,26 +51,26 @@ function RenameField({ feed, onDone }: { feed: ManagedFeed; onDone: () => void }
         onChangeText={setName}
         onSubmitEditing={save}
         autoFocus
-        maxLength={100}
+        maxLength={MAX_FEED_NAME}
         returnKeyType="done"
         placeholderTextColor={themes[colorScheme].textMuted}
         className="rounded-lg border border-text-muted px-group py-related text-text"
         style={{ fontFamily: typeScale.reading.fontFamily, fontSize: typeScale.reading.fontSize * fontScale }}
       />
-      {invalid ? (
+      {problem ? (
         <AppText variant="label" role="alert" className="text-text">
-          Give the Feed a name of up to 100 characters.
+          {problem}
         </AppText>
       ) : null}
       <View className="flex-row gap-group">
-        <Action label="Save" accessibleName="Save name" onPress={save} />
-        <Action label="Cancel" accessibleName="Cancel renaming" onPress={onDone} />
+        <RowAction label="Save" accessibleName="Save name" onPress={save} />
+        <RowAction label="Cancel" accessibleName="Cancel renaming" onPress={onDone} />
       </View>
     </View>
   );
 }
 
-function FeedRow({ feed, accessibleName, moves }: { feed: ManagedFeed; accessibleName: string; moves?: ReorderActions }) {
+function FeedRow({ feed }: { feed: ManagedFeed }) {
   const setPinned = useSetPinned();
   const { remove } = useManageActions();
   const [renaming, setRenaming] = useState(false);
@@ -75,17 +82,15 @@ function FeedRow({ feed, accessibleName, moves }: { feed: ManagedFeed; accessibl
   const confirmRemove = () =>
     Alert.alert(`Remove ${feed.title}?`, 'Its Articles go too. Articles you’ve Saved stay in Saved.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => void remove(feed.id) },
+      { text: 'Remove', style: 'destructive', onPress: () => void removeFeed() },
     ]);
+  const removeFeed = async () => {
+    if ((await remove(feed.id)) === 'failed') ToastAndroid.show(`Couldn't remove ${feed.title}. Try again.`, ToastAndroid.SHORT);
+  };
 
   return (
-    <View
-      accessible={!renaming}
-      aria-label={accessibleName}
-      accessibilityActions={moves?.actions}
-      onAccessibilityAction={(event) => moves?.onAction(event.nativeEvent.actionName)}
-      className="gap-related py-group"
-    >
+    // Not grouped into one TalkBack stop: its name, site and each action are reached on their own (Q15).
+    <View className="gap-related py-group">
       <View className="flex-row items-center gap-related">
         <FeedIcon key={feed.faviconUrl ?? feed.title} url={feed.faviconUrl} title={feed.title} size={ICON} />
         <View className="flex-1 gap-inside">
@@ -106,28 +111,17 @@ function FeedRow({ feed, accessibleName, moves }: { feed: ManagedFeed; accessibl
         <RenameField feed={feed} onDone={() => setRenaming(false)} />
       ) : (
         <View className="flex-row flex-wrap gap-group">
-          <Action label="Rename" accessibleName={`Rename ${feed.title}`} onPress={() => setRenaming(true)} />
-          <Action
+          <RowAction label="Rename" accessibleName={`Rename ${feed.title}`} onPress={() => setRenaming(true)} />
+          <RowAction
             label={feed.pinned ? 'Unpin' : 'Pin'}
             accessibleName={`${feed.pinned ? 'Unpin' : 'Pin'} ${feed.title}`}
             onPress={() => void togglePin()}
           />
-          <Action label="Remove" accessibleName={`Remove ${feed.title}`} onPress={confirmRemove} />
+          <RowAction label="Remove" accessibleName={`Remove ${feed.title}`} onPress={confirmRemove} />
         </View>
       )}
     </View>
   );
-}
-
-type ReorderActions = { actions: { name: string; label: string }[]; onAction: (name: string) => void };
-
-/** A Pinned Feed's TalkBack actions: move it up or down among the Pinned (Q15). */
-function reorderActions(index: number, count: number, move: (to: number) => void): ReorderActions {
-  const actions = [
-    ...(index > 0 ? [{ name: 'moveUp', label: 'Move up' }] : []),
-    ...(index < count - 1 ? [{ name: 'moveDown', label: 'Move down' }] : []),
-  ];
-  return { actions, onAction: (name) => move(name === 'moveUp' ? index - 1 : index + 1) };
 }
 
 /** Manage Feeds (D13): rename, remove, Pin and order Feeds, and see which have stopped working (P15). */
@@ -170,7 +164,7 @@ export function ManageFeedsScreen() {
               key={feed.id}
               index={index}
               count={pinned.length}
-              handleLabel={`Drag to reorder ${feed.title}`}
+              handleLabel={`Reorder ${feed.title}`}
               onDrop={(to) => move(index, to)}
               handle={
                 <View className="pr-related">
@@ -178,11 +172,7 @@ export function ManageFeedsScreen() {
                 </View>
               }
             >
-              <FeedRow
-                feed={feed}
-                accessibleName={`${feed.title}, Pinned, ${index + 1} of ${pinned.length}`}
-                moves={reorderActions(index, pinned.length, (to) => move(index, to))}
-              />
+              <FeedRow feed={feed} />
             </DragRow>
           ))}
         </View>
@@ -195,7 +185,7 @@ export function ManageFeedsScreen() {
             </AppText>
           ) : null}
           {others.map((feed) => (
-            <FeedRow key={feed.id} feed={feed} accessibleName={feed.title} />
+            <FeedRow key={feed.id} feed={feed} />
           ))}
         </View>
       ) : null}
