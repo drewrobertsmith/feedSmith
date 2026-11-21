@@ -1,4 +1,4 @@
-import { userEvent } from '@testing-library/react-native';
+import { act, userEvent } from '@testing-library/react-native';
 import { renderRouter, screen } from 'expo-router/testing-library';
 import * as WebBrowser from 'expo-web-browser';
 import { Uniwind } from 'uniwind';
@@ -56,13 +56,14 @@ afterEach(() => {
 });
 
 describe('All', () => {
-  type Shows = { rows: number; empty: boolean; theme: 'dark' | 'light'; titleSize: number };
+  type Shows = { rows: number; empty: boolean; refreshing: boolean; theme: 'dark' | 'light'; titleSize: number };
   const SHOWS: Record<AllWorldId, Shows> = {
-    'all-dark': { rows: FIXTURE_ROWS.length, empty: false, theme: 'dark', titleSize: 24 },
-    'all-light': { rows: FIXTURE_ROWS.length, empty: false, theme: 'light', titleSize: 24 },
-    'all-empty': { rows: 0, empty: true, theme: 'dark', titleSize: 24 },
-    'all-loading': { rows: 0, empty: false, theme: 'dark', titleSize: 24 },
-    'all-largest-font': { rows: FIXTURE_ROWS.length, empty: false, theme: 'dark', titleSize: 48 },
+    'all-dark': { rows: FIXTURE_ROWS.length, empty: false, refreshing: false, theme: 'dark', titleSize: 24 },
+    'all-light': { rows: FIXTURE_ROWS.length, empty: false, refreshing: false, theme: 'light', titleSize: 24 },
+    'all-empty': { rows: 0, empty: true, refreshing: false, theme: 'dark', titleSize: 24 },
+    'all-loading': { rows: 0, empty: false, refreshing: false, theme: 'dark', titleSize: 24 },
+    'all-refreshing': { rows: FIXTURE_ROWS.length, empty: false, refreshing: true, theme: 'light', titleSize: 24 },
+    'all-largest-font': { rows: FIXTURE_ROWS.length, empty: false, refreshing: false, theme: 'dark', titleSize: 48 },
   };
 
   test.each(ALL_WORLDS)('$label', async ({ id, spec }) => {
@@ -76,7 +77,17 @@ describe('All', () => {
     } else {
       expect(screen.queryByText('Add a Feed to see its Articles here.')).not.toBeOnTheScreen();
     }
+    if (!shows.empty && shows.rows > 0) {
+      expect(screen.getByTestId('all-list').props.refreshControl.props.refreshing).toBe(shows.refreshing);
+    }
     expect(Uniwind.currentTheme).toBe(shows.theme);
+  });
+
+  test('pulling down asks every Feed to refresh, from the server (Q21)', async () => {
+    const w = await open({ colorScheme: 'dark', feeds: 'some' });
+    const list = await screen.findByTestId('all-list');
+    await act(() => list.props.refreshControl.props.onRefresh());
+    expect(w.feedsLog.refreshes).toBe(1);
   });
 
   test('each Article reads its title, Feed and date to TalkBack, newest first (Q15)', async () => {

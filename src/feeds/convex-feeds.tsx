@@ -35,7 +35,25 @@ function useAddFeed() {
   return { view, add };
 }
 
-const convexFeeds: FeedsData = { useAll, useArticle, useAddFeed };
+function useRefresh() {
+  const refreshAll = useAction(api.feeds.refreshAll);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const refresh = async () => {
+    setRefreshing(true);
+    try {
+      await refreshAll();
+    } catch {
+      // A failed pull changes nothing on screen; the schedule keeps Feeds fresh regardless.
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  return { refreshing, refresh };
+}
+
+const convexFeeds: FeedsData = { useAll, useArticle, useAddFeed, useRefresh };
 
 /** The app's Feeds and Articles, from Convex. Sits inside `ConvexAuth`, which owns the client. */
 export function ConvexFeeds({ children }: { children: ReactNode }) {

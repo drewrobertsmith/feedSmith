@@ -39,6 +39,7 @@ export const ALL_WORLDS = [
   { id: 'all-light', label: 'All, light', spec: { colorScheme: 'light', feeds: 'some' } },
   { id: 'all-empty', label: 'No Feeds yet', spec: { colorScheme: 'dark', feeds: 'none' } },
   { id: 'all-loading', label: 'All, loading', spec: { colorScheme: 'dark', feeds: 'loading' } },
+  { id: 'all-refreshing', label: 'All, refreshing', spec: { colorScheme: 'light', feeds: 'some', refreshing: true } },
   { id: 'all-largest-font', label: 'All, largest font size', spec: { colorScheme: 'dark', feeds: 'some', fontScale: 2 } },
 ] as const satisfies readonly CatalogWorld[];
 

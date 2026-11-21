@@ -24,18 +24,20 @@ export type WorldSpec = {
   feeds?: 'none' | 'loading' | 'some';
   /** Where adding a Feed is up to. Defaults to idle, where adding succeeds. */
   addFeed?: 'idle' | 'busy' | AddFeedReason;
+  /** Whether a pull-down refresh is under way. */
+  refreshing?: boolean;
   /** The Article the Reading view opens. Defaults to one with every kind of block. */
   article?: 'full' | 'omitted' | 'missing' | 'loading';
 };
 
 /** What a world's fake Feeds were asked to do. */
-export type FeedsLog = { added: string[] };
+export type FeedsLog = { added: string[]; refreshes: number };
 
 /** What a world's fake auth was asked to do. */
 export type SignInLog = { starts: number; completions: { code?: string; error?: string }[] };
 
 /** A world's Feeds and Articles: fixture data, and a log of what it's asked. */
-export function worldFeeds(spec: WorldSpec, log: FeedsLog = { added: [] }): FeedsData {
+export function worldFeeds(spec: WorldSpec, log: FeedsLog = { added: [], refreshes: 0 }): FeedsData {
   const feeds = spec.feeds ?? 'none';
   const addFeed = spec.addFeed ?? 'idle';
   const article = spec.article ?? 'full';
@@ -60,6 +62,12 @@ export function worldFeeds(spec: WorldSpec, log: FeedsLog = { added: [] }): Feed
         log.added.push(url);
         // Busy stays busy; an error stays on the screen; idle adds the Feed.
         return addFeed === 'busy' ? new Promise(() => {}) : Promise.resolve(addFeed === 'idle');
+      },
+    }),
+    useRefresh: () => ({
+      refreshing: spec.refreshing ?? false,
+      refresh: async () => {
+        log.refreshes += 1;
       },
     }),
   };
@@ -119,7 +127,7 @@ export function createWorld(spec: WorldSpec): World {
   Uniwind.setTheme(spec.colorScheme);
   const signInLog: SignInLog = { starts: 0, completions: [] };
   const signedIn = (spec.auth ?? 'signed-in') === 'signed-in';
-  const feedsLog: FeedsLog = { added: [] };
+  const feedsLog: FeedsLog = { added: [], refreshes: 0 };
 
   return {
     environment: worldEnvironment(spec),

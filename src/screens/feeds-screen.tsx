@@ -1,10 +1,10 @@
 import { router } from 'expo-router';
-import { FlatList, Pressable, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/app-button';
 import { AppText } from '@/components/app-text';
-import { useAll, type ArticleRow } from '@/feeds/feeds-data';
+import { useAll, useRefresh, type ArticleRow } from '@/feeds/feeds-data';
 import { publishedDate } from '@/feeds/format';
 import { useEnvironment } from '@/environment';
 import { spacing } from '@/theme/spacing';
@@ -40,6 +40,9 @@ function Row({ article }: { article: ArticleRow }) {
 export function FeedsScreen() {
   const insets = useSafeAreaInsets();
   const all = useAll();
+  const { refreshing, refresh } = useRefresh();
+  const { colorScheme } = useEnvironment();
+  const theme = themes[colorScheme];
   const empty = all.status === 'ready' && all.articles.length === 0;
 
   const header = (
@@ -72,6 +75,16 @@ export function FeedsScreen() {
 
   return (
     <FlatList
+      testID="all-list"
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={refresh}
+          progressViewOffset={insets.top}
+          colors={[theme.accent]}
+          progressBackgroundColor={theme.surface}
+        />
+      }
       className="flex-1 bg-background"
       data={all.status === 'ready' ? all.articles : []}
       keyExtractor={(article) => article.id}
