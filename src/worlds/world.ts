@@ -8,6 +8,8 @@ import {
   FIXTURE_ARTICLE,
   FIXTURE_CHIPS,
   FIXTURE_CHOICES,
+  FIXTURE_MANAGE,
+  FIXTURE_MANAGE_PINNED,
   FIXTURE_NOW,
   FIXTURE_OMITTED_ARTICLE,
   FIXTURE_READ_ROWS,
@@ -25,7 +27,7 @@ export type WorldSpec = {
   /** Android's largest font size is 2.0. */
   fontScale?: number;
   /** The screen the world opens on. */
-  section?: 'feeds' | 'saved' | 'add-feed' | 'article';
+  section?: 'feeds' | 'saved' | 'add-feed' | 'article' | 'manage';
   /** Where the User is in signing in. Defaults to signed in. */
   auth?: 'signed-in' | 'signed-out' | 'signing-in' | 'not-allowed' | 'failed';
   /** What All holds. Defaults to no Feeds yet. `read` is every Article already Read. */
@@ -41,12 +43,24 @@ export type WorldSpec = {
   feed?: string;
   /** `full`: three Feeds are Pinned already, so another Pin is refused (P9). */
   pins?: 'full';
+  /** What Manage Feeds lists. Defaults to `some`: one Pinned Feed, one not working. */
+  manage?: 'some' | 'pinned' | 'none' | 'loading';
   /** The Article the Reading view opens. Defaults to one with every kind of block. */
   article?: 'full' | 'omitted' | 'missing' | 'loading';
 };
 
 /** What a world's fake Feeds were asked to do. */
-export type FeedsLog = { added: string[]; refreshes: number; read: string[]; pins: { id: string; pinned: boolean }[] };
+export type FeedsLog = {
+  added: string[];
+  refreshes: number;
+  read: string[];
+  pins: { id: string; pinned: boolean }[];
+  renames: { id: string; title: string }[];
+  removed: string[];
+  pinOrders: string[][];
+};
+
+const emptyLog = (): FeedsLog => ({ added: [], refreshes: 0, read: [], pins: [], renames: [], removed: [], pinOrders: [] });
 
 /** What a world's fake auth was asked to do. */
 export type SignInLog = { starts: number; completions: { code?: string; error?: string }[] };
@@ -54,8 +68,9 @@ export type SignInLog = { starts: number; completions: { code?: string; error?: 
 /** A world's Feeds and Articles: fixture data, and a log of what it's asked. */
 export function worldFeeds(
   spec: WorldSpec,
-  log: FeedsLog = { added: [], refreshes: 0, read: [], pins: [] },
+  log: FeedsLog = emptyLog(),
 ): FeedsData {
+  const manage = spec.manage ?? 'some';
   const feeds = spec.feeds ?? 'none';
   const addFeed = spec.addFeed ?? 'idle';
   const article = spec.article ?? 'full';
@@ -82,6 +97,22 @@ export function worldFeeds(
     },
     useChips: () =>
       feeds === 'loading' ? { status: 'loading' } : { status: 'ready', chips: feeds === 'none' ? [] : FIXTURE_CHIPS },
+    useManage: () =>
+      manage === 'loading'
+        ? { status: 'loading' }
+        : { status: 'ready', feeds: manage === 'none' ? [] : manage === 'pinned' ? FIXTURE_MANAGE_PINNED : FIXTURE_MANAGE },
+    useManageActions: () => ({
+      rename: async (id, title) => {
+        log.renames.push({ id, title });
+        return 'ok';
+      },
+      remove: async (id) => {
+        log.removed.push(id);
+      },
+      orderPins: async (ids) => {
+        log.pinOrders.push(ids);
+      },
+    }),
     useSetPinned: () => async (id, pinned) => {
       if (pinned && spec.pins === 'full') return 'pins-full';
       log.pins.push({ id, pinned });
@@ -121,7 +152,7 @@ export type World = {
   feeds: FeedsData;
   feedsLog: FeedsLog;
   /** Where the router starts. */
-  initialUrl: '/' | '/saved' | '/sign-in' | '/add-feed' | `/article/${string}` | `/?feed=${string}`;
+  initialUrl: '/' | '/saved' | '/sign-in' | '/add-feed' | '/manage-feeds' | `/article/${string}` | `/?feed=${string}`;
   /** Puts back what the world changed: the theme follows the phone again. */
   dispose: () => void;
 };
@@ -163,6 +194,7 @@ const SECTION_URLS = {
   feeds: '/',
   saved: '/saved',
   'add-feed': '/add-feed',
+  manage: '/manage-feeds',
   article: `/article/${FIXTURE_ROWS[0].id}`,
 } as const satisfies Record<NonNullable<WorldSpec['section']>, World['initialUrl']>;
 
@@ -170,7 +202,7 @@ export function createWorld(spec: WorldSpec): World {
   Uniwind.setTheme(spec.colorScheme);
   const signInLog: SignInLog = { starts: 0, completions: [] };
   const signedIn = (spec.auth ?? 'signed-in') === 'signed-in';
-  const feedsLog: FeedsLog = { added: [], refreshes: 0, read: [], pins: [] };
+  const feedsLog: FeedsLog = emptyLog();
 
   return {
     environment: worldEnvironment(spec),

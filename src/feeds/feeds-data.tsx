@@ -37,6 +37,16 @@ export type AllView = { status: 'loading' } | { status: 'ready'; articles: Artic
 /** One Feed's chip (P5, P9). Never carries a feed URL (Q9). */
 export type FeedChip = { id: string; title: string; faviconUrl?: string; pinned: boolean };
 export type ChipsView = { status: 'loading' } | { status: 'ready'; chips: FeedChip[] };
+/** One Feed in Manage Feeds (D13): its site host, never its URL (Q9), and whether it works (P15). */
+export type ManagedFeed = { id: string; title: string; faviconUrl?: string; host: string; pinned: boolean; working: boolean };
+export type ManageView = { status: 'loading' } | { status: 'ready'; feeds: ManagedFeed[] };
+export type ManageActions = {
+  rename: (id: string, title: string) => Promise<'ok' | 'invalid-name' | 'not-found'>;
+  remove: (id: string) => Promise<void>;
+  /** The Pinned Feeds' ids in their new order. */
+  orderPins: (ids: string[]) => Promise<void>;
+};
+
 /** What Pinning or unpinning came to: a fourth Pin is refused (P9). */
 export type PinOutcome = 'ok' | 'pins-full' | 'not-found';
 export type ArticleView = { status: 'loading' } | { status: 'missing' } | { status: 'ready'; article: ReadingArticle };
@@ -67,6 +77,10 @@ export type FeedsData = {
   useChips: () => ChipsView;
   /** Pins or unpins a Feed. */
   useSetPinned: () => (id: string, pinned: boolean) => Promise<PinOutcome>;
+  /** Manage Feeds' list, Pinned first in order (D13). */
+  useManage: () => ManageView;
+  /** Renaming, removing and ordering Pinned Feeds. */
+  useManageActions: () => ManageActions;
   useArticle: (id: string) => ArticleView;
   /** Adding a Feed: where it's up to, and `add`, which resolves to what happened. */
   useAddFeed: () => { view: AddFeedView; add: (url: string) => Promise<AddOutcome> };
@@ -96,6 +110,18 @@ export function useAll(feedId: string | null): AllView {
 /** The chip row's Feeds. */
 export function useChips(): ChipsView {
   const { useChips: read } = useFeedsData();
+  return read();
+}
+
+/** Manage Feeds' list. */
+export function useManage(): ManageView {
+  const { useManage: read } = useFeedsData();
+  return read();
+}
+
+/** Renaming, removing and ordering. */
+export function useManageActions(): ManageActions {
+  const { useManageActions: read } = useFeedsData();
   return read();
 }
 

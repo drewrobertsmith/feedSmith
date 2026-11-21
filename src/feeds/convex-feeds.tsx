@@ -9,6 +9,8 @@ import {
   type AllView,
   type ArticleView,
   type ChipsView,
+  type ManageActions,
+  type ManageView,
   type PinOutcome,
   type FeedsData,
 } from '@/feeds/feeds-data';
@@ -89,7 +91,41 @@ function useMarkRead() {
   };
 }
 
-const convexFeeds: FeedsData = { useAll, useChips, useSetPinned, useArticle, useAddFeed, useRefresh, useMarkRead };
+function useManage(): ManageView {
+  const feeds = useQuery(api.feeds.manage);
+  return feeds === undefined ? { status: 'loading' } : { status: 'ready', feeds };
+}
+
+function useManageActions(): ManageActions {
+  const rename = useMutation(api.feeds.rename);
+  const remove = useMutation(api.feeds.remove);
+  const orderPins = useMutation(api.feeds.orderPins);
+  return {
+    rename: async (id, title) => {
+      const result = await rename({ id, title }).catch(() => null);
+      if (!result) return 'not-found';
+      return result.ok ? 'ok' : result.reason;
+    },
+    remove: async (id) => {
+      await remove({ id }).catch(() => null);
+    },
+    orderPins: async (ids) => {
+      await orderPins({ ids }).catch(() => null);
+    },
+  };
+}
+
+const convexFeeds: FeedsData = {
+  useAll,
+  useChips,
+  useSetPinned,
+  useManage,
+  useManageActions,
+  useArticle,
+  useAddFeed,
+  useRefresh,
+  useMarkRead,
+};
 
 /** The app's Feeds and Articles, from Convex. Sits inside `ConvexAuth`, which owns the client. */
 export function ConvexFeeds({ children }: { children: ReactNode }) {

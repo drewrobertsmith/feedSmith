@@ -85,3 +85,19 @@ export const READING_WORLDS = [
 ] as const satisfies readonly CatalogWorld[];
 
 export type ReadingWorldId = (typeof READING_WORLDS)[number]['id'];
+
+/** Manage Feeds (FEE-31, D13). */
+export const MANAGE_WORLDS = [
+  { id: 'manage-dark', label: 'Manage Feeds, dark', spec: { colorScheme: 'dark', section: 'manage' } },
+  { id: 'manage-light', label: 'Manage Feeds, light', spec: { colorScheme: 'light', section: 'manage' } },
+  { id: 'manage-pinned', label: 'Three Pinned to order', spec: { colorScheme: 'dark', section: 'manage', manage: 'pinned' } },
+  { id: 'manage-empty', label: 'No Feeds to manage', spec: { colorScheme: 'dark', section: 'manage', manage: 'none' } },
+  { id: 'manage-loading', label: 'Manage Feeds, loading', spec: { colorScheme: 'dark', section: 'manage', manage: 'loading' } },
+  {
+    id: 'manage-largest-font',
+    label: 'Manage Feeds, largest font size',
+    spec: { colorScheme: 'dark', section: 'manage', manage: 'pinned', fontScale: 2 },
+  },
+] as const satisfies readonly CatalogWorld[];
+
+export type ManageWorldId = (typeof MANAGE_WORLDS)[number]['id'];

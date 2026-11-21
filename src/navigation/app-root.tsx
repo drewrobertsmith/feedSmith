@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { DarkTheme, DefaultTheme, ThemeProvider, type Theme } from 'expo-router/react-navigation';
 import { StatusBar } from 'expo-status-bar';
 
@@ -40,6 +41,7 @@ function ThemedStack() {
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="add-feed" />
             <Stack.Screen name="article/[id]" />
+            <Stack.Screen name="manage-feeds" />
           </Stack.Protected>
           <Stack.Protected guard={session === 'signed-out'}>
             <Stack.Screen name="sign-in" />
@@ -62,9 +64,12 @@ function ThemedStack() {
  */
 export function AppRoot({ environment, auth, feeds }: { environment?: Environment; auth?: Auth; feeds?: FeedsData }) {
   const stack = (
-    <EnvironmentProvider environment={environment}>
-      <ThemedStack />
-    </EnvironmentProvider>
+    // Gestures (dragging Pinned Feeds, D13) need a root that sees every touch.
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <EnvironmentProvider environment={environment}>
+        <ThemedStack />
+      </EnvironmentProvider>
+    </GestureHandlerRootView>
   );
   if (auth && feeds) {
     return (
