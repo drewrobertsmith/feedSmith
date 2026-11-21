@@ -16,6 +16,8 @@ afterAll(() => {
 const load = () => {
   let format: typeof import('@/feeds/format') | undefined;
   jest.isolateModules(() => {
+    // A fresh load, after RelativeTimeFormat is gone, needs require().
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     format = require('@/feeds/format');
   });
   return format!;
