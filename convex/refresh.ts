@@ -95,10 +95,12 @@ export const scheduleDue = internalMutation({
       .query('feeds')
       .withIndex('by_next_fetch', (q) => q.lte('nextFetchAt', now))
       .take(PER_TICK);
-    for (const feed of due) {
-      await ctx.db.patch(feed._id, { nextFetchAt: now + LEASE });
-      await ctx.scheduler.runAfter(0, internal.refresh.refreshFeed, { feedId: feed._id });
-    }
+    await Promise.all(
+      due.map(async (feed) => {
+        await ctx.db.patch(feed._id, { nextFetchAt: now + LEASE });
+        await ctx.scheduler.runAfter(0, internal.refresh.refreshFeed, { feedId: feed._id });
+      }),
+    );
     return null;
   },
 });

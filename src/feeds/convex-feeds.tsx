@@ -41,13 +41,9 @@ function useRefresh() {
 
   const refresh = async () => {
     setRefreshing(true);
-    try {
-      await refreshAll();
-    } catch {
-      // A failed pull changes nothing on screen; the schedule keeps Feeds fresh regardless.
-    } finally {
-      setRefreshing(false);
-    }
+    // A failed pull changes nothing on screen; the schedule keeps Feeds fresh regardless.
+    await refreshAll().catch(() => null);
+    setRefreshing(false);
   };
 
   return { refreshing, refresh };
