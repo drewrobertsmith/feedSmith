@@ -6,8 +6,8 @@ Findings from rnsec (`security`, `security:full`), the dependency audit and any 
 
 | Date | Tool | Rule / advisory | Where | Verdict | Why |
 |---|---|---|---|---|---|
-| 2026-11-21 | bun audit | GHSA-g3hv-75wg-m249 (minimatch, moderate ReDoS) | via eslint, jest, jest-expo, expo › @expo/fingerprint | accepted risk (proposed; needs owner sign-off) | Dev and build-time tooling only, not in the app bundle; patterns come from the repo's own config. Review again 2027-02-21 or at the next SDK upgrade. |
-| 2026-11-21 | bun audit | GHSA-3g3m-2fjr-6pw4 (glob, moderate) | via jest, jest-expo | accepted risk (proposed; needs owner sign-off) | Test tooling only, run locally on the repo's own files. Review again 2027-02-21 or at the next SDK upgrade. |
+| 2026-11-21 | bun audit | GHSA-g3hv-75wg-m249 (minimatch, moderate ReDoS) | via eslint, jest, jest-expo, expo › @expo/fingerprint | accepted risk (Drew Smith, 2026-11-21) | Dev and build-time tooling only, not in the app bundle; patterns come from the repo's own config. Review again 2027-02-21 or at the next SDK upgrade. |
+| 2026-11-21 | bun audit | GHSA-3g3m-2fjr-6pw4 (glob, moderate) | via jest, jest-expo | accepted risk (Drew Smith, 2026-11-21) | Test tooling only, run locally on the repo's own files. Review again 2027-02-21 or at the next SDK upgrade. |
 
 Verdicts: **fixed**, **false positive**, **accepted risk** (with the reason and who accepted it).
 

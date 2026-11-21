@@ -44,3 +44,8 @@ example
 
 # expo-dev-loop scanner reports
 .rnsec/
+
+# project-installed agent skills (installed per machine with npx skills add)
+.agents/
+.claude/skills/
+skills-lock.json
