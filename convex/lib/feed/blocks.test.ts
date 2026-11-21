@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { htmlToBlocks, MAX_BLOCKS, MAX_TEXT } from './blocks';
+import { htmlToBlocks, MAX_BLOCKS, MAX_SPANS, MAX_TEXT } from './blocks';
 
 const BASE = 'https://example.com/posts/1';
 
@@ -63,6 +63,14 @@ describe('hostile HTML never reaches the stored blocks (Q8)', () => {
     expect(blocks).toHaveLength(MAX_BLOCKS + 1);
     expect(blocks.at(-1)).toEqual({ type: 'omitted', kind: 'other' });
     expect(omitted).toEqual(['other']);
+  });
+
+  test(`a run of styles keeps at most ${MAX_SPANS} spans per block, losing no text`, () => {
+    const html = `<p>${'<b>x</b>y'.repeat(5000)}</p>`;
+    const [block] = htmlToBlocks(html, BASE).blocks;
+    if (block.type !== 'paragraph') throw new Error('expected a paragraph');
+    expect(block.spans.length).toBeLessThanOrEqual(MAX_SPANS);
+    expect(block.spans.map((s) => s.text).join('')).toBe('xy'.repeat(5000));
   });
 
   test(`keeps at most ${MAX_TEXT} characters of text`, () => {

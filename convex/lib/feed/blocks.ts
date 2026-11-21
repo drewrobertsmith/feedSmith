@@ -22,6 +22,8 @@ export type Content = { blocks: Block[]; omitted: OmittedKind[] };
 /** Caps on what one Article can store; past them the rest is noted as omitted. */
 export const MAX_BLOCKS = 500;
 export const MAX_TEXT = 100_000;
+/** Spans per block or list item; past it the rest is kept as plain text. Convex arrays hold 8192. */
+export const MAX_SPANS = 1000;
 const MAX_ALT = 300;
 
 type Node = ChildNode;
@@ -226,6 +228,10 @@ function tidy(spans: Span[]): Span[] {
     const last = merged.at(-1);
     if (last && sameStyle(last, span)) last.text = collapse(last.text + span.text);
     else merged.push({ ...span });
+  }
+  if (merged.length > MAX_SPANS) {
+    const rest = merged.splice(MAX_SPANS - 1);
+    merged.push({ text: rest.map((span) => span.text).join('') });
   }
   if (merged.length) {
     merged[0].text = merged[0].text.trimStart();
