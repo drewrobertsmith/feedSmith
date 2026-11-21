@@ -29,15 +29,17 @@ function FeedMark({ title, faviconUrl }: { title: string; faviconUrl?: string })
   const size = FAVICON * fontScale;
   if (faviconUrl && !failed) {
     return (
-      <Image
-        testID="row-favicon"
-        source={{ uri: faviconUrl }}
-        recyclingKey={faviconUrl}
-        onError={() => setFailed(true)}
-        accessible={false}
-        className="rounded-sm"
-        style={{ width: size, height: size }}
-      />
+      // The View clips the corners: expo-image doesn't take Uniwind's rounding classes.
+      <View className="overflow-hidden rounded-sm" style={{ width: size, height: size }}>
+        <Image
+          testID="row-favicon"
+          source={{ uri: faviconUrl }}
+          recyclingKey={faviconUrl}
+          onError={() => setFailed(true)}
+          accessible={false}
+          style={{ width: size, height: size }}
+        />
+      </View>
     );
   }
   return (
@@ -84,15 +86,16 @@ function Row({ article }: { article: ArticleRow }) {
         ) : null}
       </View>
       {article.imageUrl ? (
-        <Image
-          testID="row-image"
-          source={{ uri: article.imageUrl }}
-          accessible={false}
-          contentFit="cover"
-          recyclingKey={article.id}
-          className="rounded-lg bg-surface"
-          style={{ width: thumbnail, height: thumbnail, opacity: article.read ? READ_IMAGE_OPACITY : 1 }}
-        />
+        <View className="overflow-hidden rounded-lg bg-surface" style={{ width: thumbnail, height: thumbnail }}>
+          <Image
+            testID="row-image"
+            source={{ uri: article.imageUrl }}
+            accessible={false}
+            contentFit="cover"
+            recyclingKey={article.id}
+            style={{ width: thumbnail, height: thumbnail, opacity: article.read ? READ_IMAGE_OPACITY : 1 }}
+          />
+        </View>
       ) : null}
     </Pressable>
   );
