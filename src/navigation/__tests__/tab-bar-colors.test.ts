@@ -27,6 +27,12 @@ describe.each([
     expect(contrastRatio(colors.labelStyle.default.color, colors.backgroundColor)).toBeGreaterThanOrEqual(4.5);
   });
 
+  test('icons reach 3:1 on the bar and on the active indicator (Q14)', () => {
+    expect(contrastRatio(colors.iconColor.default, colors.backgroundColor)).toBeGreaterThanOrEqual(3);
+    expect(contrastRatio(colors.iconColor.selected, colors.indicatorColor)).toBeGreaterThanOrEqual(3);
+    expect(contrastRatio(colors.iconColor.selected, colors.backgroundColor)).toBeGreaterThanOrEqual(3);
+  });
+
   test('labels use the interface typeface, not Roboto', () => {
     expect(colors.labelStyle.default.fontFamily).toBe('InstrumentSans');
     expect(colors.labelStyle.selected.fontFamily).toBe('InstrumentSans');

@@ -21,15 +21,16 @@ What this app must never get wrong. `/expo-dev-loop:feature` plans, reviews and 
 | Q11 | No secrets in the repo, the app bundle or `EXPO_PUBLIC_*` variables. | Anything shipped in the app is public. | every change | `security` gate; review of the diff and of `EXPO_PUBLIC_*` names. |
 | Q12 | A crash report holds only the stack trace, app version, device model, Android version and current screen. It has no feed URLs, Article text, Google identity or IP address, and no Session Replay or screenshots. | Crash reports must not reveal what you read or how to reach your Feeds. | data | Test of the Sentry `beforeSend` scrubber with an event carrying a feed URL and Article text; review of the Sentry config (`sendDefaultPii` off, replay off). |
 | Q13 | Sentry is the only third-party SDK that sends data. There are no analytics, tracking or advertising SDKs. | Single-user, private reading. | every change | Review of every new dependency. |
-| Q14 | All text and icons meet WCAG 2.2 AA contrast in both themes. Gold is never text or an icon colour on light backgrounds (light mode uses a darker gold), and Sage is never text on Midnight. | Readable in every theme. | UI | Unit test over the theme's text and background token pairs; device check in light and dark. |
+| Q14 | All text meets WCAG 2.2 AA contrast (4.5:1) in both themes. Icons, control boundaries, and any colour or shape that is the only sign of a state reach 3:1 against what's next to them; decorative fills that repeat a state shown another way (the active tab's indicator pill) are exempt. Gold is never text or an icon colour on light backgrounds (light mode uses a darker gold), and Sage is never text on Midnight. | Readable and usable in every theme. | UI | Unit test over the theme's text and background token pairs, and over the icon and state pairs (the tab bar's icons on its background and indicator); device check in light and dark. |
 | Q15 | Every control has a TalkBack label and role. Save and Done have accessible actions as well as the swipes. | Every action reachable without sight or gestures. | UI | RNTL queries by role and label; device check with TalkBack on. |
 | Q16 | Layouts hold at Android's largest font size and display size, with nothing clipped or overlapping. | Reading comfort includes big text. | UI | Device check at the largest font and display size. |
 | Q17 | With "Remove animations" on, expressive motion is reduced to simple fades or none. | Motion must never be forced on anyone. | UI | Test of the reduced-motion seam; device check with the setting on. |
-| Q18 | The app behaves natively: predictive back on, edge-to-edge, haptics on Save and Done. Row swipes never fight the system back gesture at the screen edges. | D8: native behaviour, own identity. | UI | Device check of back, edges and swipes. `app.json` must set `predictiveBackGestureEnabled: true`. |
-| Q19 | Colours and type come only from the theme's tokens (D2–D6): no hard-coded colours, and no Roboto in the interface. | The brand holds across every screen. | UI | Review, and a grep for hex colours outside the theme. |
+| Q18 | The app behaves natively: predictive back on, edge-to-edge, haptics on Save and Done. Row swipes never fight the system back gesture at the screen edges. | D8: native behaviour, own identity. | UI | Device check of back, edges and swipes, and of edge-to-edge: content draws behind the status and navigation bars, and nothing important sits under them (insets respected), in both themes. `app.json` must set `predictiveBackGestureEnabled: true`. |
+| Q19 | Colours and type come only from the theme's tokens (D2–D6): no hard-coded colours, and no Roboto in the interface. Colours in the app config (splash, icon background, window background) are brand tokens too. | The brand holds across every screen, from the launcher icon onwards. | UI | Test that no source file outside the theme holds a hex colour or Roboto; test that every colour in `app.json` is in the palette; review of the drawn icon. |
 | Q20 | Every subscription, listener, timer and native event has a cleanup path, and no cache or list grows without limit over a session. | Sessions run up to half an hour, and the app stays alive in the background. | lifecycle | Tests that cleanup runs on unmount; memory check in the pre-release soak. |
 | Q21 | Nothing runs on the JS thread while the app is in the background, and the phone never polls: fetching is the server's job (T5). | Battery, and the phone never does the fetching. | lifecycle | Review; device check of background CPU. |
 | Q22 | Without the owner's explicit say-so, the agent never touches the production Convex deployment (deploys, data, environment variables), uploads to the Play Store or runs EAS submit, uses the owner's real Google account, or turns on a paid service. Development uses a separate dev deployment with test data. | Real data and real releases are the owner's call. | every change | Review of every command that targets a deployment or store. |
+| Q23 | Dev-only surfaces (the state gallery, its `feedsmith://gallery` link, any debug route) can't be opened in a release build, and their code isn't in the release bundle. | A debug screen in a released app exposes internals and drives the app into states it was never meant to be in. | trust boundary, release | Test that the route renders nothing with `__DEV__` off; pre-release check that the exported release bundle doesn't contain the gallery's code. |
 
 ## Budgets
 
@@ -42,7 +43,7 @@ What this app must never get wrong. `/expo-dev-loop:feature` plans, reviews and 
 
 ## Release blockers
 
-Q1, Q2, Q3, Q4, Q8, Q9, Q10, Q11, Q12, Q14, Q15, Q22. Any other failure, including a missed budget, becomes a ticket.
+Q1, Q2, Q3, Q4, Q8, Q9, Q10, Q11, Q12, Q14, Q15, Q22, Q23. Any other failure, including a missed budget, becomes a ticket.
 
 ## Deferred
 
@@ -58,4 +59,8 @@ Q1, Q2, Q3, Q4, Q8, Q9, Q10, Q11, Q12, Q14, Q15, Q22. Any other failure, includi
 
 ## Superseded
 
-None yet.
+| ID | Old wording | Superseded | Why |
+|---|---|---|---|
+| Q14 | All text and icons meet WCAG 2.2 AA contrast in both themes. Gold is never text or an icon colour on light backgrounds (light mode uses a darker gold), and Sage is never text on Midnight. Checked by: unit test over the theme's text and background token pairs; device check in light and dark. | 2026-11-21 | FEE-18 review: "icons" had no threshold or check. Now 3:1 for icons, boundaries and sole state signs (WCAG 1.4.11), tested. |
+| Q18 | Checked by: device check of back, edges and swipes. `app.json` must set `predictiveBackGestureEnabled: true`. | 2026-11-21 | FEE-18 review: edge-to-edge was in the rule but not in the check. Rule unchanged. |
+| Q19 | Colours and type come only from the theme's tokens (D2–D6): no hard-coded colours, and no Roboto in the interface. Checked by: review, and a grep for hex colours outside the theme. | 2026-11-21 | FEE-18 review: colours in `app.json` escaped the check. |
