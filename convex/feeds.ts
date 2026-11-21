@@ -272,3 +272,134 @@ export const setPinned = mutation({
     return { ok: true as const };
   },
 });
+
+/** A Feed's name: what the User sees on its chip and in Manage Feeds. */
+const MAX_NAME = 100;
+/** Articles (with their bodies) deleted per batch after a Feed is removed. */
+const REMOVE_BATCH = 50;
+
+/**
+ * Manage Feeds (D13): every one of the signed-in User's Feeds, Pinned first in their order,
+ * then by name. Each shows its site host, never its URL (Q9), and whether it's working (P15).
+ */
+export const manage = query({
+  args: {},
+  returns: v.array(
+    v.object({
+      id: v.id('feeds'),
+      title: v.string(),
+      faviconUrl: v.optional(v.string()),
+      host: v.string(),
+      pinned: v.boolean(),
+      working: v.boolean(),
+    }),
+  ),
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
+    const feeds = await ctx.db
+      .query('feeds')
+      .withIndex('by_user_url', (q) => q.eq('userId', userId))
+      .take(CHIP_LIMIT);
+    feeds.sort((x, y) => {
+      if (x.pinOrder !== undefined || y.pinOrder !== undefined) {
+        if (x.pinOrder === undefined) return 1;
+        if (y.pinOrder === undefined) return -1;
+        return x.pinOrder - y.pinOrder;
+      }
+      return x.title.localeCompare(y.title, undefined, { sensitivity: 'base' });
+    });
+    return feeds.map((feed) => {
+      const row: {
+        id: typeof feed._id;
+        title: string;
+        faviconUrl?: string;
+        host: string;
+        pinned: boolean;
+        working: boolean;
+      } = {
+        id: feed._id,
+        title: feed.title,
+        host: new URL(feed.url).hostname,
+        pinned: feed.pinOrder !== undefined,
+        working: feed.status !== 'failing',
+      };
+      const faviconUrl = faviconOf(feed);
+      if (faviconUrl) row.faviconUrl = faviconUrl;
+      return row;
+    });
+  },
+});
+
+/** Renames one of the signed-in User's Feeds: its chip, its Articles' Feed name, everywhere. */
+export const rename = mutation({
+  args: { id: v.string(), title: v.string() },
+  returns: v.union(
+    v.object({ ok: v.literal(true) }),
+    v.object({ ok: v.literal(false), reason: v.union(v.literal('invalid-name'), v.literal('not-found')) }),
+  ),
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const feed = await ownFeed(ctx, userId, args.id);
+    if (!feed) return { ok: false as const, reason: 'not-found' as const };
+    const title = args.title.replace(/\s+/g, ' ').trim();
+    if (!title || title.length > MAX_NAME) return { ok: false as const, reason: 'invalid-name' as const };
+    await ctx.db.patch(feed._id, { title });
+    return { ok: true as const };
+  },
+});
+
+/**
+ * Removes one of the signed-in User's Feeds and its Articles (T23). The Feed goes at once;
+ * its Articles follow in batches, and All never shows them meanwhile.
+ */
+export const remove = mutation({
+  args: { id: v.string() },
+  returns: v.union(v.object({ ok: v.literal(true) }), v.object({ ok: v.literal(false), reason: v.literal('not-found') })),
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const feed = await ownFeed(ctx, userId, args.id);
+    if (!feed) return { ok: false as const, reason: 'not-found' as const };
+    await ctx.db.delete(feed._id);
+    await ctx.scheduler.runAfter(0, internal.feeds.removeArticles, { feedId: feed._id });
+    return { ok: true as const };
+  },
+});
+
+/** Deletes a removed Feed's Articles and their bodies, a batch at a time. Saved ones stay once Saved exists (T23, FEE-30). */
+export const removeArticles = internalMutation({
+  args: { feedId: v.id('feeds') },
+  returns: v.null(),
+  handler: async (ctx, { feedId }) => {
+    const articles = await ctx.db
+      .query('articles')
+      .withIndex('by_feed_published', (q) => q.eq('feedId', feedId))
+      .take(REMOVE_BATCH);
+    await Promise.all(
+      articles.map(async (article) => {
+        const bodies = await ctx.db
+          .query('articleBodies')
+          .withIndex('by_article', (q) => q.eq('articleId', article._id))
+          .take(10);
+        await Promise.all(bodies.map((body) => ctx.db.delete(body._id)));
+        await ctx.db.delete(article._id);
+      }),
+    );
+    if (articles.length === REMOVE_BATCH) await ctx.scheduler.runAfter(0, internal.feeds.removeArticles, { feedId });
+    return null;
+  },
+});
+
+/** Sets the order of the signed-in User's Pinned Feeds: `ids` must be exactly those Feeds (P9). */
+export const orderPins = mutation({
+  args: { ids: v.array(v.string()) },
+  returns: v.union(v.object({ ok: v.literal(true) }), v.object({ ok: v.literal(false), reason: v.literal('not-pinned') })),
+  handler: async (ctx, { ids }) => {
+    const userId = await requireUserId(ctx);
+    const pinned = await pinnedFeeds(ctx, userId);
+    const byId = new Map(pinned.map((feed) => [feed._id as string, feed]));
+    const same = ids.length === pinned.length && new Set(ids).size === ids.length && ids.every((id) => byId.has(id));
+    if (!same) return { ok: false as const, reason: 'not-pinned' as const };
+    await Promise.all(ids.map((id, i) => ctx.db.patch(byId.get(id)!._id, { pinOrder: i + 1 })));
+    return { ok: true as const };
+  },
+});

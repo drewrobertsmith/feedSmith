@@ -73,7 +73,8 @@ export const all = query({
         .take(ALL_LIMIT);
     }
     const faces = await feedFaces(ctx, articles.map((a) => a.feedId));
-    return articles.map((a) => {
+    // A removed Feed's Articles are deleted in batches after it; they're never shown meanwhile.
+    return articles.filter((a) => faces.get(a.feedId)?.title).map((a) => {
       const face = faces.get(a.feedId);
       return {
         id: a._id,
