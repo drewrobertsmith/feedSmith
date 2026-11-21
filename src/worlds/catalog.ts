@@ -42,6 +42,14 @@ export const ALL_WORLDS = [
   { id: 'all-loading', label: 'All, loading', spec: { colorScheme: 'dark', feeds: 'loading' } },
   { id: 'all-refreshing', label: 'All, refreshing', spec: { colorScheme: 'light', feeds: 'some', refreshing: true } },
   { id: 'all-largest-font', label: 'All, largest font size', spec: { colorScheme: 'dark', feeds: 'some', fontScale: 2 } },
+  { id: 'all-feed', label: 'One Feed chosen', spec: { colorScheme: 'dark', feeds: 'some', feed: 'f1' } },
+  { id: 'all-feed-light', label: 'One Feed chosen, light', spec: { colorScheme: 'light', feeds: 'some', feed: 'f2' } },
+  { id: 'all-feed-empty', label: 'A Feed with nothing new', spec: { colorScheme: 'dark', feeds: 'some', feed: 'f3' } },
+  {
+    id: 'all-remove-animations',
+    label: 'All, Remove animations',
+    spec: { colorScheme: 'dark', feeds: 'some', reduceMotion: true },
+  },
 ] as const satisfies readonly CatalogWorld[];
 
 export type AllWorldId = (typeof ALL_WORLDS)[number]['id'];

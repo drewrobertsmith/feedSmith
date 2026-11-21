@@ -6,6 +6,7 @@ import type { Environment } from '@/environment';
 import type { AddFeedReason, AddFeedView, ArticleView, FeedsData } from '@/feeds/feeds-data';
 import {
   FIXTURE_ARTICLE,
+  FIXTURE_CHIPS,
   FIXTURE_CHOICES,
   FIXTURE_NOW,
   FIXTURE_OMITTED_ARTICLE,
@@ -36,18 +37,25 @@ export type WorldSpec = {
   addFeed?: 'idle' | 'busy' | 'choose' | 'already' | AddFeedReason;
   /** Whether a pull-down refresh is under way. */
   refreshing?: boolean;
+  /** The chosen Feed's chip, by id: All shows only its Articles (P5). */
+  feed?: string;
+  /** `full`: three Feeds are Pinned already, so another Pin is refused (P9). */
+  pins?: 'full';
   /** The Article the Reading view opens. Defaults to one with every kind of block. */
   article?: 'full' | 'omitted' | 'missing' | 'loading';
 };
 
 /** What a world's fake Feeds were asked to do. */
-export type FeedsLog = { added: string[]; refreshes: number; read: string[] };
+export type FeedsLog = { added: string[]; refreshes: number; read: string[]; pins: { id: string; pinned: boolean }[] };
 
 /** What a world's fake auth was asked to do. */
 export type SignInLog = { starts: number; completions: { code?: string; error?: string }[] };
 
 /** A world's Feeds and Articles: fixture data, and a log of what it's asked. */
-export function worldFeeds(spec: WorldSpec, log: FeedsLog = { added: [], refreshes: 0, read: [] }): FeedsData {
+export function worldFeeds(
+  spec: WorldSpec,
+  log: FeedsLog = { added: [], refreshes: 0, read: [], pins: [] },
+): FeedsData {
   const feeds = spec.feeds ?? 'none';
   const addFeed = spec.addFeed ?? 'idle';
   const article = spec.article ?? 'full';
@@ -67,10 +75,18 @@ export function worldFeeds(spec: WorldSpec, log: FeedsLog = { added: [], refresh
         : { status: 'ready', article: article === 'omitted' ? FIXTURE_OMITTED_ARTICLE : FIXTURE_ARTICLE };
 
   return {
-    useAll: () =>
-      feeds === 'loading'
-        ? { status: 'loading' }
-        : { status: 'ready', articles: feeds === 'some' ? FIXTURE_ROWS : feeds === 'read' ? FIXTURE_READ_ROWS : [] },
+    useAll: (feedId) => {
+      if (feeds === 'loading') return { status: 'loading' };
+      const rows = feeds === 'some' ? FIXTURE_ROWS : feeds === 'read' ? FIXTURE_READ_ROWS : [];
+      return { status: 'ready', articles: feedId === null ? rows : rows.filter((row) => row.feedId === feedId) };
+    },
+    useChips: () =>
+      feeds === 'loading' ? { status: 'loading' } : { status: 'ready', chips: feeds === 'none' ? [] : FIXTURE_CHIPS },
+    useSetPinned: () => async (id, pinned) => {
+      if (pinned && spec.pins === 'full') return 'pins-full';
+      log.pins.push({ id, pinned });
+      return 'ok';
+    },
     useArticle: () => articleView,
     useAddFeed: () => ({
       view: addView,
@@ -79,7 +95,7 @@ export function worldFeeds(spec: WorldSpec, log: FeedsLog = { added: [], refresh
         // Busy stays busy; an error stays on the screen; idle adds the Feed.
         if (addFeed === 'busy') return new Promise(() => {});
         if (addFeed === 'idle') return Promise.resolve({ kind: 'added' });
-        if (addFeed === 'already') return Promise.resolve({ kind: 'already', title: 'The Verge' });
+        if (addFeed === 'already') return Promise.resolve({ kind: 'already', title: 'The Verge', feedId: 'f1' });
         return Promise.resolve({ kind: 'stay' });
       },
     }),
@@ -105,7 +121,7 @@ export type World = {
   feeds: FeedsData;
   feedsLog: FeedsLog;
   /** Where the router starts. */
-  initialUrl: '/' | '/saved' | '/sign-in' | '/add-feed' | `/article/${string}`;
+  initialUrl: '/' | '/saved' | '/sign-in' | '/add-feed' | `/article/${string}` | `/?feed=${string}`;
   /** Puts back what the world changed: the theme follows the phone again. */
   dispose: () => void;
 };
@@ -154,7 +170,7 @@ export function createWorld(spec: WorldSpec): World {
   Uniwind.setTheme(spec.colorScheme);
   const signInLog: SignInLog = { starts: 0, completions: [] };
   const signedIn = (spec.auth ?? 'signed-in') === 'signed-in';
-  const feedsLog: FeedsLog = { added: [], refreshes: 0, read: [] };
+  const feedsLog: FeedsLog = { added: [], refreshes: 0, read: [], pins: [] };
 
   return {
     environment: worldEnvironment(spec),
@@ -162,7 +178,11 @@ export function createWorld(spec: WorldSpec): World {
     signInLog,
     feeds: worldFeeds(spec, feedsLog),
     feedsLog,
-    initialUrl: !signedIn ? '/sign-in' : SECTION_URLS[spec.section ?? 'feeds'],
+    initialUrl: !signedIn
+      ? '/sign-in'
+      : spec.feed && (spec.section ?? 'feeds') === 'feeds'
+        ? `/?feed=${spec.feed}`
+        : SECTION_URLS[spec.section ?? 'feeds'],
     dispose: () => Uniwind.setTheme('system'),
   };
 }

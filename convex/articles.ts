@@ -43,6 +43,7 @@ export const all = query({
   returns: v.array(
     v.object({
       id: v.id('articles'),
+      feedId: v.id('feeds'),
       title: v.string(),
       subtitle: v.optional(v.string()),
       imageUrl: v.optional(v.string()),
@@ -76,6 +77,7 @@ export const all = query({
       const face = faces.get(a.feedId);
       return {
         id: a._id,
+        feedId: a.feedId,
         title: a.title,
         subtitle: a.subtitle,
         imageUrl: a.imageUrl,

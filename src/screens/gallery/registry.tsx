@@ -28,7 +28,7 @@ export const GALLERY: readonly GalleryEntry[] = [
     worlds: SIGN_IN_WORLDS,
     render: () => <SignInScreen />,
   },
-  { screen: 'All', worlds: ALL_WORLDS, render: () => <FeedsScreen /> },
+  { screen: 'All', worlds: ALL_WORLDS, render: (spec) => <FeedsScreen feed={spec.feed} /> },
   { screen: 'Add a Feed', worlds: ADD_FEED_WORLDS, render: () => <AddFeedScreen /> },
   { screen: 'Reading view', worlds: READING_WORLDS, render: () => <ReadingScreen id={FIXTURE_ROWS[0].id} /> },
 ];
