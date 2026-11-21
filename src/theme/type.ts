@@ -7,7 +7,6 @@ import type { TextStyle } from 'react-native';
  */
 export const typeScale = {
   title: { fontFamily: 'InstrumentSans', fontWeight: '600', fontSize: 24, lineHeight: 30 },
-  body: { fontFamily: 'InstrumentSans', fontWeight: '400', fontSize: 16, lineHeight: 24 },
   label: { fontFamily: 'InstrumentSans', fontWeight: '500', fontSize: 13, lineHeight: 18 },
   reading: { fontFamily: 'Literata', fontWeight: '400', fontSize: 19, lineHeight: 31 },
 } as const satisfies Record<string, TextStyle>;

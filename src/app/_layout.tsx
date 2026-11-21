@@ -1,4 +1,4 @@
-import '../global.css';
+import '@/global.css';
 
 import { AppRoot } from '@/navigation/app-root';
 

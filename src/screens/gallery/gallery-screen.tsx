@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/app-text';
 import { EnvironmentProvider } from '@/environment';
-import { GALLERY } from '@/screens/gallery/registry';
+import { GALLERY, type GalleryEntry } from '@/screens/gallery/registry';
 import type { ThemeName } from '@/theme/tokens';
 import { createWorld, worldEnvironment, type CatalogWorld } from '@/worlds/world';
 
@@ -37,14 +37,11 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /** Applies the world for as long as it's shown, then hands the theme back to the phone. */
-function WorldPreview({ world, theme, children }: { world: CatalogWorld; theme: ThemeName; children: ReactNode }) {
+function WorldPreview({ entry, world, theme }: { entry: GalleryEntry; world: CatalogWorld; theme: ThemeName }) {
+  const spec = { ...world.spec, colorScheme: theme };
   // `world` comes from the catalog, so it's stable while it stays selected.
   useEffect(() => createWorld({ ...world.spec, colorScheme: theme }).dispose, [world, theme]);
-  return (
-    <EnvironmentProvider environment={worldEnvironment({ ...world.spec, colorScheme: theme })}>
-      {children}
-    </EnvironmentProvider>
-  );
+  return <EnvironmentProvider environment={worldEnvironment(spec)}>{entry.render(spec)}</EnvironmentProvider>;
 }
 
 /** Dev-only (T13): the real screens, once per world, to walk a ticket's state table. */
@@ -92,9 +89,7 @@ export function GalleryScreen() {
         ))}
       </View>
       <View className="h-[640px] border-t border-decor">
-        <WorldPreview world={selected.world} theme={theme}>
-          {selected.entry.render({ ...selected.world.spec, colorScheme: theme })}
-        </WorldPreview>
+        <WorldPreview entry={selected.entry} world={selected.world} theme={theme} />
       </View>
     </ScrollView>
   );

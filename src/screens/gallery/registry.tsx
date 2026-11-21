@@ -5,7 +5,7 @@ import { SavedScreen } from '@/screens/saved-screen';
 import { SHELL_WORLDS } from '@/worlds/catalog';
 import type { CatalogWorld, WorldSpec } from '@/worlds/world';
 
-type GalleryEntry = {
+export type GalleryEntry = {
   screen: string;
   worlds: readonly CatalogWorld[];
   /** Renders the real screen; the world's environment is provided around it. */
