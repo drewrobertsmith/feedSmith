@@ -51,7 +51,7 @@ describe('adding a Feed', () => {
   test("fetches it at once, and its Articles appear in All, newest first, with the Feed's name", async () => {
     const { a } = await setup();
     expect(await a.action(api.feeds.add, { url: FEED_URL })).toEqual({ ok: true });
-    expect(network).toHaveBeenCalledTimes(1);
+    expect(network.mock.calls[0][0]).toBe(FEED_URL.replace('www.theverge.com', 'www.theverge.com'));
 
     const all = await a.query(api.articles.all, {});
     expect(all.map((row) => row.title)).toEqual([
@@ -83,7 +83,8 @@ describe('adding a Feed', () => {
   test.each([
     ['unreachable', async () => Promise.reject(new TypeError('down')), 'unreachable'],
     ['an error status', async () => new Response('nope', { status: 500 }), 'unreachable'],
-    ['not a feed', async () => new Response('<!doctype html><html><body>Hi</body></html>'), 'not-a-feed'],
+    // A web page with no feed links (T21): the plainer answer.
+    ['a page with no feed', async () => new Response('<!doctype html><html><body>Hi</body></html>'), 'no-feed-found'],
     ['too large', async () => new Response('x', { headers: { 'content-length': String(10 * 1024 * 1024) } }), 'too-large'],
   ])('a Feed that is %s is reported, and no Feed is created', async (_case, answer, reason) => {
     const { t, a } = await setup();
@@ -228,4 +229,98 @@ describe('Read (P7)', () => {
     const { t } = await setup();
     await expect(t.mutation(api.articles.markRead, { id: 'x' })).rejects.toThrow(/SIGNED_OUT/);
   });
+});
+
+describe('finding a Feed from a website (T21)', () => {
+  const html = (head: string) => new Response(`<!doctype html><html><head>${head}</head><body><p>Home</p></body></html>`);
+  const rssOf = (title: string) =>
+    new Response(`<rss version="2.0"><channel><title>${title}</title><link>https://www.site.example.com/</link><item><title>Post</title><guid>p1</guid></item></channel></rss>`);
+  const SITE_HEAD =
+    '<meta property="og:site_name" content="Site Example"><link rel="apple-touch-icon" href="/touch.png"><link rel="alternate" type="application/rss+xml" title="All posts" href="/rss.xml">';
+
+  /** The fake network as a map of addresses; anything else is a 404. */
+  const route = (pages: Record<string, () => Response>) =>
+    network.mockImplementation(async (url) => (pages[url] ?? (() => new Response('nope', { status: 404 })))());
+
+  test("typing a site's address finds its one feed and adds it, named and iconed by the site", async () => {
+    const { a } = await setup();
+    route({
+      'https://site.example.com/': () => new Response(null, { status: 301, headers: { location: 'https://www.site.example.com/' } }),
+      'https://www.site.example.com/': () => html(SITE_HEAD),
+      'https://www.site.example.com/rss.xml': () => rssOf('Site Example – Everything, all the time'),
+    });
+    expect(await a.action(api.feeds.add, { url: 'site.example.com' })).toEqual({ ok: true });
+    const [row] = await a.query(api.articles.all, {});
+    expect(row).toMatchObject({ title: 'Post', feedTitle: 'Site Example', faviconUrl: 'https://www.site.example.com/touch.png' });
+  });
+
+  test('a site with several feeds offers them to choose from, and adds nothing yet', async () => {
+    const { t, a } = await setup();
+    route({
+      'https://site.example.com/': () =>
+        html(
+          '<link rel="alternate" type="application/rss+xml" title="All posts" href="/rss.xml"><link rel="alternate" type="application/atom+xml" title="Reviews" href="/reviews.atom">',
+        ),
+      'https://site.example.com/reviews.atom': () => rssOf('Reviews'),
+    });
+    expect(await a.action(api.feeds.add, { url: 'https://site.example.com/' })).toEqual({
+      ok: false,
+      reason: 'choose',
+      choices: [
+        { url: 'https://site.example.com/rss.xml', title: 'All posts' },
+        { url: 'https://site.example.com/reviews.atom', title: 'Reviews' },
+      ],
+    });
+    expect(await t.run((ctx) => ctx.db.query('feeds').take(1))).toEqual([]);
+    expect(await a.action(api.feeds.add, { url: 'https://site.example.com/reviews.atom' })).toEqual({ ok: true });
+  });
+
+  test('a page with no feed says so', async () => {
+    const { a } = await setup();
+    route({ 'https://shop.example.com/': () => html('<title>Shop</title>') });
+    expect(await a.action(api.feeds.add, { url: 'shop.example.com' })).toEqual({ ok: false, reason: 'no-feed-found' });
+  });
+
+  test("an address that can't be reached says so", async () => {
+    const { a } = await setup();
+    network.mockImplementation(async () => Promise.reject(new TypeError('down')));
+    expect(await a.action(api.feeds.add, { url: 'gone.example.com' })).toEqual({ ok: false, reason: 'unreachable' });
+  });
+
+  test('a feed link that leads to another page is followed one level only', async () => {
+    const { a } = await setup();
+    route({
+      'https://site.example.com/': () => html('<link rel="alternate" type="application/rss+xml" href="/more">'),
+      'https://site.example.com/more': () => html('<link rel="alternate" type="application/rss+xml" href="/rss.xml">'),
+      'https://site.example.com/rss.xml': () => rssOf('Never reached'),
+    });
+    expect(await a.action(api.feeds.add, { url: 'site.example.com' })).toEqual({ ok: false, reason: 'not-a-feed' });
+    expect(network.mock.calls.map(([url]) => url)).not.toContain('https://site.example.com/rss.xml');
+  });
+
+  test("typing a feed URL still works, and the Feed is named by its site's homepage", async () => {
+    const { a } = await setup();
+    route({
+      'https://www.site.example.com/rss.xml': () => rssOf('Site Example – Everything, all the time'),
+      'https://www.site.example.com/': () => html(SITE_HEAD),
+    });
+    expect(await a.action(api.feeds.add, { url: 'https://www.site.example.com/rss.xml' })).toEqual({ ok: true });
+    expect((await a.query(api.articles.all, {}))[0].feedTitle).toBe('Site Example');
+  });
+
+  test("when the homepage can't be read, the Feed keeps its own title", async () => {
+    const { a } = await setup();
+    route({ 'https://www.site.example.com/rss.xml': () => rssOf('Own Title') });
+    expect(await a.action(api.feeds.add, { url: 'https://www.site.example.com/rss.xml' })).toEqual({ ok: true });
+    expect((await a.query(api.articles.all, {}))[0].feedTitle).toBe('Own Title');
+  });
+
+  test.each([['http://site.example.com/'], ['javascript:alert(1)'], ['ftp://site.example.com/']])(
+    '%s is still refused without fetching',
+    async (url) => {
+      const { a } = await setup();
+      expect(await a.action(api.feeds.add, { url })).toEqual({ ok: false, reason: 'invalid-url' });
+      expect(network).not.toHaveBeenCalled();
+    },
+  );
 });

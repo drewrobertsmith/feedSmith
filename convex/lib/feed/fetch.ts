@@ -5,7 +5,7 @@ import { parseFeed } from './parse';
 import { articlesToStore } from './store';
 import type { AddFeedReason, StoredArticle } from './validators';
 
-export type FetchFailure = Exclude<AddFeedReason, 'already-added'>;
+export type FetchFailure = Exclude<AddFeedReason, 'already-added' | 'no-feed-found'>;
 
 const REASONS = {
   InvalidUrl: 'invalid-url',
@@ -18,6 +18,8 @@ const REASONS = {
 export type FetchOutcome =
   | { _tag: 'Fetched'; title: string; siteUrl?: string; articles: StoredArticle[]; validators: Validators }
   | { _tag: 'NotModified' }
+  /** A web page, not a feed: its HTML and the address it was finally read from (T21). */
+  | { _tag: 'Page'; body: string; url: string }
   | { _tag: 'Failed'; reason: FetchFailure };
 
 /**
@@ -30,7 +32,10 @@ export function fetchFeed(url: string, validators?: Validators): Promise<FetchOu
       const http = yield* FeedHttp;
       const response = yield* http.get(url, validators);
       if (response._tag === 'NotModified') return response;
-      const feed = yield* parseFeed(response.body, Date.now());
+      const feed = yield* parseFeed(response.body, Date.now()).pipe(
+        Effect.catchTag('NotAFeed', () => Effect.succeed(null)),
+      );
+      if (!feed) return { _tag: 'Page' as const, body: response.body, url: response.url };
       const { etag, lastModified } = response;
       return {
         _tag: 'Fetched' as const,

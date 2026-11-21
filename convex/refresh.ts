@@ -35,6 +35,7 @@ export async function refreshOne(ctx: ActionCtx, feedId: Id<'feeds'>) {
     } else if (outcome._tag === 'NotModified') {
       await ctx.runMutation(internal.refresh.recordNotModified, { feedId, now });
     } else {
+      // Failed, or a page where a feed used to be: either way the Feed isn't working.
       await ctx.runMutation(internal.refresh.recordFailure, { feedId, now });
     }
   } catch {

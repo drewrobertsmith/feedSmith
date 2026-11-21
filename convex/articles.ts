@@ -18,7 +18,8 @@ async function feedFaces(ctx: QueryCtx, feedIds: Id<'feeds'>[]) {
     ids.map((id, i) => {
       const feed = feeds[i];
       const face: FeedFace = { title: feed?.title ?? '' };
-      if (feed?.siteUrl) face.faviconUrl = `${feed.siteUrl}/favicon.ico`;
+      if (feed?.iconUrl) face.faviconUrl = feed.iconUrl;
+      else if (feed?.siteUrl) face.faviconUrl = `${feed.siteUrl}/favicon.ico`;
       return [id, face];
     }),
   );

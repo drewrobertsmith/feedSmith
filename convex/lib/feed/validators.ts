@@ -46,8 +46,12 @@ export const vAddFeedReason = v.union(
   v.literal('timeout'),
   v.literal('too-large'),
   v.literal('not-a-feed'),
+  v.literal('no-feed-found'),
   v.literal('already-added'),
 );
+
+/** A feed a web page advertises, offered to choose from (T21). */
+export const vFeedChoice = v.object({ url: v.string(), title: v.string() });
 
 export type AddFeedReason = Infer<typeof vAddFeedReason>;
 
