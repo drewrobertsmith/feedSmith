@@ -1,9 +1,12 @@
 import type { ReactElement } from 'react';
 
+import { AddFeedScreen } from '@/screens/add-feed-screen';
 import { FeedsScreen } from '@/screens/feeds-screen';
+import { ReadingScreen } from '@/screens/reading/reading-screen';
 import { SavedScreen } from '@/screens/saved-screen';
 import { SignInScreen } from '@/screens/sign-in/sign-in-screen';
-import { SHELL_WORLDS, SIGN_IN_WORLDS } from '@/worlds/catalog';
+import { ADD_FEED_WORLDS, ALL_WORLDS, READING_WORLDS, SHELL_WORLDS, SIGN_IN_WORLDS } from '@/worlds/catalog';
+import { FIXTURE_ROWS } from '@/worlds/fixtures';
 import type { CatalogWorld, WorldSpec } from '@/worlds/world';
 
 export type GalleryEntry = {
@@ -25,4 +28,7 @@ export const GALLERY: readonly GalleryEntry[] = [
     worlds: SIGN_IN_WORLDS,
     render: () => <SignInScreen />,
   },
+  { screen: 'All', worlds: ALL_WORLDS, render: () => <FeedsScreen /> },
+  { screen: 'Add a Feed', worlds: ADD_FEED_WORLDS, render: () => <AddFeedScreen /> },
+  { screen: 'Reading view', worlds: READING_WORLDS, render: () => <ReadingScreen id={FIXTURE_ROWS[0].id} /> },
 ];

@@ -5,6 +5,8 @@ import { StatusBar } from 'expo-status-bar';
 import { AuthContext, useAuth, type Auth } from '@/auth/auth-context';
 import { ConvexAuth } from '@/auth/convex-auth';
 import { EnvironmentProvider, useEnvironment, type Environment } from '@/environment';
+import { ConvexFeeds } from '@/feeds/convex-feeds';
+import { FeedsContext, type FeedsData } from '@/feeds/feeds-data';
 import { themes, type ThemeName } from '@/theme/tokens';
 
 function navigationTheme(scheme: ThemeName): Theme {
@@ -36,6 +38,8 @@ function ThemedStack() {
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Protected guard={session === 'signed-in'}>
             <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="add-feed" />
+            <Stack.Screen name="article/[id]" />
           </Stack.Protected>
           <Stack.Protected guard={session === 'signed-out'}>
             <Stack.Screen name="sign-in" />
@@ -53,14 +57,25 @@ function ThemedStack() {
 }
 
 /**
- * The app's providers and root stack. A world passes its environment and auth; the app
- * uses the phone's environment and Convex Auth.
+ * The app's providers and root stack. A world passes its environment, auth and Feeds; the
+ * app uses the phone's environment, Convex Auth and Convex.
  */
-export function AppRoot({ environment, auth }: { environment?: Environment; auth?: Auth }) {
+export function AppRoot({ environment, auth, feeds }: { environment?: Environment; auth?: Auth; feeds?: FeedsData }) {
   const stack = (
     <EnvironmentProvider environment={environment}>
       <ThemedStack />
     </EnvironmentProvider>
   );
-  return auth ? <AuthContext value={auth}>{stack}</AuthContext> : <ConvexAuth>{stack}</ConvexAuth>;
+  if (auth && feeds) {
+    return (
+      <AuthContext value={auth}>
+        <FeedsContext value={feeds}>{stack}</FeedsContext>
+      </AuthContext>
+    );
+  }
+  return (
+    <ConvexAuth>
+      <ConvexFeeds>{stack}</ConvexFeeds>
+    </ConvexAuth>
+  );
 }

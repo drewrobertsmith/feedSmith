@@ -10,10 +10,10 @@ import AuthReturnRoute from '@/app/auth';
 import GalleryRoute from '@/app/gallery';
 import SignInRoute from '@/app/sign-in';
 import { AppRoot } from '@/navigation/app-root';
-import { worldAuth } from '@/worlds/world';
+import { worldAuth, worldFeeds } from '@/worlds/world';
 
 const routes = {
-  _layout: () => <AppRoot auth={worldAuth({ colorScheme: 'dark' })} />,
+  _layout: () => <AppRoot auth={worldAuth({ colorScheme: 'dark' })} feeds={worldFeeds({ colorScheme: 'dark' })} />,
   '(tabs)/_layout': TabsLayout,
   '(tabs)/index': FeedsRoute,
   '(tabs)/saved': SavedRoute,

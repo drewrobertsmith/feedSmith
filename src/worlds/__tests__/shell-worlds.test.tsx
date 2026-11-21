@@ -20,7 +20,7 @@ type Shows = {
   reduceMotion: boolean;
 };
 
-const FEEDS = /Articles from your Feeds will appear here/;
+const FEEDS = /Add a Feed to see its Articles here/;
 const SAVED = /Articles you Save wait here until you mark them Done/;
 
 const SHOWS: Record<ShellWorldId, Shows> = {
@@ -38,7 +38,7 @@ test.each(SHELL_WORLDS)('$label', async ({ id, spec }) => {
 
   await renderRouter(
     {
-      _layout: () => <AppRoot environment={world.environment} auth={world.auth} />,
+      _layout: () => <AppRoot environment={world.environment} auth={world.auth} feeds={world.feeds} />,
       '(tabs)/_layout': TabsLayout,
       '(tabs)/index': FeedsRoute,
       '(tabs)/saved': SavedRoute,
