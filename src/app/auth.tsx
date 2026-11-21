@@ -1,23 +1,21 @@
-// SPIKE (FEE-21): the sign-in return link lands here with the one-time code.
-import { useSignInWithGoogle } from '@convex-dev/auth/methods/google/react';
-import { router, useLocalSearchParams } from 'expo-router';
+import { Redirect, useLocalSearchParams } from 'expo-router';
 import { useEffect } from 'react';
 
-import { api } from '../../convex/_generated/api';
+import { useAuth } from '@/auth/auth-context';
 
-export default function AuthReturn() {
-  const params = useLocalSearchParams<{ convexAuthCode?: string; convexAuthError?: string }>();
-  const { signIn } = useSignInWithGoogle(api.auth);
+/**
+ * The return link, feedsmith://auth, lands here with Convex Auth's one-time code or
+ * its error. Sign-in finishes in the auth provider; the guard then shows the right screen.
+ */
+export default function AuthReturnRoute() {
+  const { convexAuthCode, convexAuthError } = useLocalSearchParams<{ convexAuthCode?: string; convexAuthError?: string }>();
+  const { session, completeSignIn } = useAuth();
 
   useEffect(() => {
-    console.log(`[spike] auth route: code=${params.convexAuthCode ? 'yes' : 'no'} error=${params.convexAuthError ?? '-'} keys=${Object.keys(params).join(',')}`);
-    const code = params.convexAuthCode;
-    if (!code) return;
-    void signIn({ code }).then((result) => {
-      console.log(`[spike] complete: ${JSON.stringify(result).slice(0, 160)}`);
-      router.replace('/');
-    });
-  }, [params.convexAuthCode, params.convexAuthError, signIn]);
+    completeSignIn({ code: convexAuthCode, error: convexAuthError });
+    // Once per link: the code can only be redeemed once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [convexAuthCode, convexAuthError]);
 
-  return null;
+  return <Redirect href={session === 'signed-in' ? '/' : '/sign-in'} />;
 }

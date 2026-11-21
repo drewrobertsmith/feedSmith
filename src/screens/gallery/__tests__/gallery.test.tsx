@@ -6,15 +6,20 @@ import { Uniwind } from 'uniwind';
 import TabsLayout from '@/app/(tabs)/_layout';
 import FeedsRoute from '@/app/(tabs)/index';
 import SavedRoute from '@/app/(tabs)/saved';
+import AuthReturnRoute from '@/app/auth';
 import GalleryRoute from '@/app/gallery';
+import SignInRoute from '@/app/sign-in';
 import { AppRoot } from '@/navigation/app-root';
+import { worldAuth } from '@/worlds/world';
 
 const routes = {
-  _layout: () => <AppRoot />,
+  _layout: () => <AppRoot auth={worldAuth({ colorScheme: 'dark' })} />,
   '(tabs)/_layout': TabsLayout,
   '(tabs)/index': FeedsRoute,
   '(tabs)/saved': SavedRoute,
   gallery: GalleryRoute,
+  'sign-in': SignInRoute,
+  auth: AuthReturnRoute,
 };
 
 const setDev = (value: boolean) => {

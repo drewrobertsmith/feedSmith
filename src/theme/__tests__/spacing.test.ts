@@ -36,11 +36,13 @@ describe('the spacing scale (D9)', () => {
   });
 });
 
-// Q24: every space in the app comes from the scale.
+// Q24: every space in the app comes from the scale. Google's own sign-in button follows
+// Google's branding guidelines instead (D10), so its spec file is exempt.
+const EXEMPT = new Set(['theme/google.ts']);
 const SPACING_CLASS = /\b-?(?:gap|gap-x|gap-y|space-x|space-y|p|px|py|pt|pb|pl|pr|ps|pe|m|mx|my|mt|mb|ml|mr|ms|me|inset|top|bottom|left|right)-([\w[\].]+)/g;
 const NAMES = new Set([...Object.keys(spacing), '0', 'auto', 'px']);
 
-test.each(sourceFiles(SRC).map((f) => relative(SRC, f)))('%s spaces only on the scale', (file) => {
+test.each(sourceFiles(SRC).map((f) => relative(SRC, f)).filter((f) => !EXEMPT.has(f)))('%s spaces only on the scale', (file) => {
   const text = readFileSync(join(SRC, file), 'utf8');
 
   const classNames = [...text.matchAll(/className=(?:"([^"]*)"|\{[^}]*?'([^']*)'[^}]*?'([^']*)'[^}]*\})/g)]

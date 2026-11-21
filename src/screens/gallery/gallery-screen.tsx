@@ -4,11 +4,12 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/app-text';
+import { AuthContext } from '@/auth/auth-context';
 import { EnvironmentProvider } from '@/environment';
 import { GALLERY, type GalleryEntry } from '@/screens/gallery/registry';
 import { spacing } from '@/theme/spacing';
 import type { ThemeName } from '@/theme/tokens';
-import { createWorld, worldEnvironment, type CatalogWorld } from '@/worlds/world';
+import { createWorld, worldAuth, worldEnvironment, type CatalogWorld } from '@/worlds/world';
 
 const ALL = GALLERY.flatMap((entry) => entry.worlds.map((world) => ({ entry, world })));
 
@@ -42,7 +43,11 @@ function WorldPreview({ entry, world, theme }: { entry: GalleryEntry; world: Cat
   const spec = { ...world.spec, colorScheme: theme };
   // `world` comes from the catalog, so it's stable while it stays selected.
   useEffect(() => createWorld({ ...world.spec, colorScheme: theme }).dispose, [world, theme]);
-  return <EnvironmentProvider environment={worldEnvironment(spec)}>{entry.render(spec)}</EnvironmentProvider>;
+  return (
+    <AuthContext value={worldAuth(spec)}>
+      <EnvironmentProvider environment={worldEnvironment(spec)}>{entry.render(spec)}</EnvironmentProvider>
+    </AuthContext>
+  );
 }
 
 /** Dev-only (T13): the real screens, once per world, to walk a ticket's state table. */
