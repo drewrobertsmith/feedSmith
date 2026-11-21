@@ -6,6 +6,19 @@ import { InvalidUrl, TooLarge, Timeout, Unreachable, type FetchError } from './e
 export const MAX_REDIRECTS = 3;
 export const MAX_BYTES = 2 * 1024 * 1024;
 const TIMEOUT_MS = 10_000;
+/** An ETag or Last-Modified longer than this isn't kept or sent. */
+export const MAX_VALIDATOR = 256;
+
+/** What a Feed said about its version last time, sent back so it can answer "not modified" (T19). */
+export type Validators = { etag?: string; lastModified?: string };
+
+export type FetchResult = ({ _tag: 'Fetched'; body: string } & Validators) | { _tag: 'NotModified' };
+
+/** A validator worth keeping: short, printable, no control characters. */
+function cleanValidator(value: string | null | undefined): string | undefined {
+  if (!value || value.length > MAX_VALIDATOR || /[\u0000-\u001f\u007f]/.test(value)) return undefined;
+  return value;
+}
 
 const BLOCKED_SUFFIXES = ['.localhost', '.local', '.internal'];
 
@@ -73,22 +86,35 @@ type Fetch = typeof globalThis.fetch;
 export class FeedHttp extends Context.Service<
   FeedHttp,
   {
-    /** Fetches `url` under the policy and returns its body as text. */
-    get(url: string): Effect.Effect<string, FetchError>;
+    /**
+     * Fetches `url` under the policy. With `validators`, an unchanged Feed answers
+     * `NotModified`; otherwise the body comes back as text with the Feed's new validators.
+     */
+    get(url: string, validators?: Validators): Effect.Effect<FetchResult, FetchError>;
   }
 >()('feedsmith/feed/FeedHttp') {
   static make(fetch: Fetch, options: { timeoutMs?: number } = {}): FeedHttp['Service'] {
-    const once = (url: URL) =>
+    const once = (url: URL, headers: Record<string, string>) =>
       Effect.tryPromise({
-        try: (signal) => fetch(url.href, { redirect: 'manual', headers: HEADERS, signal }),
+        try: (signal) => fetch(url.href, { redirect: 'manual', headers, signal }),
         catch: () => new Unreachable(),
       });
 
-    const get = Effect.fnUntraced(function* (input: string): Effect.fn.Return<string, FetchError> {
+    const get = Effect.fnUntraced(function* (input: string, validators: Validators = {}): Effect.fn.Return<FetchResult, FetchError> {
+      const etag = cleanValidator(validators.etag);
+      const lastModified = cleanValidator(validators.lastModified);
+      const headers: Record<string, string> = { ...HEADERS };
+      if (etag) headers['if-none-match'] = etag;
+      if (lastModified) headers['if-modified-since'] = lastModified;
       let url = safeUrl(input);
       if (!url) return yield* new InvalidUrl();
       for (let hop = 0; ; hop++) {
-        const response = yield* once(url);
+        const response = yield* once(url, headers);
+        if (response.status === 304) {
+          // Only meaningful as an answer to our validators.
+          if (!etag && !lastModified) return yield* new Unreachable();
+          return { _tag: 'NotModified' } as const;
+        }
         if (response.status >= 300 && response.status < 400) {
           if (hop >= MAX_REDIRECTS) return yield* new Unreachable();
           const next = safeUrl(response.headers.get('location') ?? '', url.href);
@@ -99,13 +125,18 @@ export class FeedHttp extends Context.Service<
         if (!response.ok) return yield* new Unreachable();
         const body = yield* Effect.tryPromise({ try: () => readCapped(response), catch: () => new Unreachable() });
         if (body === null) return yield* new TooLarge();
-        return body;
+        const result: FetchResult = { _tag: 'Fetched', body };
+        const newEtag = cleanValidator(response.headers.get('etag'));
+        const newLastModified = cleanValidator(response.headers.get('last-modified'));
+        if (newEtag) result.etag = newEtag;
+        if (newLastModified) result.lastModified = newLastModified;
+        return result;
       }
     });
 
     return FeedHttp.of({
-      get: (url) =>
-        get(url).pipe(
+      get: (url, validators) =>
+        get(url, validators).pipe(
           Effect.timeoutOrElse({
             duration: options.timeoutMs ?? TIMEOUT_MS,
             orElse: () => Effect.fail(new Timeout()),

@@ -33,6 +33,8 @@ export type FeedsData = {
   useArticle: (id: string) => ArticleView;
   /** Adding a Feed: where it's up to, and `add`, which resolves true once the Feed is added. */
   useAddFeed: () => { view: AddFeedView; add: (url: string) => Promise<boolean> };
+  /** Pulling down: fetches every Feed now, on the server (P15, Q21). */
+  useRefresh: () => { refreshing: boolean; refresh: () => Promise<void> };
 };
 
 export const FeedsContext = createContext<FeedsData | null>(null);
@@ -61,5 +63,11 @@ export function useArticle(id: string): ArticleView {
 /** Adding a Feed. */
 export function useAddFeed(): ReturnType<FeedsData['useAddFeed']> {
   const { useAddFeed: read } = useFeedsData();
+  return read();
+}
+
+/** Pulling down to fetch every Feed now. */
+export function useRefresh(): ReturnType<FeedsData['useRefresh']> {
+  const { useRefresh: read } = useFeedsData();
   return read();
 }

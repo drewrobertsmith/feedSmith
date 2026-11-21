@@ -1,39 +1,27 @@
 import { v } from 'convex/values';
-import { Effect } from 'effect';
 
 import { internal } from './_generated/api';
 import { action, internalMutation, internalQuery } from './_generated/server';
 import { requireUserId } from './lib/currentUser';
-import { FeedHttp, safeUrl } from './lib/feed/http';
-import { parseFeed } from './lib/feed/parse';
-import { articlesToStore } from './lib/feed/store';
-import { vAddFeedReason, vBlock, vOmittedKind, type AddFeedReason } from './lib/feed/validators';
+import { fetchFeed } from './lib/feed/fetch';
+import { safeUrl } from './lib/feed/http';
+import { markWorking, storeNewArticles } from './lib/feed/record';
+import { vAddFeedReason, vStoredArticle, vValidators, type AddFeedReason } from './lib/feed/validators';
+import { inBatches, refreshOne } from './refresh';
 
 const MAX_URL = 2048;
-
-const REASONS = {
-  InvalidUrl: 'invalid-url',
-  Unreachable: 'unreachable',
-  Timeout: 'timeout',
-  TooLarge: 'too-large',
-  NotAFeed: 'not-a-feed',
-} as const satisfies Record<string, AddFeedReason>;
+/** Pulling down skips a Feed fetched this recently, so repeated pulls can't hammer a site. */
+const PULL_GAP = 2 * 60_000;
+/** Feeds one pull fetches at most. */
+const PULL_LIMIT = 200;
+/** Fetches one pull runs at once: each can hold a couple of megabytes while it parses. */
+const PULL_CONCURRENCY = 4;
 
 const vAddResult = v.union(
   v.object({ ok: v.literal(true) }),
   v.object({ ok: v.literal(false), reason: vAddFeedReason }),
 );
 type AddResult = { ok: true } | { ok: false; reason: AddFeedReason };
-
-const vStoredArticle = v.object({
-  guid: v.string(),
-  title: v.string(),
-  link: v.optional(v.string()),
-  subtitle: v.optional(v.string()),
-  publishedAt: v.number(),
-  blocks: v.array(vBlock),
-  omitted: v.array(vOmittedKind),
-});
 
 /**
  * Adds a Feed for the signed-in User: fetches it at once under the fetch policy (T18),
@@ -48,28 +36,32 @@ export const add = action({
     const feedUrl = url.length <= MAX_URL ? safeUrl(url)?.href : undefined;
     if (!feedUrl) return { ok: false, reason: 'invalid-url' };
 
-    const fetched = await Effect.runPromise(
-      Effect.gen(function* () {
-        const http = yield* FeedHttp;
-        const body = yield* http.get(feedUrl);
-        return yield* parseFeed(body, Date.now());
-      }).pipe(
-        Effect.provide(FeedHttp.layer),
-        Effect.match({
-          onFailure: (error) => ({ ok: false as const, reason: REASONS[error._tag] }),
-          onSuccess: (feed) => ({ ok: true as const, feed }),
-        }),
-      ),
-    );
-    if (!fetched.ok) return fetched;
+    const outcome = await fetchFeed(feedUrl);
+    if (outcome._tag === 'Failed') return { ok: false, reason: outcome.reason };
+    // Without validators of ours, a "not modified" answer is no answer at all.
+    if (outcome._tag === 'NotModified') return { ok: false, reason: 'unreachable' };
 
     const stored = await ctx.runMutation(internal.feeds.store, {
       userId,
       url: feedUrl,
-      title: fetched.feed.title,
-      articles: articlesToStore(fetched.feed.articles),
+      title: outcome.title,
+      articles: outcome.articles,
+      now: Date.now(),
+      ...outcome.validators,
     });
-    return stored === 'stored' ? { ok: true as const } : { ok: false as const, reason: stored };
+    return stored === 'stored' ? { ok: true } : { ok: false, reason: stored };
+  },
+});
+
+/** Pulling down on Feeds: fetches every one of the signed-in User's Feeds now (P15). */
+export const refreshAll = action({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx): Promise<null> => {
+    const userId = await ctx.runQuery(internal.feeds.viewer, {});
+    const feedIds = await ctx.runQuery(internal.feeds.toRefresh, { userId, now: Date.now() });
+    await inBatches(feedIds, PULL_CONCURRENCY, (feedId) => refreshOne(ctx, feedId));
+    return null;
   },
 });
 
@@ -80,23 +72,39 @@ export const viewer = internalQuery({
   handler: (ctx) => requireUserId(ctx),
 });
 
-/** Saves a fetched Feed and its Articles, unless the User already follows it. */
+/** A User's Feeds that weren't fetched in the last couple of minutes. */
+export const toRefresh = internalQuery({
+  args: { userId: v.id('users'), now: v.number() },
+  returns: v.array(v.id('feeds')),
+  handler: async (ctx, { userId, now }) => {
+    const feeds = await ctx.db
+      .query('feeds')
+      .withIndex('by_user_url', (q) => q.eq('userId', userId))
+      .take(PULL_LIMIT);
+    return feeds.filter((feed) => (feed.lastFetchedAt ?? 0) <= now - PULL_GAP).map((feed) => feed._id);
+  },
+});
+
+/** Saves a newly fetched Feed and its Articles, unless the User already follows it. */
 export const store = internalMutation({
-  args: { userId: v.id('users'), url: v.string(), title: v.string(), articles: v.array(vStoredArticle) },
+  args: {
+    userId: v.id('users'),
+    url: v.string(),
+    title: v.string(),
+    articles: v.array(vStoredArticle),
+    now: v.number(),
+    ...vValidators,
+  },
   returns: v.union(v.literal('stored'), v.literal('already-added')),
-  handler: async (ctx, { userId, url, title, articles }) => {
+  handler: async (ctx, { userId, url, title, articles, now, etag, lastModified }) => {
     const existing = await ctx.db
       .query('feeds')
       .withIndex('by_user_url', (q) => q.eq('userId', userId).eq('url', url))
       .first();
     if (existing) return 'already-added' as const;
     const feedId = await ctx.db.insert('feeds', { userId, url, title });
-    await Promise.all(
-      articles.map(async ({ blocks, omitted, ...fields }) => {
-        const articleId = await ctx.db.insert('articles', { userId, feedId, ...fields });
-        await ctx.db.insert('articleBodies', { userId, articleId, blocks, omitted });
-      }),
-    );
+    await storeNewArticles(ctx, userId, feedId, articles, now);
+    await markWorking(ctx, feedId, now, { etag, lastModified });
     return 'stored' as const;
   },
 });

@@ -1,15 +1,15 @@
 import { Effect, Exit } from 'effect';
 import { describe, expect, test, vi } from 'vitest';
 
-import { FeedHttp, MAX_BYTES, MAX_REDIRECTS } from './http';
+import { FeedHttp, MAX_BYTES, MAX_REDIRECTS, MAX_VALIDATOR, type Validators } from './http';
 
 type Fake = (url: string, init: RequestInit) => Promise<Response>;
 
 /** Runs `get` against a fake network; never the real one. */
-async function get(url: string, fake: Fake, timeoutMs = 1000) {
+async function get(url: string, fake: Fake, timeoutMs = 1000, validators?: Validators) {
   const fetch = vi.fn(fake);
   const http = FeedHttp.make(fetch as unknown as typeof globalThis.fetch, { timeoutMs });
-  const exit = await Effect.runPromiseExit(http.get(url));
+  const exit = await Effect.runPromiseExit(http.get(url, validators));
   return { exit, fetch, tag: Exit.isFailure(exit) ? exit.cause.toString().match(/(InvalidUrl|Unreachable|Timeout|TooLarge)/)?.[1] : 'ok' };
 }
 
@@ -99,12 +99,54 @@ describe('responses are bounded', () => {
 
 test('returns the body as text, asking for feeds', async () => {
   const { exit, fetch } = await get('https://example.com/feed', ok('<rss version="2.0"/>'));
-  expect(Exit.isSuccess(exit) && exit.value).toBe('<rss version="2.0"/>');
+  expect(Exit.isSuccess(exit) && exit.value).toEqual({ _tag: 'Fetched', body: '<rss version="2.0"/>' });
   const [, init] = fetch.mock.calls[0];
   expect(new Headers(init.headers).get('accept')).toContain('application/rss+xml');
 });
 
 test('a body that happens to read "too-large" is just a body', async () => {
   const { exit } = await get('https://example.com/feed', ok('too-large'));
-  expect(Exit.isSuccess(exit) && exit.value).toBe('too-large');
+  expect(Exit.isSuccess(exit) && exit.value).toEqual({ _tag: 'Fetched', body: 'too-large' });
+});
+
+describe('conditional requests (T19)', () => {
+  test("keeps the Feed's ETag and Last-Modified", async () => {
+    const { exit } = await get(
+      'https://example.com/feed',
+      ok('<rss/>', { etag: '"abc"', 'last-modified': 'Sat, 21 Nov 2026 12:00:00 GMT' }),
+    );
+    expect(Exit.isSuccess(exit) && exit.value).toEqual({
+      _tag: 'Fetched',
+      body: '<rss/>',
+      etag: '"abc"',
+      lastModified: 'Sat, 21 Nov 2026 12:00:00 GMT',
+    });
+  });
+
+  test('sends them back, and a 304 means nothing changed', async () => {
+    const { exit, fetch } = await get('https://example.com/feed', async () => new Response(null, { status: 304 }), 1000, {
+      etag: '"abc"',
+      lastModified: 'Sat, 21 Nov 2026 12:00:00 GMT',
+    });
+    expect(Exit.isSuccess(exit) && exit.value).toEqual({ _tag: 'NotModified' });
+    const headers = new Headers(fetch.mock.calls[0][1].headers);
+    expect(headers.get('if-none-match')).toBe('"abc"');
+    expect(headers.get('if-modified-since')).toBe('Sat, 21 Nov 2026 12:00:00 GMT');
+  });
+
+  test(`a validator over ${MAX_VALIDATOR} characters, or with control characters, is never kept or sent`, async () => {
+    const huge = `"${'x'.repeat(MAX_VALIDATOR)}"`;
+    const kept = await get('https://example.com/feed', ok('<rss/>', { etag: huge }));
+    expect(Exit.isSuccess(kept.exit) && kept.exit.value).toEqual({ _tag: 'Fetched', body: '<rss/>' });
+
+    const sent = await get('https://example.com/feed', ok(), 1000, { etag: '"a"\r\nX-Evil: 1', lastModified: huge });
+    const headers = new Headers(sent.fetch.mock.calls[0][1].headers);
+    expect(headers.get('if-none-match')).toBeNull();
+    expect(headers.get('if-modified-since')).toBeNull();
+  });
+
+  test('a 304 to a request without validators is unreachable, not "nothing changed"', async () => {
+    const { tag } = await get('https://example.com/feed', async () => new Response(null, { status: 304 }));
+    expect(tag).toBe('Unreachable');
+  });
 });
