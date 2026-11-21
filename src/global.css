@@ -34,3 +34,17 @@
   --font-sans: 'InstrumentSans';
   --font-serif: 'Literata';
 }
+
+/*
+ * The spacing scale (D9), mirroring src/theme/spacing.ts: an 8-point grid named by
+ * relationship, used as gap-related, px-edge, py-inside… Tailwind's numeric steps
+ * (gap-3, px-5…) still compile, because Uniwind needs the base --spacing, so
+ * src/theme/__tests__/spacing.test.ts fails on any of them instead (Q24).
+ */
+@theme {
+  --spacing-inside: 4px;
+  --spacing-related: 8px;
+  --spacing-group: 16px;
+  --spacing-section: 32px;
+  --spacing-edge: 16px;
+}

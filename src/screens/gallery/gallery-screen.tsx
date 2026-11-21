@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText } from '@/components/app-text';
 import { EnvironmentProvider } from '@/environment';
 import { GALLERY, type GalleryEntry } from '@/screens/gallery/registry';
+import { spacing } from '@/theme/spacing';
 import type { ThemeName } from '@/theme/tokens';
 import { createWorld, worldEnvironment, type CatalogWorld } from '@/worlds/world';
 
@@ -18,7 +19,7 @@ function Choice({ label, selected, onPress }: { label: string; selected: boolean
       aria-label={label}
       aria-checked={selected}
       onPress={onPress}
-      className={selected ? 'rounded-full bg-indicator px-3 py-2' : 'rounded-full px-3 py-2'}
+      className={selected ? 'rounded-full bg-indicator px-related py-inside' : 'rounded-full px-related py-inside'}
     >
       <AppText variant="label" className={selected ? 'text-accent' : 'text-text-muted'}>
         {label}
@@ -30,7 +31,7 @@ function Choice({ label, selected, onPress }: { label: string; selected: boolean
 /** A single-choice group of `Choice`s. */
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <View role="radiogroup" aria-label={label} className="flex-row flex-wrap gap-2">
+    <View role="radiogroup" aria-label={label} className="flex-row flex-wrap gap-related">
       {children}
     </View>
   );
@@ -55,7 +56,7 @@ export function GalleryScreen() {
 
   return (
     <ScrollView className="flex-1 bg-background">
-      <View className="gap-4 px-5 pb-6" style={{ paddingTop: insets.top + 16 }}>
+      <View className="gap-group px-edge pb-section" style={{ paddingTop: insets.top + spacing.group }}>
         <AppText variant="title">State gallery</AppText>
         <Row label="Theme">
           {(['dark', 'light'] as const).map((name) => (
@@ -68,7 +69,7 @@ export function GalleryScreen() {
           ))}
         </Row>
         {GALLERY.map((entry) => (
-          <View key={entry.screen} className="gap-2">
+          <View key={entry.screen} className="gap-related">
             <AppText variant="label" className="text-text-muted">
               {entry.screen}
             </AppText>
