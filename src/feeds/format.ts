@@ -6,24 +6,22 @@ export function publishedDate(ms: number): string {
   return DATE.format(ms);
 }
 
-const SECOND = 1000;
-const STEPS: [Intl.RelativeTimeFormatUnit, number][] = [
-  ['year', 365 * 24 * 3600 * SECOND],
-  ['month', 30 * 24 * 3600 * SECOND],
-  ['week', 7 * 24 * 3600 * SECOND],
-  ['day', 24 * 3600 * SECOND],
-  ['hour', 3600 * SECOND],
-  ['minute', 60 * SECOND],
-];
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+const WEEK = 7 * DAY;
 
-// Hoisted, like DATE. `numeric: 'auto'` says "now" and "yesterday".
-const AGO = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto', style: 'short' });
-
-/** How long ago an Article was published, in the phone's own words ("2 hr. ago", "yesterday"). */
+/**
+ * How long ago an Article was published: "just now", "5 min ago", "2 hr ago", "yesterday",
+ * "4 days ago", "2 wk ago". Written out rather than Intl.RelativeTimeFormat, which Hermes on
+ * Android doesn't have; feedSmith is English-only in v1.
+ */
 export function publishedAgo(ms: number, now: number): string {
   const elapsed = Math.max(0, now - ms);
-  for (const [unit, size] of STEPS) {
-    if (elapsed >= size) return AGO.format(-Math.floor(elapsed / size), unit);
-  }
-  return AGO.format(0, 'second');
+  if (elapsed < MINUTE) return 'just now';
+  if (elapsed < HOUR) return `${Math.floor(elapsed / MINUTE)} min ago`;
+  if (elapsed < DAY) return `${Math.floor(elapsed / HOUR)} hr ago`;
+  if (elapsed < 2 * DAY) return 'yesterday';
+  if (elapsed < WEEK) return `${Math.floor(elapsed / DAY)} days ago`;
+  return `${Math.floor(elapsed / WEEK)} wk ago`;
 }
