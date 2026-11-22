@@ -19,8 +19,15 @@ const HANDLE = 24;
 /** A small text action on a Feed's row; TalkBack hears its full name, e.g. "Rename The Verge" (Q15). */
 function RowAction({ label, accessibleName, onPress }: { label: string; accessibleName: string; onPress: () => void }) {
   return (
-    <Pressable role="button" aria-label={accessibleName} onPress={onPress} hitSlop={spacing.inside} className="py-inside">
-      <AppText variant="label" className="text-text underline" accessible={false}>
+    // Outlined like a chip: plainly tappable, with room for a thumb.
+    <Pressable
+      role="button"
+      aria-label={accessibleName}
+      onPress={onPress}
+      hitSlop={spacing.inside}
+      className="rounded-full border border-text-muted px-group py-related"
+    >
+      <AppText variant="label" className="text-text" accessible={false}>
         {label}
       </AppText>
     </Pressable>
@@ -62,7 +69,7 @@ function RenameField({ feed, onDone }: { feed: ManagedFeed; onDone: () => void }
           {problem}
         </AppText>
       ) : null}
-      <View className="flex-row gap-group">
+      <View className="flex-row gap-related">
         <RowAction label="Save" accessibleName="Save name" onPress={save} />
         <RowAction label="Cancel" accessibleName="Cancel renaming" onPress={onDone} />
       </View>
@@ -110,7 +117,7 @@ function FeedRow({ feed }: { feed: ManagedFeed }) {
       {renaming ? (
         <RenameField feed={feed} onDone={() => setRenaming(false)} />
       ) : (
-        <View className="flex-row flex-wrap gap-group">
+        <View className="flex-row flex-wrap gap-related">
           <RowAction label="Rename" accessibleName={`Rename ${feed.title}`} onPress={() => setRenaming(true)} />
           <RowAction
             label={feed.pinned ? 'Unpin' : 'Pin'}
