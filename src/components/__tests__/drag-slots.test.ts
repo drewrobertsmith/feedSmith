@@ -1,4 +1,4 @@
-import { shiftFor, slotFor } from '@/components/drag-slots';
+import { moved, slotFor, slotTop, totalHeight } from '@/components/drag-slots';
 
 // Three rows; the middle one is taller (say, a "Not working" line). 8 between rows.
 const HEIGHTS = [100, 140, 100];
@@ -21,19 +21,27 @@ describe('slotFor: where a held row would land', () => {
   });
 });
 
-describe('shiftFor: how far the other rows make room', () => {
-  test('rows the held one passes going down move up by its height', () => {
-    // Row 0 held and dragged to the end: rows 1 and 2 move up by 100 + 8.
-    expect([1, 2].map((row) => shiftFor(row, 0, 999, HEIGHTS, GAP, 3))).toEqual([-108, -108]);
+describe('the order a drag makes, and where each row sits in it', () => {
+  const ORDER = ['a', 'b', 'c'];
+  const BY_ID = { a: 100, b: 140, c: 100 };
+
+  test('moving a row takes it out and puts it back at its new place', () => {
+    expect(moved(ORDER, 2, 0)).toEqual(['c', 'a', 'b']);
+    expect(moved(ORDER, 0, 2)).toEqual(['b', 'c', 'a']);
+    expect(moved(ORDER, 1, 1)).toEqual(ORDER);
   });
 
-  test('rows the held one passes going up move down by its height', () => {
-    expect([0, 1].map((row) => shiftFor(row, 2, -999, HEIGHTS, GAP, 3))).toEqual([108, 108]);
+  test("a row's top is the rows above it, each with the gap after it", () => {
+    expect(ORDER.map((id) => slotTop(ORDER, BY_ID, GAP, id))).toEqual([0, 108, 256]);
+    expect(slotTop(['c', 'a', 'b'], BY_ID, GAP, 'b')).toBe(216);
   });
 
-  test("rows it hasn't reached, the held row itself, and nothing held: no shift", () => {
-    expect(shiftFor(2, 0, 80, HEIGHTS, GAP, 3)).toBe(0);
-    expect(shiftFor(0, 0, 80, HEIGHTS, GAP, 3)).toBe(0);
-    expect(shiftFor(1, -1, 0, HEIGHTS, GAP, 3)).toBe(0);
+  test('the list is as tall as its rows and the gaps between them', () => {
+    expect(totalHeight(ORDER, BY_ID, GAP)).toBe(356);
+    expect(totalHeight([], BY_ID, GAP)).toBe(0);
+  });
+
+  test("a row not measured yet takes no room", () => {
+    expect(slotTop(ORDER, { a: 100 }, GAP, 'c')).toBe(116);
   });
 });

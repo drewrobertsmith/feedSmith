@@ -231,10 +231,11 @@ export function ManageFeedsScreen() {
           <AppText variant="label" className="text-text-muted">
             Pinned
           </AppText>
-          <DragList gap={spacing.related}>
+          <DragList ids={pinned.map((feed) => feed.id)} gap={spacing.related}>
             {pinned.map((feed, index) => (
               <DragRow
                 key={feed.id}
+                id={feed.id}
                 index={index}
                 count={pinned.length}
                 handleLabel={`Reorder ${feed.title}`}
