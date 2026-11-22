@@ -1,11 +1,20 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { View, type LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { reorderHandleProps } from '@/components/reorder-handle';
+import { useEnvironment } from '@/environment';
 import { motion } from '@/theme/motion';
+import { spacing } from '@/theme/spacing';
+import { themes } from '@/theme/tokens';
+
+/** How high a lifted row floats (Android elevation), and how round its card is. */
+const LIFT_ELEVATION = 6;
+const CARD_RADIUS = 12;
+/** Padded the same at rest and lifted, so the card appears without moving anything; it reaches into the edge gutter. */
+const CARD = { marginHorizontal: -spacing.related, paddingHorizontal: spacing.related, borderRadius: CARD_RADIUS };
 
 /**
  * A row in a short list that can be dragged by its handle (D13). This is the only place the
@@ -30,6 +39,8 @@ export function DragRow({
   onDrop: (to: number) => void;
   children: ReactNode;
 }) {
+  const { colorScheme } = useEnvironment();
+  const surface = themes[colorScheme].surface;
   const [height, setHeight] = useState(1);
   const offset = useSharedValue(0);
   const lifted = useSharedValue(0);
@@ -54,13 +65,17 @@ export function DragRow({
       if (to !== index) scheduleOnRN(onDrop, to);
     });
 
+  // Lifted, the whole row becomes one card (handle, text and actions) that moves as a unit;
+  // at rest the card fades away and the list stays quiet.
   const style = useAnimatedStyle(() => ({
     transform: [{ translateY: offset.get() }, { scale: 1 + lifted.get() * 0.02 }],
     zIndex: lifted.get() > 0 ? 1 : 0,
+    backgroundColor: interpolateColor(lifted.get(), [0, 1], ['transparent', surface]),
+    elevation: lifted.get() * LIFT_ELEVATION,
   }));
 
   return (
-    <Animated.View style={style} onLayout={(e: LayoutChangeEvent) => setHeight(e.nativeEvent.layout.height || 1)}>
+    <Animated.View style={[CARD, style]} onLayout={(e: LayoutChangeEvent) => setHeight(e.nativeEvent.layout.height || 1)}>
       <View className="flex-row items-center">
         <GestureDetector gesture={pan}>
           <View {...reorderHandleProps({ index, count, label: handleLabel, onDrop })} hitSlop={8}>
