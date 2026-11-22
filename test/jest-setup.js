@@ -8,6 +8,7 @@ jest.mock('@/environment/motion-config', () => ({ MotionConfig: jest.fn(() => nu
 jest.mock('@/components/drag-row', () => {
   const { View } = require('react-native');
   return {
+    DragList: ({ gap, children }) => <View style={{ gap }}>{children}</View>,
     // The gesture can't run here (FEE-33); the handle keeps its TalkBack props, and `onDrop` stands in for a drag.
     DragRow: ({ index, count, handle, handleLabel, onDrop, children }) => (
       <View style={{ flexDirection: 'row' }}>
