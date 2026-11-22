@@ -1,23 +1,43 @@
-import { SymbolView } from 'expo-symbols';
-import { useState } from 'react';
-import { Alert, Pressable, ScrollView, TextInput, ToastAndroid, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SymbolView } from "expo-symbols";
+import { useState } from "react";
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  TextInput,
+  ToastAndroid,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { AppText } from '@/components/app-text';
-import { DragRow } from '@/components/drag-row';
-import { FeedIcon } from '@/components/feed-icon';
-import { useEnvironment } from '@/environment';
-import { useManage, useManageActions, useSetPinned, type ManagedFeed } from '@/feeds/feeds-data';
-import { spacing } from '@/theme/spacing';
-import { themes } from '@/theme/tokens';
-import { typeScale } from '@/theme/type';
-import { MAX_FEED_NAME } from '../../convex/lib/feedName';
+import { AppText } from "@/components/app-text";
+import { DragList, DragRow } from "@/components/drag-row";
+import { FeedIcon } from "@/components/feed-icon";
+import { useEnvironment } from "@/environment";
+import {
+  useManage,
+  useManageActions,
+  useSetPinned,
+  type ManagedFeed,
+} from "@/feeds/feeds-data";
+import { spacing } from "@/theme/spacing";
+import { themes } from "@/theme/tokens";
+import { typeScale } from "@/theme/type";
+import { MAX_FEED_NAME } from "../../convex/lib/feedName";
 
 const ICON = 20;
 const HANDLE = 24;
 
 /** A small text action on a Feed's row; TalkBack hears its full name, e.g. "Rename The Verge" (Q15). */
-function RowAction({ label, accessibleName, onPress }: { label: string; accessibleName: string; onPress: () => void }) {
+function RowAction({
+  label,
+  accessibleName,
+  onPress,
+}: {
+  label: string;
+  accessibleName: string;
+  onPress: () => void;
+}) {
   return (
     // Outlined like a chip: plainly tappable, with room for a thumb.
     <Pressable
@@ -34,7 +54,13 @@ function RowAction({ label, accessibleName, onPress }: { label: string; accessib
   );
 }
 
-function RenameField({ feed, onDone }: { feed: ManagedFeed; onDone: () => void }) {
+function RenameField({
+  feed,
+  onDone,
+}: {
+  feed: ManagedFeed;
+  onDone: () => void;
+}) {
   const { colorScheme, fontScale } = useEnvironment();
   const { rename } = useManageActions();
   const [name, setName] = useState(feed.title);
@@ -43,8 +69,8 @@ function RenameField({ feed, onDone }: { feed: ManagedFeed; onDone: () => void }
     const outcome = await rename(feed.id, name);
     const problems: Record<typeof outcome, string | null> = {
       ok: null,
-      'not-found': null,
-      'invalid-name': `Give the Feed a name of up to ${MAX_FEED_NAME} characters.`,
+      "not-found": null,
+      "invalid-name": `Give the Feed a name of up to ${MAX_FEED_NAME} characters.`,
       failed: "Couldn't save the name. Check your connection and try again.",
     };
     if (problems[outcome]) setProblem(problems[outcome]);
@@ -62,7 +88,10 @@ function RenameField({ feed, onDone }: { feed: ManagedFeed; onDone: () => void }
         returnKeyType="done"
         placeholderTextColor={themes[colorScheme].textMuted}
         className="rounded-lg border border-text-muted px-group py-related text-text"
-        style={{ fontFamily: typeScale.reading.fontFamily, fontSize: typeScale.reading.fontSize * fontScale }}
+        style={{
+          fontFamily: typeScale.reading.fontFamily,
+          fontSize: typeScale.reading.fontSize * fontScale,
+        }}
       />
       {problem ? (
         <AppText variant="label" role="alert" className="text-text">
@@ -71,7 +100,11 @@ function RenameField({ feed, onDone }: { feed: ManagedFeed; onDone: () => void }
       ) : null}
       <View className="flex-row gap-related">
         <RowAction label="Save" accessibleName="Save name" onPress={save} />
-        <RowAction label="Cancel" accessibleName="Cancel renaming" onPress={onDone} />
+        <RowAction
+          label="Cancel"
+          accessibleName="Cancel renaming"
+          onPress={onDone}
+        />
       </View>
     </View>
   );
@@ -84,22 +117,43 @@ function FeedRow({ feed }: { feed: ManagedFeed }) {
 
   const togglePin = async () => {
     const outcome = await setPinned(feed.id, !feed.pinned);
-    if (outcome === 'pins-full') ToastAndroid.show('You can Pin up to 3 Feeds. Unpin one first.', ToastAndroid.SHORT);
+    if (outcome === "pins-full")
+      ToastAndroid.show(
+        "You can Pin up to 3 Feeds. Unpin one first.",
+        ToastAndroid.SHORT,
+      );
   };
   const confirmRemove = () =>
-    Alert.alert(`Remove ${feed.title}?`, 'Its Articles go too. Articles you’ve Saved stay in Saved.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => void removeFeed() },
-    ]);
+    Alert.alert(
+      `Remove ${feed.title}?`,
+      "Its Articles go too. Articles you’ve Saved stay in Saved.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: () => void removeFeed(),
+        },
+      ],
+    );
   const removeFeed = async () => {
-    if ((await remove(feed.id)) === 'failed') ToastAndroid.show(`Couldn't remove ${feed.title}. Try again.`, ToastAndroid.SHORT);
+    if ((await remove(feed.id)) === "failed")
+      ToastAndroid.show(
+        `Couldn't remove ${feed.title}. Try again.`,
+        ToastAndroid.SHORT,
+      );
   };
 
   return (
     // Not grouped into one TalkBack stop: its name, site and each action are reached on their own (Q15).
     <View className="gap-related py-group">
       <View className="flex-row items-center gap-related">
-        <FeedIcon key={feed.faviconUrl ?? feed.title} url={feed.faviconUrl} title={feed.title} size={ICON} />
+        <FeedIcon
+          key={feed.faviconUrl ?? feed.title}
+          url={feed.faviconUrl}
+          title={feed.title}
+          size={ICON}
+        />
         <View className="flex-1 gap-inside">
           <AppText variant="reading" className="text-text">
             {feed.title}
@@ -118,13 +172,21 @@ function FeedRow({ feed }: { feed: ManagedFeed }) {
         <RenameField feed={feed} onDone={() => setRenaming(false)} />
       ) : (
         <View className="flex-row flex-wrap gap-related">
-          <RowAction label="Rename" accessibleName={`Rename ${feed.title}`} onPress={() => setRenaming(true)} />
           <RowAction
-            label={feed.pinned ? 'Unpin' : 'Pin'}
-            accessibleName={`${feed.pinned ? 'Unpin' : 'Pin'} ${feed.title}`}
+            label="Rename"
+            accessibleName={`Rename ${feed.title}`}
+            onPress={() => setRenaming(true)}
+          />
+          <RowAction
+            label={feed.pinned ? "Unpin" : "Pin"}
+            accessibleName={`${feed.pinned ? "Unpin" : "Pin"} ${feed.title}`}
             onPress={() => void togglePin()}
           />
-          <RowAction label="Remove" accessibleName={`Remove ${feed.title}`} onPress={confirmRemove} />
+          <RowAction
+            label="Remove"
+            accessibleName={`Remove ${feed.title}`}
+            onPress={confirmRemove}
+          />
         </View>
       )}
     </View>
@@ -137,7 +199,7 @@ export function ManageFeedsScreen() {
   const { colorScheme } = useEnvironment();
   const view = useManage();
   const { orderPins } = useManageActions();
-  const feeds = view.status === 'ready' ? view.feeds : [];
+  const feeds = view.status === "ready" ? view.feeds : [];
   const pinned = feeds.filter((feed) => feed.pinned);
   const others = feeds.filter((feed) => !feed.pinned);
 
@@ -152,11 +214,14 @@ export function ManageFeedsScreen() {
     <ScrollView
       className="flex-1 bg-background"
       contentContainerClassName="gap-section px-edge"
-      contentContainerStyle={{ paddingTop: insets.top + spacing.section, paddingBottom: insets.bottom + spacing.section }}
+      contentContainerStyle={{
+        paddingTop: insets.top + spacing.section,
+        paddingBottom: insets.bottom + spacing.section,
+      }}
       keyboardShouldPersistTaps="handled"
     >
       <AppText variant="title">Manage Feeds</AppText>
-      {view.status === 'ready' && feeds.length === 0 ? (
+      {view.status === "ready" && feeds.length === 0 ? (
         <AppText variant="reading" className="text-text-muted">
           No Feeds yet. Add one from the + on Feeds.
         </AppText>
@@ -166,22 +231,31 @@ export function ManageFeedsScreen() {
           <AppText variant="label" className="text-text-muted">
             Pinned
           </AppText>
-          {pinned.map((feed, index) => (
-            <DragRow
-              key={feed.id}
-              index={index}
-              count={pinned.length}
-              handleLabel={`Reorder ${feed.title}`}
-              onDrop={(to) => move(index, to)}
-              handle={
-                <View className="pr-related">
-                  <SymbolView name={{ ios: 'line.3.horizontal', android: 'drag_indicator' }} size={HANDLE} tintColor={themes[colorScheme].textMuted} />
-                </View>
-              }
-            >
-              <FeedRow feed={feed} />
-            </DragRow>
-          ))}
+          <DragList gap={spacing.related}>
+            {pinned.map((feed, index) => (
+              <DragRow
+                key={feed.id}
+                index={index}
+                count={pinned.length}
+                handleLabel={`Reorder ${feed.title}`}
+                onDrop={(to) => move(index, to)}
+                handle={
+                  <View className="pr-related">
+                    <SymbolView
+                      name={{
+                        ios: "line.3.horizontal",
+                        android: "drag_indicator",
+                      }}
+                      size={HANDLE}
+                      tintColor={themes[colorScheme].textMuted}
+                    />
+                  </View>
+                }
+              >
+                <FeedRow feed={feed} />
+              </DragRow>
+            ))}
+          </DragList>
         </View>
       ) : null}
       {others.length > 0 ? (
