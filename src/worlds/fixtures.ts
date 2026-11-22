@@ -1,4 +1,4 @@
-import type { ArticleRow, FeedChip, ReadingArticle } from '@/feeds/feeds-data';
+import type { ArticleRow, FeedChip, ManagedFeed, ReadingArticle } from '@/feeds/feeds-data';
 
 /** Midday UTC, so the date reads the same in every time zone a test runs in. */
 const day = (d: number) => Date.UTC(2026, 10, d, 12);
@@ -116,4 +116,19 @@ export const FIXTURE_CHIPS: FeedChip[] = [
   { id: 'f1', title: VERGE, faviconUrl: 'https://www.theverge.com/favicon.ico', pinned: true },
   { id: 'f2', title: 'Calm Notes', pinned: false },
   { id: 'f3', title: 'Daring Fireball', faviconUrl: 'https://daringfireball.net/favicon.ico', pinned: false },
+];
+
+/** Manage Feeds (D13): one Pinned Feed, then the rest by name; Farnam Street has stopped working. */
+export const FIXTURE_MANAGE: ManagedFeed[] = [
+  { id: 'f1', title: VERGE, faviconUrl: 'https://www.theverge.com/favicon.ico', host: 'www.theverge.com', pinned: true, working: true },
+  { id: 'f2', title: 'Calm Notes', host: 'calmnotes.example', pinned: false, working: true },
+  { id: 'f4', title: 'Farnam Street', faviconUrl: 'https://fs.blog/favicon.ico', host: 'fs.blog', pinned: false, working: false },
+];
+
+/** Three Pinned Feeds, so they can be ordered, and a fourth Pin is refused. */
+export const FIXTURE_MANAGE_PINNED: ManagedFeed[] = [
+  { ...FIXTURE_MANAGE[0] },
+  { ...FIXTURE_MANAGE[1], pinned: true },
+  { ...FIXTURE_MANAGE[2], pinned: true },
+  { id: 'f3', title: 'Daring Fireball', host: 'daringfireball.net', pinned: false, working: true },
 ];

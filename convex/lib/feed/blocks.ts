@@ -26,6 +26,11 @@ export const MAX_BLOCKS = 500;
  * bytes a character, it keeps an Article well under Convex's 1 MiB document limit.
  */
 export const MAX_SIZE = 250_000;
+/**
+ * Articles deleted per transaction, with their bodies. A body can reach about 750 KB (MAX_SIZE at
+ * three bytes a character), so 16 keep a batch under the 16 MiB a transaction may read and write.
+ */
+export const DELETE_BATCH = 16;
 /** Entries in one list, or paragraphs in one quote. */
 export const MAX_ENTRIES = 1000;
 /** Nesting deeper than this is hostile, not writing; it's left out rather than walked. */

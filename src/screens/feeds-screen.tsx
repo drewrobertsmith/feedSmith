@@ -1,5 +1,6 @@
 import { LegendList } from '@legendapp/list/react-native';
 import { Image } from 'expo-image';
+import { SymbolView } from 'expo-symbols';
 import { router } from 'expo-router';
 import { Pressable, RefreshControl, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,6 +16,8 @@ import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
 
 const addFeed = () => router.push('/add-feed');
+const manageFeeds = () => router.push('/manage-feeds');
+const MANAGE_ICON = 24;
 
 /** A Read row's image fades back with its text (P7); text dims by colour, so contrast holds (Q14). */
 const READ_IMAGE_OPACITY = 0.55;
@@ -100,9 +103,16 @@ export function FeedsScreen({ feed }: { feed?: string }) {
 
   const header = (
     <View className="gap-group pb-related" style={{ paddingTop: insets.top + spacing.section }}>
-      <AppText variant="title" className="px-edge text-text">
-        Feeds
-      </AppText>
+      <View className="flex-row items-center justify-between px-edge">
+        <AppText variant="title" className="text-text">
+          Feeds
+        </AppText>
+        {chips.length > 0 ? (
+          <Pressable role="button" aria-label="Manage Feeds" onPress={manageFeeds} hitSlop={spacing.related} className="p-inside">
+            <SymbolView name={{ ios: 'slider.horizontal.3', android: 'tune' }} size={MANAGE_ICON} tintColor={theme.text} />
+          </Pressable>
+        ) : null}
+      </View>
       {chips.length > 0 ? <ChipRow chips={chips} selected={selectedChip?.id ?? null} onSelect={select} onAdd={addFeed} /> : null}
       {selectedChip && empty ? (
         <AppText variant="reading" className="px-edge text-text-muted">

@@ -2,3 +2,21 @@
 // which its JS implementation throws on). The app's one Reanimated adapter is mocked instead;
 // tests assert what it receives.
 jest.mock('@/environment/motion-config', () => ({ MotionConfig: jest.fn(() => null) }));
+
+// The drag gesture needs Reanimated too (D13): its one adapter becomes a plain row whose handle
+// carries `onDrop`, so tests drop a row where a drag would.
+jest.mock('@/components/drag-row', () => {
+  const { View } = require('react-native');
+  return {
+    DragList: ({ gap, children }) => <View style={{ gap }}>{children}</View>,
+    // The gesture can't run here (FEE-33); the handle keeps its TalkBack props, and `onDrop` stands in for a drag.
+    DragRow: ({ index, count, handle, handleLabel, onDrop, children }) => (
+      <View style={{ flexDirection: 'row' }}>
+        <View {...require('@/components/reorder-handle').reorderHandleProps({ index, count, label: handleLabel, onDrop })} onDrop={onDrop}>
+          {handle}
+        </View>
+        <View style={{ flex: 1 }}>{children}</View>
+      </View>
+    ),
+  };
+});
