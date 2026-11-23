@@ -91,6 +91,18 @@ function children(el: Element, name: string): Element[] {
 }
 
 /**
+ * A name with any email address taken out: `jane@example.com (Jane Doe)` and
+ * `Jane Doe (jane@example.com)` both give "Jane Doe"; brackets that aren't around an email,
+ * like "Jane Doe (Editor)", stay as written.
+ */
+function withoutEmail(text: string): string {
+  if (!text.match(EMAIL)) return text;
+  const rest = squash(text.replace(EMAIL, '').replace(/\(\s*\)/g, ''));
+  const bracketed = rest.match(/^\((.*)\)$/);
+  return squash(bracketed ? bracketed[1] : rest);
+}
+
+/**
  * Authors by name, as plain text: emails are removed (RSS `<author>` is often
  * `jane@example.com (Jane Doe)`, which keeps "Jane Doe"), duplicates dropped, and both the
  * count and each name capped. Undefined when nobody is credited.
@@ -98,7 +110,7 @@ function children(el: Element, name: string): Element[] {
 function authorNames(values: string[]): string[] | undefined {
   const names = new Set<string>();
   for (const value of values) {
-    const name = squash(plain(value).replace(EMAIL, '').replace(/[()]/g, ' '));
+    const name = withoutEmail(squash(plain(value)));
     if (name) names.add(clip(name, MAX_AUTHOR));
     if (names.size >= MAX_AUTHORS) break;
   }

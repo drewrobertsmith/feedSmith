@@ -172,6 +172,8 @@ describe("an Article's authors (FEE-41)", () => {
     ['several Atom authors', atomEntry('<author><name>A. One</name></author><author><name>B. Two</name></author>'), ['A. One', 'B. Two']],
     ['the same name twice', rssItem('<dc:creator>Emma Roth</dc:creator><author>e@example.com (Emma Roth)</author>'), ['Emma Roth']],
     ['a name with markup and spacing', rssItem('<dc:creator><![CDATA[  <b>Emma</b>   Roth ]]></dc:creator>'), ['Emma Roth']],
+    ['a name with a role in brackets, kept as written', rssItem('<dc:creator>Jane Doe (Editor)</dc:creator>'), ['Jane Doe (Editor)']],
+    ['a name followed by its email in brackets', rssItem('<dc:creator>Emma Roth (emma@example.com)</dc:creator>'), ['Emma Roth']],
   ])('reads %s', (_case, xml, authors) => {
     expect(authorsOf(xml)).toEqual(authors);
   });
