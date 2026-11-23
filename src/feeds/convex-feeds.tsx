@@ -3,6 +3,7 @@ import type { FunctionArgs, FunctionReference } from 'convex/server';
 import { useState, type ReactNode } from 'react';
 
 import { api } from '../../convex/_generated/api';
+import { useAuth } from '@/auth/auth-context';
 import {
   FeedsContext,
   type AddFeedView,
@@ -17,13 +18,17 @@ import {
 } from '@/feeds/feeds-data';
 
 /**
- * A query that runs only while signed in. Signing out clears the session before the route guard
- * leaves Feeds, and every User query refuses a signed-out caller (Q10), so a query still
- * subscribed then would throw; skipped, it just stops (FEE-35).
+ * A query that runs only while signed in, and not while the Account is being deleted. Every User
+ * query refuses a caller without a session (Q10), and the session ends before the route guard
+ * leaves Feeds: on signing out (FEE-35), and the moment `deleteAccount` revokes it on the server
+ * (FEE-36). A query still subscribed then would throw; skipped, it just stops, and comes back if
+ * the delete fails.
  */
 function useSignedInQuery<Query extends FunctionReference<'query'>>(query: Query, args: FunctionArgs<Query>) {
   const { isAuthenticated } = useConvexAuth();
-  return useQuery(query, ...((isAuthenticated ? [args] : ['skip']) as [FunctionArgs<Query> | 'skip']));
+  const { deletion } = useAuth();
+  const live = isAuthenticated && deletion !== 'deleting';
+  return useQuery(query, ...((live ? [args] : ['skip']) as [FunctionArgs<Query> | 'skip']));
 }
 
 function useAll(feedId: string | null): AllView {

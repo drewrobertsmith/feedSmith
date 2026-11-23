@@ -4,4 +4,6 @@ export const AUTH_ERRORS = {
   notAllowed: 'NOT_ALLOWED',
   /** No one is signed in. */
   signedOut: 'SIGNED_OUT',
+  /** The signed-in Account no longer exists: it was already deleted. */
+  accountGone: 'ACCOUNT_GONE',
 } as const;

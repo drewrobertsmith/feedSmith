@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { useAuth } from '@/auth/auth-context';
 import { AppText } from '@/components/app-text';
@@ -22,16 +22,21 @@ function SheetRow({
   onPress,
   busy = false,
   busyLabel,
+  tone = 'plain',
 }: {
   label: string;
   icon: SymbolViewProps['name'];
   onPress: () => void;
   busy?: boolean;
   busyLabel?: string;
+  /** `destructive` colours it brick: this action deletes something for good (D19). */
+  tone?: 'plain' | 'destructive';
 }) {
   const { colorScheme } = useEnvironment();
   const box = ICON * useSizeScale();
   const shown = busy && busyLabel ? busyLabel : label;
+  const destructive = tone === 'destructive';
+  const colour = destructive ? themes[colorScheme].destructive : themes[colorScheme].text;
   return (
     <Pressable
       role="button"
@@ -48,22 +53,30 @@ function SheetRow({
       <SymbolView
         name={icon}
         size={ICON}
-        tintColor={themes[colorScheme].text}
+        tintColor={colour}
         style={{ width: box, height: box, flexShrink: 0 }}
       />
-      <AppText variant="action" className="shrink text-text" accessible={false}>
+      <AppText variant="action" className={destructive ? 'shrink text-destructive' : 'shrink text-text'} accessible={false}>
         {shown}
       </AppText>
     </Pressable>
   );
 }
 
+/** Asks once, with Android's own dialog, before deleting the Account for good (P18, Q32). */
+function confirmDelete(deleteAccount: () => Promise<void>) {
+  Alert.alert('Delete your account and everything in it?', "This can't be undone.", [
+    { text: 'Cancel', style: 'cancel' },
+    { text: 'Delete', style: 'destructive', onPress: () => void deleteAccount() },
+  ]);
+}
+
 /**
- * The Account sheet (P17): who is signed in, Manage Feeds (D17), then Sign out last, behind a
- * divider (Q32). Delete account joins Sign out there with FEE-36.
+ * The Account sheet (P17): who is signed in, Manage Feeds (D17), then Sign out and Delete account
+ * last, behind a divider (Q32).
  */
 function AccountSheetContent({ onClose }: { onClose: () => void }) {
-  const { account, signOut, signingOut } = useAuth();
+  const { account, signOut, signingOut, deleteAccount, deletion } = useAuth();
   const { colorScheme } = useEnvironment();
   const manageFeeds = () => {
     onClose();
@@ -94,6 +107,20 @@ function AccountSheetContent({ onClose }: { onClose: () => void }) {
         icon={{ ios: 'rectangle.portrait.and.arrow.right', android: 'logout' }}
         onPress={() => void signOut()}
       />
+      <SheetRow
+        label="Delete account"
+        busyLabel="Deleting account"
+        busy={deletion === 'deleting'}
+        tone="destructive"
+        icon={{ ios: 'trash', android: 'delete' }}
+        onPress={() => confirmDelete(deleteAccount)}
+      />
+      {deletion === 'failed' ? (
+        // Nothing was deleted and the User is still signed in: say so, and what to do (P18).
+        <AppText variant="label" role="alert" className="px-edge text-text">
+          Couldn&apos;t delete your account. Check your connection and try again.
+        </AppText>
+      ) : null}
     </View>
   );
 }

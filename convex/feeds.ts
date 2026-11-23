@@ -2,6 +2,7 @@ import { v } from 'convex/values';
 
 import { internal } from './_generated/api';
 import { DELETE_BATCH } from './lib/feed/blocks';
+import { deleteArticles } from './lib/deleteArticles';
 import { MAX_FEED_NAME } from './lib/feedName';
 import type { Id } from './_generated/dataModel';
 import { action, internalMutation, internalQuery, mutation, query, type QueryCtx } from './_generated/server';
@@ -372,16 +373,7 @@ export const removeArticles = internalMutation({
       .query('articles')
       .withIndex('by_feed_published', (q) => q.eq('feedId', feedId))
       .take(DELETE_BATCH);
-    await Promise.all(
-      articles.map(async (article) => {
-        const bodies = await ctx.db
-          .query('articleBodies')
-          .withIndex('by_article', (q) => q.eq('articleId', article._id))
-          .take(10);
-        await Promise.all(bodies.map((body) => ctx.db.delete(body._id)));
-        await ctx.db.delete(article._id);
-      }),
-    );
+    await deleteArticles(ctx, articles);
     if (articles.length === DELETE_BATCH) await ctx.scheduler.runAfter(0, internal.feeds.removeArticles, { feedId });
     return null;
   },

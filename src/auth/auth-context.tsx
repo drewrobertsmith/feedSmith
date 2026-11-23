@@ -27,6 +27,13 @@ export type Auth = {
   signOut: () => Promise<void>;
   /** Whether a sign-out is under way. */
   signingOut: boolean;
+  /**
+   * Deletes the Account for good, then signs out (P18). If it doesn't reach the server, nothing
+   * is deleted, the User stays signed in, and `deletion` says it failed.
+   */
+  deleteAccount: () => Promise<void>;
+  /** Where deleting the Account is up to. */
+  deletion: 'idle' | 'deleting' | 'failed';
   /** Opens Google's sign-in in an in-app browser. */
   startSignIn: () => void;
   /** Finishes sign-in with what the return link (`feedsmith://auth`) carried. */

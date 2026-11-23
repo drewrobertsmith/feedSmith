@@ -14,6 +14,7 @@
       --color-text: #F3ECDD;
       --color-text-muted: #B9B2A4;
       --color-accent: #CBB07B;
+      --color-destructive: #E8A08A;
       --color-decor: #50716C;
     }
 
@@ -24,6 +25,7 @@
       --color-text: #1D2532;
       --color-text-muted: #4A5468;
       --color-accent: #6F5626;
+      --color-destructive: #8E2F23;
       --color-decor: #50716C;
     }
   }

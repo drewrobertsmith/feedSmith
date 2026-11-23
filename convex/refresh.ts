@@ -4,6 +4,7 @@ import { internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { internalAction, internalMutation, internalQuery, type ActionCtx } from './_generated/server';
 import { DELETE_BATCH } from './lib/feed/blocks';
+import { deleteArticles } from './lib/deleteArticles';
 import { fetchFeed } from './lib/feed/fetch';
 import { markFailing, markWorking, RETENTION, storeNewArticles } from './lib/feed/record';
 import { vStoredArticle, vValidators } from './lib/feed/validators';
@@ -141,16 +142,7 @@ export const cleanup = internalMutation({
       .query('articles')
       .withIndex('by_published', (q) => q.lt('publishedAt', Date.now() - RETENTION))
       .take(DELETE_BATCH);
-    await Promise.all(
-      old.map(async (article) => {
-        const bodies = await ctx.db
-          .query('articleBodies')
-          .withIndex('by_article', (q) => q.eq('articleId', article._id))
-          .take(10);
-        await Promise.all(bodies.map((body) => ctx.db.delete(body._id)));
-        await ctx.db.delete(article._id);
-      }),
-    );
+    await deleteArticles(ctx, old);
     if (old.length === DELETE_BATCH) await ctx.scheduler.runAfter(0, internal.refresh.cleanup, {});
     return null;
   },

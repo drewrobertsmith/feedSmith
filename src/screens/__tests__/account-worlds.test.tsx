@@ -1,5 +1,6 @@
 import { act, userEvent, within } from '@testing-library/react-native';
 import { renderRouter, screen } from 'expo-router/testing-library';
+import { Alert } from 'react-native';
 import { Uniwind } from 'uniwind';
 
 import TabsLayout from '@/app/(tabs)/_layout';
@@ -20,13 +21,13 @@ type Shows = {
   circle: string;
   initial: string;
   /** The sheet's content, once the circle is tapped; `null` for the worlds that only show the circle. */
-  sheet: { title: string; email?: string; signingOut: boolean } | null;
+  sheet: { title: string; email?: string; signingOut: boolean; deletion: 'idle' | 'deleting' | 'failed' } | null;
   fontScale: number;
   reduceMotion: boolean;
 };
 
 const ADA = 'Account, Ada Lovelace';
-const OPEN = { title: 'Ada Lovelace', email: 'ada@example.com', signingOut: false };
+const OPEN = { title: 'Ada Lovelace', email: 'ada@example.com', signingOut: false, deletion: 'idle' } as const;
 
 const SHOWS: Record<AccountWorldId, Shows> = {
   'account-circle-dark': { theme: 'dark', section: 'Feeds', circle: ADA, initial: 'A', sheet: null, fontScale: 1, reduceMotion: false },
@@ -48,7 +49,7 @@ const SHOWS: Record<AccountWorldId, Shows> = {
     section: 'Feeds',
     circle: 'Account, ada@example.com',
     initial: 'A',
-    sheet: { title: 'ada@example.com', signingOut: false },
+    sheet: { title: 'ada@example.com', signingOut: false, deletion: 'idle' },
     fontScale: 1,
     reduceMotion: false,
   },
@@ -62,7 +63,29 @@ const SHOWS: Record<AccountWorldId, Shows> = {
     fontScale: 1,
     reduceMotion: true,
   },
+  // The confirmation itself is Android's own dialog: the test presses Delete account to reach it.
+  'account-delete-confirm': { theme: 'dark', section: 'Feeds', circle: ADA, initial: 'A', sheet: OPEN, fontScale: 1, reduceMotion: false },
+  'account-deleting': {
+    theme: 'dark',
+    section: 'Feeds',
+    circle: ADA,
+    initial: 'A',
+    sheet: { ...OPEN, deletion: 'deleting' },
+    fontScale: 1,
+    reduceMotion: false,
+  },
+  'account-delete-failed': {
+    theme: 'light',
+    section: 'Feeds',
+    circle: ADA,
+    initial: 'A',
+    sheet: { ...OPEN, deletion: 'failed' },
+    fontScale: 1,
+    reduceMotion: false,
+  },
 };
+
+const FAILED = "Couldn't delete your account. Check your connection and try again.";
 
 function renderWorld(world: World) {
   return renderRouter(
@@ -119,6 +142,17 @@ describe.each(ACCOUNT_WORLDS)('$label', ({ id, spec }) => {
     if (open.email) expect(within(sheet()).getByText(open.email)).toBeOnTheScreen();
     expect(within(sheet()).getByRole('button', { name: 'Manage Feeds' })).toBeOnTheScreen();
     const signOut = within(sheet()).getByRole('button', { name: open.signingOut ? 'Signing out' : 'Sign out' });
+    const deleteRow = within(sheet()).getByRole('button', { name: open.deletion === 'deleting' ? 'Deleting account' : 'Delete account' });
+    if (open.deletion === 'deleting') {
+      expect(deleteRow).toBeBusy();
+      expect(deleteRow).toBeDisabled();
+    } else {
+      expect(deleteRow).not.toBeBusy();
+      expect(deleteRow).toBeEnabled();
+    }
+    // A failure says what happened and what to do, and the User stays signed in (P18).
+    if (open.deletion === 'failed') expect(within(sheet()).getByRole('alert')).toHaveTextContent(FAILED);
+    else expect(within(sheet()).queryByText(FAILED)).toBeNull();
     if (open.signingOut) {
       expect(signOut).toBeBusy();
       expect(signOut).toBeDisabled();
@@ -145,6 +179,34 @@ describe.each(ACCOUNT_WORLDS)('$label', ({ id, spec }) => {
     world.dispose();
   });
 
+  if (open.deletion !== 'deleting') {
+    test('Delete account asks first, with a native confirmation; Cancel deletes nothing', async () => {
+      const world = createWorld(spec);
+      const alert = jest.spyOn(Alert, 'alert');
+      await renderWorld(world);
+      await userEvent.press(await circle(shows));
+
+      await userEvent.press(within(sheet()).getByRole('button', { name: 'Delete account' }));
+
+      expect(alert).toHaveBeenCalledTimes(1);
+      const [title, message, buttons] = alert.mock.calls[0];
+      expect(title).toBe('Delete your account and everything in it?');
+      expect(message).toBe("This can't be undone.");
+      expect(buttons?.map((button) => [button.text, button.style])).toEqual([
+        ['Cancel', 'cancel'],
+        ['Delete', 'destructive'],
+      ]);
+      await act(async () => buttons?.[0].onPress?.());
+      expect(world.signInLog.deletes).toBe(0);
+
+      await act(async () => buttons?.[1].onPress?.());
+      expect(world.signInLog.deletes).toBe(1);
+
+      alert.mockRestore();
+      world.dispose();
+    });
+  }
+
   if (open.signingOut) return;
 
   test('Sign out signs out once, server or not', async () => {
@@ -152,10 +214,12 @@ describe.each(ACCOUNT_WORLDS)('$label', ({ id, spec }) => {
     await renderWorld(world);
     await userEvent.press(await circle(shows));
 
+    const alertsBefore = screen.queryAllByRole('alert').length;
     await userEvent.press(within(sheet()).getByRole('button', { name: 'Sign out' }));
 
     expect(world.signInLog.signOuts).toBe(1);
-    expect(screen.queryByText(/error|couldn/i)).toBeNull();
+    // Signing out never shows an error of its own, server or not.
+    expect(screen.queryAllByRole('alert')).toHaveLength(alertsBefore);
 
     world.dispose();
   });
