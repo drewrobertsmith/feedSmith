@@ -190,6 +190,32 @@ function ArticleEnd({ link }: { link: string }) {
   );
 }
 
+/** Below the header: the fallback for a page that couldn't be read, or the lead image, the text and its end. */
+function ArticleBody({ article }: { article: ReadingArticle }) {
+  if (article.page === 'unavailable') return <PageUnavailable article={article} />;
+  // The lead image, unless the text opens with an image of its own (often the same one, resized).
+  const lead = article.imageUrl && article.blocks[0]?.type !== 'image' ? article.imageUrl : undefined;
+  return (
+    <>
+      {lead ? (
+        <View testID="lead-image">
+          <ArticleBlocks blocks={[{ type: 'image', src: lead }]} />
+        </View>
+      ) : null}
+      <View className="gap-group">
+        {article.page === 'extracting' ? (
+          // Announced when it goes: the full text replaces the Subtitle as soon as it's read.
+          <AppText variant="label" className="text-text-muted" accessibilityLiveRegion="polite">
+            Bringing in the full Article from its page…
+          </AppText>
+        ) : null}
+        <ArticleBlocks blocks={article.blocks} link={article.link} />
+      </View>
+      {article.link ? <ArticleEnd link={article.link} /> : null}
+    </>
+  );
+}
+
 /**
  * The Reading view (P13, D6, D7): headline, Subtitle, Feed and date, the lead image, then the
  * text, and a plain end. Literata for everything the author wrote, Instrument Sans for what
@@ -212,9 +238,6 @@ export function ReadingScreen({ id }: { id: string }) {
   const article = view.status === 'ready' ? view.article : undefined;
   const title = article?.title ?? (view.status === 'loading' ? view.title : undefined);
   if (title === undefined) return <View className="flex-1 bg-background" />;
-  // The lead image, unless the text opens with an image of its own (often the same one, resized).
-  const lead = article?.imageUrl && article.blocks[0]?.type !== 'image' ? article.imageUrl : undefined;
-
   return (
     // Only the screen in front carries titles (FEE-48).
     <SharedTitleScreen>
@@ -229,27 +252,7 @@ export function ReadingScreen({ id }: { id: string }) {
         >
           <View className="w-full gap-section" style={{ maxWidth: MEASURE * scale }}>
             <ArticleHeader id={id} title={title} article={article} />
-            {!article ? null : article.page === 'unavailable' ? (
-              <PageUnavailable article={article} />
-            ) : (
-              <>
-                {lead ? (
-                  <View testID="lead-image">
-                    <ArticleBlocks blocks={[{ type: 'image', src: lead }]} />
-                  </View>
-                ) : null}
-                <View className="gap-group">
-                  {article.page === 'extracting' ? (
-                    // Announced when it goes: the full text replaces the Subtitle as soon as it's read.
-                    <AppText variant="label" className="text-text-muted" accessibilityLiveRegion="polite">
-                      Bringing in the full Article from its page…
-                    </AppText>
-                  ) : null}
-                  <ArticleBlocks blocks={article.blocks} link={article.link} />
-                </View>
-                {article.link ? <ArticleEnd link={article.link} /> : null}
-              </>
-            )}
+            {article ? <ArticleBody article={article} /> : null}
           </View>
         </ScrollView>
         {article ? (
