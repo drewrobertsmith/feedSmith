@@ -88,7 +88,10 @@ export type WorldSpec = {
     | 'unextracted'
     | 'unextracted-no-image'
     | 'missing'
-    | 'loading';
+    | 'loading'
+    | 'removed-feed';
+  /** The Article the Reading view opens is Saved (FEE-30). */
+  articleSaved?: true;
 };
 
 /** What a world's fake Feeds were asked to do. */
@@ -175,6 +178,8 @@ const READING_FIXTURES = {
   extracting: FIXTURE_EXTRACTING_ARTICLE,
   unextracted: FIXTURE_UNEXTRACTED_ARTICLE,
   'unextracted-no-image': { ...FIXTURE_UNEXTRACTED_ARTICLE, imageUrl: undefined },
+  // Saved, then its Feed removed: it keeps the Feed's name, with no Feed to link to (T23).
+  'removed-feed': { ...FIXTURE_ARTICLE, feedId: undefined, feedTitle: 'Morning Brief' },
 } as const;
 
 /** A world's Feeds and Articles: fixture data, and a log of what it's asked. */
@@ -200,7 +205,7 @@ export function worldFeeds(
   // Saved has Articles when the world has Feeds, unless it says otherwise.
   const savedSpec = spec.saved ?? (feeds === 'some' || feeds === 'read' ? 'some' : 'none');
   const store = savedStore(
-    savedSpec === 'some' ? FIXTURE_SAVED_ROWS.map((row) => row.id) : [],
+    [...(spec.articleSaved ? [FIXTURE_ROWS[0].id] : []), ...(savedSpec === 'some' ? FIXTURE_SAVED_ROWS.map((row) => row.id) : [])],
     universe.filter((row) => feeds === 'read' || row.read).map((row) => row.id),
   );
   const useStore = () => useSyncExternalStore(store.subscribe, store.get);

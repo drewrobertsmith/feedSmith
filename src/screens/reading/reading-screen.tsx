@@ -1,16 +1,21 @@
 import { router } from 'expo-router';
-import { useEffect, useEffectEvent } from 'react';
+import { SymbolView } from 'expo-symbols';
+import { useEffect, useEffectEvent, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
+import Animated, { cubicBezier } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/app-button';
 import { AppText } from '@/components/app-text';
-import { useSizeScale } from '@/environment';
+import { UndoToastHost } from '@/components/undo-toast';
+import { useEnvironment, useSizeScale } from '@/environment';
 import { useArticle, useMarkRead, type Block, type ReadingArticle } from '@/feeds/feeds-data';
 import { byline, publishedDate } from '@/feeds/format';
 import { openLink } from '@/feeds/open-link';
+import { useSaveAndDone } from '@/feeds/use-save-and-done';
 import { ArticleBlocks } from '@/screens/reading/article-blocks';
 import { spacing } from '@/theme/spacing';
+import { themes } from '@/theme/tokens';
 
 /** When the link names no Article of this User's, or one that's gone. */
 export function ArticleMissing() {
@@ -49,8 +54,63 @@ function PageUnavailable({ article }: { article: ReadingArticle }) {
 
 /** About 34em of reading text: the column stops widening on wide screens (D6). */
 const MEASURE = 680;
-/** Room kept under every Article, the fallback too, for Save and Done (FEE-30). */
+/** Room kept under every Article, the fallback too, so its end clears Save and Done (FEE-30). */
 const SAVE_AND_DONE_ROOM = spacing.section * 3;
+/** Save and Done's height at the default type size: a 48 dp touch target. */
+const PILL_HEIGHT = 48;
+const PILL_ICON = 20;
+/** Press feedback: a near-imperceptible squeeze, quick enough for something tapped often. */
+const PRESS = { transitionProperty: 'transform', transitionDuration: 120, transitionTimingFunction: cubicBezier(0.23, 1, 0.32, 1) } as const;
+
+const leave = () => (router.canGoBack() ? router.back() : router.replace('/'));
+
+/**
+ * Save, or Done once Saved (P11, P13): one quiet pill at the foot of the page, in thumb's reach
+ * however far you've read, so Done is there when the Article ends. Its bookmark fills in Gold once
+ * Saved (D5). Done means finished, so it goes back to the list, where Undo waits (Q35). The page
+ * itself never moves (D7).
+ */
+function SaveOrDone({ id, saved }: { id: string; saved: boolean }) {
+  const insets = useSafeAreaInsets();
+  const scale = useSizeScale();
+  const { colorScheme, reduceMotion } = useEnvironment();
+  const theme = themes[colorScheme];
+  const saveOrDone = useSaveAndDone();
+  const [pressed, setPressed] = useState(false);
+  const label = saved ? 'Done' : 'Save';
+  const press = () => {
+    saveOrDone(id, saved ? 'done' : 'save');
+    if (saved) leave();
+  };
+  return (
+    <View pointerEvents="box-none" className="absolute right-0 px-edge" style={{ bottom: insets.bottom + spacing.group }}>
+      <Pressable
+        role="button"
+        aria-label={label}
+        onPress={press}
+        onPressIn={() => setPressed(true)}
+        onPressOut={() => setPressed(false)}
+        hitSlop={spacing.related}
+      >
+        <Animated.View
+          style={[{ minHeight: PILL_HEIGHT * scale, transform: [{ scale: pressed && !reduceMotion ? 0.97 : 1 }] }, PRESS]}
+          className="flex-row items-center gap-related rounded-full border border-text-muted bg-background px-group"
+        >
+          <SymbolView
+            testID="save-icon"
+            name={saved ? { ios: 'bookmark.fill', android: 'bookmark' } : { ios: 'bookmark', android: 'bookmark_border' }}
+            size={PILL_ICON * scale}
+            tintColor={saved ? theme.accent : theme.text}
+            accessible={false}
+          />
+          <AppText variant="action" className="text-text" accessible={false}>
+            {label}
+          </AppText>
+        </Animated.View>
+      </Pressable>
+    </View>
+  );
+}
 
 const textOf = (block: Block | undefined) =>
   block?.type === 'paragraph'
@@ -81,21 +141,27 @@ function ArticleHeader({ article }: { article: ReadingArticle }) {
         </AppText>
       ) : null}
       <View className="flex-row items-baseline gap-related pt-inside">
-        {/* A breadcrumb to the Feed (FEE-47): back to Feeds with its chip chosen. */}
-        <Pressable
-          role="link"
-          aria-label={`${feedTitle}, open its Articles`}
-          onPress={() => router.dismissTo({ pathname: '/', params: { feed: feedId } })}
-          hitSlop={spacing.related}
-          className="shrink flex-row items-baseline gap-inside"
-        >
-          <AppText variant="label" className="shrink text-text-muted" numberOfLines={1} accessible={false}>
+        {/* A breadcrumb to the Feed (FEE-47): back to Feeds with its chip chosen. A removed Feed's name stays, unlinked (T23). */}
+        {feedId ? (
+          <Pressable
+            role="link"
+            aria-label={`${feedTitle}, open its Articles`}
+            onPress={() => router.dismissTo({ pathname: '/', params: { feed: feedId } })}
+            hitSlop={spacing.related}
+            className="shrink flex-row items-baseline gap-inside"
+          >
+            <AppText variant="label" className="shrink text-text-muted" numberOfLines={1} accessible={false}>
+              {feedTitle}
+            </AppText>
+            <AppText variant="label" className="text-text-muted" accessible={false}>
+              ›
+            </AppText>
+          </Pressable>
+        ) : (
+          <AppText variant="label" className="shrink text-text-muted" numberOfLines={1}>
             {feedTitle}
           </AppText>
-          <AppText variant="label" className="text-text-muted" accessible={false}>
-            ›
-          </AppText>
-        </Pressable>
+        )}
         <AppText variant="label" className="text-text-muted">
           {publishedDate(publishedAt)}
         </AppText>
@@ -181,6 +247,9 @@ export function ReadingScreen({ id }: { id: string }) {
           )}
         </View>
       </ScrollView>
+      <SaveOrDone id={id} saved={article.saved} />
+      {/* The Undo note sits above Save and Done, never over them. */}
+      <UndoToastHost bottom={insets.bottom + spacing.group + PILL_HEIGHT * scale} />
       {/* Edge-to-edge (Q18): the text scrolls behind the status bar, and this still strip keeps its icons legible. */}
       <View
         testID="status-bar-backing"

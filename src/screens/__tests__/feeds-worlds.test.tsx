@@ -601,6 +601,8 @@ describe('the Reading view', () => {
     leadImage: boolean;
     /** The Feed name, a link to that Feed (FEE-47); null when there's no Article. */
     feed: string | null;
+    /** The floating Save or Done (FEE-30); null when there's no Article. */
+    pill: 'Save' | 'Done' | null;
   };
   const ARTICLE = FIXTURE_ARTICLE.title;
   const CALM = FIXTURE_EXTRACTING_ARTICLE.title;
@@ -622,10 +624,10 @@ describe('the Reading view', () => {
     byline: null,
   } as const;
   const SHOWS: Record<ReadingWorldId, Shows> = {
-    'reading-dark': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'dark', feed: 'The Verge' },
-    'reading-light': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'light', feed: 'The Verge' },
-    'reading-no-lead-image': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'dark', feed: 'The Verge' },
-    'reading-long-feed-name': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'light', feed: 'The Verge - Full RSS for subscribers | The Verge' },
+    'reading-dark': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'dark', feed: 'The Verge', pill: 'Save' },
+    'reading-light': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'light', feed: 'The Verge', pill: 'Save' },
+    'reading-no-lead-image': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'dark', feed: 'The Verge', pill: 'Save' },
+    'reading-long-feed-name': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'light', feed: 'The Verge - Full RSS for subscribers | The Verge', pill: 'Save' },
     'reading-several-authors': {
       ...full,
       heading: ARTICLE,
@@ -633,17 +635,49 @@ describe('the Reading view', () => {
       byline: 'By Terrence O’Brien, Emma Roth and 2 others',
       theme: 'dark',
       feed: 'The Verge',
+      pill: 'Save',
     },
-    'reading-no-author': { ...full, heading: ARTICLE, body: 'Talks resume next year.', byline: null, theme: 'light', feed: 'The Verge' },
-    'reading-omitted': { ...full, heading: ARTICLE, body: 'And how the prices compare:', omittedLines: 2, theme: 'dark', feed: 'The Verge' },
-    'reading-missing': { ...full, heading: MISSING, body: null, titleSize: 24, openButton: false, byline: null, theme: 'dark', feed: null },
-    'reading-extracting': { ...full, heading: CALM, body: SUBTITLE, note: BRINGING, byline: null, theme: 'dark', feed: 'Calm Notes' },
-    'reading-unextracted': { ...fallback, theme: 'dark', feed: 'Calm Notes' },
-    'reading-unextracted-no-image': { ...fallback, leadImage: false, theme: 'dark', feed: 'Calm Notes' },
-    'reading-unextracted-light': { ...fallback, theme: 'light', feed: 'Calm Notes' },
-    'reading-unextracted-largest-font': { ...fallback, titleSize: 60, theme: 'dark', feed: 'Calm Notes' },
-    'reading-largest-font': { ...full, heading: ARTICLE, body: 'Talks resume next year.', titleSize: 60, theme: 'dark', feed: 'The Verge' },
+    'reading-no-author': { ...full, heading: ARTICLE, body: 'Talks resume next year.', byline: null, theme: 'light', feed: 'The Verge', pill: 'Save' },
+    'reading-omitted': { ...full, heading: ARTICLE, body: 'And how the prices compare:', omittedLines: 2, theme: 'dark', feed: 'The Verge', pill: 'Save' },
+    'reading-missing': { ...full, heading: MISSING, body: null, titleSize: 24, openButton: false, byline: null, theme: 'dark', feed: null, pill: null },
+    'reading-extracting': { ...full, heading: CALM, body: SUBTITLE, note: BRINGING, byline: null, theme: 'dark', feed: 'Calm Notes', pill: 'Save' },
+    'reading-unextracted': { ...fallback, theme: 'dark', feed: 'Calm Notes', pill: 'Save' },
+    'reading-unextracted-no-image': { ...fallback, leadImage: false, theme: 'dark', feed: 'Calm Notes', pill: 'Save' },
+    'reading-unextracted-light': { ...fallback, theme: 'light', feed: 'Calm Notes', pill: 'Save' },
+    'reading-unextracted-largest-font': { ...fallback, titleSize: 60, theme: 'dark', feed: 'Calm Notes', pill: 'Save' },
+    'reading-largest-font': { ...full, heading: ARTICLE, body: 'Talks resume next year.', titleSize: 60, theme: 'dark', feed: 'The Verge', pill: 'Save' },
+    'reading-saved': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'dark', feed: 'The Verge', pill: 'Done' },
+    'reading-saved-light': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'light', feed: 'The Verge', pill: 'Done' },
+    // Its Feed is gone: the name stays, as plain text, with nowhere to link (T23).
+    'reading-removed-feed': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'dark', feed: null, pill: 'Done' },
   };
+
+  describe('Save and Done (FEE-30)', () => {
+    test('Save keeps it, with a haptic, says so, and offers Done in its place (Q3, Q35)', async () => {
+      const w = await open({ colorScheme: 'dark', section: 'article' });
+      await userEvent.press(await screen.findByRole('button', { name: 'Save' }));
+      expect(w.feedsLog.saves).toEqual([FIXTURE_ROWS[0].id]);
+      expect(Haptics.performAndroidHapticsAsync).toHaveBeenCalledWith(Haptics.AndroidHaptics.Confirm);
+      expect(await screen.findByRole('button', { name: 'Done' })).toBeOnTheScreen();
+      expect(within(await screen.findByTestId('undo-toast')).getByText('Saved.')).toBeOnTheScreen();
+    });
+
+    test('Done finishes it: back to the list, with Undo there (P8, Q35)', async () => {
+      const w = await open({ colorScheme: 'dark', feeds: 'some', articleSaved: true }, '/');
+      await userEvent.press(await screen.findByRole('link', { name: new RegExp(`^${FIXTURE_ROWS[0].title.slice(0, 20)}`) }));
+      await userEvent.press(await screen.findByRole('button', { name: 'Done' }));
+      expect(w.feedsLog.dones).toEqual([FIXTURE_ROWS[0].id]);
+      expect(await screen.findByRole('heading', { name: 'Feeds' })).toBeOnTheScreen();
+      expect(screen).toHavePathname('/');
+      expect(within(await screen.findByTestId('undo-toast')).getByText('Marked Done.')).toBeOnTheScreen();
+    });
+
+    test("an Article whose Feed was removed names it, but can't link to it (T23)", async () => {
+      await open({ colorScheme: 'dark', section: 'article', article: 'removed-feed', articleSaved: true });
+      expect(await screen.findByText('Morning Brief')).toBeOnTheScreen();
+      expect(screen.queryByRole('link', { name: /open its Articles$/ })).not.toBeOnTheScreen();
+    });
+  });
 
   test.each(READING_WORLDS)('$label', async ({ id, spec }) => {
     const shows = SHOWS[id];
@@ -656,6 +690,9 @@ describe('the Reading view', () => {
     expect(screen.queryAllByRole('button', { name: 'Open original' })).toHaveLength(shows.openButton ? 1 : 0);
     if (shows.feed) expect(screen.getByRole('link', { name: `${shows.feed}, open its Articles` })).toBeOnTheScreen();
     else expect(screen.queryByRole('link', { name: /open its Articles$/ })).not.toBeOnTheScreen();
+    expect(screen.queryAllByRole('button', { name: /^(Save|Done)$/ }).map((b) => b.props.accessibilityLabel)).toEqual(
+      shows.pill ? [shows.pill] : [],
+    );
     if (shows.byline) expect(screen.getByText(shows.byline)).toBeOnTheScreen();
     else expect(screen.queryByText(/^By /)).not.toBeOnTheScreen();
     // The fallback draws only the lead image, when there is one.

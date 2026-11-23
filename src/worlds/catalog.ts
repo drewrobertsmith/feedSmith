@@ -113,6 +113,17 @@ export const READING_WORLDS = [
     label: 'Reading, largest font size',
     spec: { colorScheme: 'dark', section: 'article', fontScale: 2 },
   },
+  { id: 'reading-saved', label: 'Reading a Saved Article', spec: { colorScheme: 'dark', section: 'article', articleSaved: true } },
+  {
+    id: 'reading-saved-light',
+    label: 'Reading a Saved Article, light',
+    spec: { colorScheme: 'light', section: 'article', articleSaved: true },
+  },
+  {
+    id: 'reading-removed-feed',
+    label: 'Saved, its Feed removed',
+    spec: { colorScheme: 'dark', section: 'article', article: 'removed-feed', articleSaved: true },
+  },
 ] as const satisfies readonly CatalogWorld[];
 
 export type ReadingWorldId = (typeof READING_WORLDS)[number]['id'];
