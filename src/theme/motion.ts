@@ -15,4 +15,9 @@ export const motion = {
    * curve, so they follow the finger without wobble. `easing` is a cubic-bezier's control points.
    */
   rowMakeRoom: { duration: 250, easing: [0.16, 1, 0.3, 1] },
+  /**
+   * Choosing another chip slides the list's rows in from that side, a short way and a little
+   * faded, on the fast-start, gentle-settle curve (FEE-42). The header stays still.
+   */
+  chipSwitch: { distance: 24, duration: 200, fadeFrom: 0.6, easing: [0.16, 1, 0.3, 1] },
 } as const;

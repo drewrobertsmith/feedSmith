@@ -12,6 +12,7 @@ import { useEnvironment } from '@/environment';
 import { useAll, useChips, useRefresh, type ArticleRow } from '@/feeds/feeds-data';
 import { byline, publishedAgo } from '@/feeds/format';
 import { ChipRow } from '@/screens/chip-row';
+import { ChipSwitch, SlideRow } from '@/components/chip-switch';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
 
@@ -26,11 +27,18 @@ const FAVICON = 16;
 /** A row's usual height, for the list's first layout before rows measure themselves. */
 const ESTIMATED_ROW = 112;
 
-function Row({ article }: { article: ArticleRow }) {
+/**
+ * One Article in the list (P12). Its parts each have one voice (Q29): muted sans meta, the title
+ * in Literata, a full-strength sans byline, the Subtitle in small muted Literata. With one Feed
+ * chosen, its chip already names it, so `feedNamed` is off and the row leaves the name out.
+ */
+function Row({ article, feedNamed }: { article: ArticleRow; feedNamed: boolean }) {
   const { colorScheme, fontScale, now } = useEnvironment();
   const ago = publishedAgo(article.publishedAt, now());
   const credit = byline(article.authors);
-  const label = [article.title, credit, article.feedTitle, ago, article.read ? 'Read' : undefined].filter(Boolean).join(', ');
+  const label = [article.title, credit, feedNamed ? article.feedTitle : undefined, ago, article.read ? 'Read' : undefined]
+    .filter(Boolean)
+    .join(', ');
   const thumbnail = THUMBNAIL * fontScale;
 
   return (
@@ -51,9 +59,11 @@ function Row({ article }: { article: ArticleRow }) {
             size={FAVICON}
             testID="row-favicon"
           />
-          <AppText variant="label" className="shrink text-text-muted" numberOfLines={1}>
-            {article.feedTitle}
-          </AppText>
+          {feedNamed ? (
+            <AppText testID="row-feed-name" variant="label" className="shrink text-text-muted" numberOfLines={1}>
+              {article.feedTitle}
+            </AppText>
+          ) : null}
           <AppText variant="label" className="text-text-muted">
             {ago}
           </AppText>
@@ -63,12 +73,12 @@ function Row({ article }: { article: ArticleRow }) {
         </AppText>
         {/* Who wrote it, where you decide whether to open it (FEE-41). */}
         {credit ? (
-          <AppText variant="label" className="text-text-muted" numberOfLines={1}>
+          <AppText variant="label" className={article.read ? 'text-text-muted' : 'text-text'} numberOfLines={1}>
             {credit}
           </AppText>
         ) : null}
         {article.subtitle ? (
-          <AppText variant="label" className="text-text-muted" numberOfLines={2}>
+          <AppText variant="summary" className="text-text-muted" numberOfLines={2}>
             {article.subtitle}
           </AppText>
         ) : null}
@@ -143,27 +153,36 @@ export function FeedsScreen({ feed }: { feed?: string }) {
     );
   }
 
+  // The chosen chip's place in the row: All is 0, then each chip in order.
+  const chipIndex = selectedChip ? chips.indexOf(selectedChip) + 1 : 0;
+
   return (
-    <LegendList
-      testID="all-list"
-      data={all.status === 'ready' ? all.articles : []}
-      keyExtractor={(article) => article.id}
-      renderItem={({ item }) => <Row article={item} />}
-      estimatedItemSize={ESTIMATED_ROW}
-      // Rows hold small state (a favicon that failed): a reused row must start fresh.
-      recycleItems={false}
-      ListHeaderComponent={header}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={refresh}
-          progressViewOffset={insets.top}
-          colors={[theme.accent]}
-          progressBackgroundColor={theme.surface}
-        />
-      }
-      className="flex-1 bg-background"
-      contentContainerStyle={{ paddingBottom: insets.bottom + spacing.section }}
-    />
+    <ChipSwitch index={chipIndex}>
+      <LegendList
+        testID="all-list"
+        data={all.status === 'ready' ? all.articles : []}
+        keyExtractor={(article) => article.id}
+        renderItem={({ item }) => (
+          <SlideRow>
+            <Row article={item} feedNamed={!selectedChip} />
+          </SlideRow>
+        )}
+        estimatedItemSize={ESTIMATED_ROW}
+        // Rows hold small state (a favicon that failed): a reused row must start fresh.
+        recycleItems={false}
+        ListHeaderComponent={header}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={refresh}
+            progressViewOffset={insets.top}
+            colors={[theme.accent]}
+            progressBackgroundColor={theme.surface}
+          />
+        }
+        className="flex-1 bg-background"
+        contentContainerStyle={{ paddingBottom: insets.bottom + spacing.section }}
+      />
+    </ChipSwitch>
   );
 }
