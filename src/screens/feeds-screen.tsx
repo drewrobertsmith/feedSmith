@@ -11,6 +11,7 @@ import { FeedIcon } from '@/components/feed-icon';
 import { useEnvironment } from '@/environment';
 import { useAll, useChips, useRefresh, type ArticleRow } from '@/feeds/feeds-data';
 import { byline, publishedAgo } from '@/feeds/format';
+import { useShownRows } from '@/feeds/use-shown-rows';
 import { ChipRow } from '@/screens/chip-row';
 import { ChipSwitch, SlideRow } from '@/components/chip-switch';
 import { spacing } from '@/theme/spacing';
@@ -110,6 +111,10 @@ export function FeedsScreen({ feed }: { feed?: string }) {
   const chips = chipsView.status === 'ready' ? chipsView.chips : [];
   const selectedChip = chips.find((chip) => chip.id === feed) ?? null;
   const all = useAll(selectedChip?.id ?? null);
+  // The chosen chip's place in the row: All is 0, then each chip in order.
+  const chipIndex = selectedChip ? chips.indexOf(selectedChip) + 1 : 0;
+  // What the list shows: the last ready rows while a newly chosen Feed's load (FEE-42).
+  const shown = useShownRows(all, chipIndex);
   const { refreshing, refresh } = useRefresh();
   const { colorScheme } = useEnvironment();
   const theme = themes[colorScheme];
@@ -153,18 +158,15 @@ export function FeedsScreen({ feed }: { feed?: string }) {
     );
   }
 
-  // The chosen chip's place in the row: All is 0, then each chip in order.
-  const chipIndex = selectedChip ? chips.indexOf(selectedChip) + 1 : 0;
-
   return (
-    <ChipSwitch index={chipIndex}>
+    <ChipSwitch index={shown.index}>
       <LegendList
         testID="all-list"
-        data={all.status === 'ready' ? all.articles : []}
+        data={shown.articles}
         keyExtractor={(article) => article.id}
         renderItem={({ item }) => (
           <SlideRow>
-            <Row article={item} feedNamed={!selectedChip} />
+            <Row article={item} feedNamed={shown.index === 0} />
           </SlideRow>
         )}
         estimatedItemSize={ESTIMATED_ROW}
