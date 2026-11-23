@@ -49,3 +49,6 @@ example
 .agents/
 .claude/skills/
 skills-lock.json
+
+# visual check captures and differences (FEE-70); approved pictures live in test/visual/approved
+.visual-check/

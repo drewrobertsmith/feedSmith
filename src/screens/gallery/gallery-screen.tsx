@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { LogBox, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/app-text';
@@ -55,14 +55,31 @@ function WorldPreview({ entry, world, theme }: { entry: GalleryEntry; world: Cat
   );
 }
 
+/** A world alone, filling the screen, for the visual check (FEE-70): no dev warnings drawn over it. */
+function Capture({ children }: { children: ReactNode }) {
+  useEffect(() => {
+    LogBox.ignoreAllLogs(true);
+    return () => LogBox.ignoreAllLogs(false);
+  }, []);
+  return <View className="flex-1 bg-background">{children}</View>;
+}
+
 /** Dev-only (T13): the real screens, once per world, to walk a ticket's state table. */
 export function GalleryScreen() {
   const insets = useSafeAreaInsets();
   // The link is the single source of truth, so `feedsmith://gallery?world=…&theme=…`
-  // switches an open gallery too.
-  const params = useLocalSearchParams<{ world?: string; theme?: ThemeName }>();
+  // switches an open gallery too. `capture=1` shows the world alone, filling the screen, for the visual check (FEE-70).
+  const params = useLocalSearchParams<{ world?: string; theme?: ThemeName; capture?: string }>();
   const selected = ALL.find(({ world }) => world.id === params.world) ?? ALL[0];
   const theme = params.theme ?? selected.world.spec.colorScheme;
+
+  if (params.capture === '1') {
+    return (
+      <Capture>
+        <WorldPreview key={`${selected.world.id}-${theme}`} entry={selected.entry} world={selected.world} theme={theme} />
+      </Capture>
+    );
+  }
 
   return (
     <ScrollView className="flex-1 bg-background">

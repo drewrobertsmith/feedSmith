@@ -10,6 +10,8 @@ import AuthReturnRoute from '@/app/auth';
 import GalleryRoute from '@/app/gallery';
 import SignInRoute from '@/app/sign-in';
 import { AppRoot } from '@/navigation/app-root';
+import { GALLERY } from '@/screens/gallery/registry';
+import * as catalog from '@/worlds/catalog';
 import { worldAuth, worldFeeds } from '@/worlds/world';
 
 const routes = {
@@ -84,4 +86,21 @@ test('an Account world with the sheet open shows it at once (FEE-35)', async () 
   expect(await screen.findByRole('heading', { name: 'State gallery' })).toBeOnTheScreen();
   expect(screen.getByTestId('account-sheet')).toBeOnTheScreen();
   expect(screen.getByRole('button', { name: 'Sign out' })).toBeOnTheScreen();
+});
+
+test('capture mode shows only the world, filling the screen, for the visual check (FEE-70)', async () => {
+  await renderRouter(routes, { initialUrl: '/gallery?world=dark-saved&theme=light&capture=1' });
+
+  expect(await screen.findByRole('heading', { name: 'Saved' })).toBeOnTheScreen();
+  expect(screen.queryByRole('heading', { name: 'State gallery' })).not.toBeOnTheScreen();
+  expect(screen.queryByRole('radiogroup', { name: 'Theme' })).not.toBeOnTheScreen();
+  expect(Uniwind.currentTheme).toBe('light');
+});
+
+test('every world in the catalog is in the gallery, once, so the visual check walks them all', () => {
+  const inCatalog = Object.values(catalog).flatMap((worlds) => worlds.map((world) => world.id));
+  const inGallery = GALLERY.flatMap((entry) => entry.worlds.map((world) => world.id));
+
+  expect(inGallery.toSorted()).toEqual(inCatalog.toSorted());
+  expect(new Set(inGallery).size).toBe(inGallery.length);
 });
