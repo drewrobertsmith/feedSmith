@@ -1,7 +1,7 @@
 import { act, render, screen } from '@testing-library/react-native';
-import { AccessibilityInfo, Text } from 'react-native';
+import { AccessibilityInfo, AppState, Text } from 'react-native';
 
-import { EnvironmentProvider, useEnvironment } from '@/environment';
+import { EnvironmentProvider, useEnvironment, useMinuteClock } from '@/environment';
 
 function Probe() {
   const { reduceMotion, colorScheme, fontScale } = useEnvironment();
@@ -61,4 +61,71 @@ test('a given environment replaces the phone', async () => {
 
   expect(await screen.findByText('motion:reduced scheme:light scale:2')).toBeOnTheScreen();
   jest.restoreAllMocks();
+});
+
+describe('the minute clock (FEE-47)', () => {
+  let emitAppState: (state: string) => void;
+  const remove = jest.fn();
+  let time = 0;
+
+  function Clock() {
+    return <Text>{`t:${useMinuteClock()}`}</Text>;
+  }
+  const environment = { colorScheme: 'dark' as const, reduceMotion: false, fontScale: 1, now: () => time };
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    time = 0;
+    remove.mockClear();
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((_event, handler) => {
+      emitAppState = handler as (state: string) => void;
+      return { remove } as never;
+    });
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  test('reads the clock again each minute, so "5 min ago" keeps up', async () => {
+    await render(
+      <EnvironmentProvider environment={environment}>
+        <Clock />
+      </EnvironmentProvider>,
+    );
+    expect(screen.getByText('t:0')).toBeOnTheScreen();
+    time = 60_000;
+    await act(async () => jest.advanceTimersByTime(60_000));
+    expect(screen.getByText('t:60000')).toBeOnTheScreen();
+  });
+
+  test('stops in the background and reads afresh on return (Q21)', async () => {
+    await render(
+      <EnvironmentProvider environment={environment}>
+        <Clock />
+      </EnvironmentProvider>,
+    );
+    await act(async () => emitAppState('background'));
+    // Minutes pass in the background: nothing reads the clock.
+    time = 5 * 60_000;
+    await act(async () => jest.advanceTimersByTime(5 * 60_000));
+    expect(screen.getByText('t:0')).toBeOnTheScreen();
+    await act(async () => emitAppState('active'));
+    expect(screen.getByText('t:300000')).toBeOnTheScreen();
+  });
+
+  test('leaves no timer or listener behind when it goes (Q20)', async () => {
+    const { unmount } = await render(
+      <EnvironmentProvider environment={environment}>
+        <Clock />
+      </EnvironmentProvider>,
+    );
+    const cleared = jest.spyOn(globalThis, 'clearInterval');
+    await act(async () => unmount());
+    expect(cleared).toHaveBeenCalled();
+    expect(remove).toHaveBeenCalled();
+    // Nothing reads the clock after it's gone.
+    time = 60_000;
+    await act(async () => jest.advanceTimersByTime(60_000));
+  });
 });

@@ -1,5 +1,5 @@
 import { createContext, use, useEffect, useState, type ReactNode } from 'react';
-import { AccessibilityInfo, useColorScheme, useWindowDimensions } from 'react-native';
+import { AccessibilityInfo, AppState, useColorScheme, useWindowDimensions } from 'react-native';
 
 import { MotionConfig } from '@/environment/motion-config';
 import type { ThemeName } from '@/theme/tokens';
@@ -32,6 +32,36 @@ export function useSizeScale(): number {
   const { fontScale } = useEnvironment();
   const { fontScale: system } = useWindowDimensions();
   return fontScale * system;
+}
+
+const MINUTE = 60_000;
+
+/**
+ * The environment's clock, read again each minute while the app is in front, so "5 min ago"
+ * keeps up (FEE-47). In the background it stops: nothing runs on the JS thread there (Q21), and
+ * it reads the clock afresh on return. Its timer and listener are removed on unmount (Q20).
+ */
+export function useMinuteClock(): number {
+  const { now } = useEnvironment();
+  const [time, setTime] = useState(now);
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval> | undefined;
+    const start = () => {
+      setTime(now());
+      timer ??= setInterval(() => setTime(now()), MINUTE);
+    };
+    const stop = () => {
+      if (timer !== undefined) clearInterval(timer);
+      timer = undefined;
+    };
+    if (AppState.currentState !== 'background') start();
+    const subscription = AppState.addEventListener('change', (state) => (state === 'active' ? start() : stop()));
+    return () => {
+      stop();
+      subscription.remove();
+    };
+  }, [now]);
+  return time;
 }
 
 function useSystemReduceMotion(): boolean {

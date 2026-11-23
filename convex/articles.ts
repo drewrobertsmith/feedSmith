@@ -105,6 +105,8 @@ export const get = query({
     v.null(),
     v.object({
       title: v.string(),
+      /** Its Feed, so the Reading view's Feed name links to it (FEE-47). */
+      feedId: v.id('feeds'),
       feedTitle: v.string(),
       publishedAt: v.number(),
       link: v.optional(v.string()),
@@ -133,6 +135,7 @@ export const get = query({
     const page = pageOf(article.extraction);
     return {
       title: article.title,
+      feedId: feed._id,
       feedTitle: feed.title,
       publishedAt: article.publishedAt,
       link: article.link,

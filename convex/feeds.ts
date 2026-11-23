@@ -135,6 +135,26 @@ export const followed = internalQuery({
   },
 });
 
+/**
+ * When All was last brought up to date: the newest fetch across the signed-in User's Feeds, for
+ * the "Updated 5 min ago" line under the Feeds title (FEE-47). Null with no Feeds, or none
+ * fetched yet. It reads the schedules, so it re-runs on each check, and only it does (FEE-54).
+ */
+export const lastUpdated = query({
+  args: {},
+  returns: v.union(v.null(), v.number()),
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
+    const schedules = await ctx.db
+      .query('feedSchedules')
+      .withIndex('by_user', (q) => q.eq('userId', userId))
+      .take(CHIP_LIMIT);
+    const fetched = schedules.map((schedule) => schedule.lastFetchedAt ?? 0);
+    const newest = Math.max(0, ...fetched);
+    return newest > 0 ? newest : null;
+  },
+});
+
 /** A User's Feeds that weren't fetched in the last couple of minutes. */
 export const toRefresh = internalQuery({
   args: { userId: v.id('users'), now: v.number() },
