@@ -1,6 +1,6 @@
 # Quality bar
 
-What this app must never get wrong. `/expo-dev-loop:feature` plans, reviews and verifies every change against the items that apply to it; `/expo-dev-loop:pre-release` walks all of them. Built and revised with `/expo-dev-loop:quality-bar`. UI items Q29–Q34 come from `docs/design-references/todoist.md`, the worked reference for structure and behaviour (D16).
+What this app must never get wrong. `/expo-dev-loop:feature` plans, reviews and verifies every change against the items that apply to it; `/expo-dev-loop:pre-release` walks all of them. Built and revised with `/expo-dev-loop:quality-bar`. UI items Q29–Q35 come from `docs/design-references/todoist.md`, the worked reference for structure and behaviour (D16).
 
 **The app:** feedSmith is read by its one owner on an Android phone (a Pixel 10 on Android 17), one-handed, often in the evening or in transit. Sessions are studied reading, from a few minutes to half an hour.
 
@@ -42,6 +42,7 @@ What this app must never get wrong. `/expo-dev-loop:feature` plans, reviews and 
 | Q32 | Actions on a screen live in a menu, grouped by kind, with destructive ones last behind a divider. Quick or passing tasks (rename, detail, options, confirm) are bottom sheets over the current screen; places you stay are full screens. Removing anything asks first. | One rule for every surface keeps you oriented, and nothing is lost by a slip (reference §2). | UI | Review against the reference; a screen test that every remove asks first (as Manage Feeds' does). |
 | Q33 | A settings or options row shows its current value; a toggle's subtitle describes its current effect; a choice between looks or layouts is shown as pictures. | You can read the state without opening anything (reference §3–4). Applies once feedSmith has settings or options. | UI | Screen test on each settings or options screen. |
 | Q34 | Reordering always uses one drag handle, on the right, with TalkBack Move up and Move down actions (D13). No screen is ever blank: an empty or zero state offers something useful, a way to add or what you recently viewed or searched. | Predictability: one gesture with one look, and never a dead end (reference §5, §7). | UI | Screen tests of each reorderable list's handle and TalkBack actions; the gallery's empty worlds walked in Verify. |
+| Q35 | An action you can reverse (Pin, Unpin, Save, Done, Mark Read) happens at once and offers Undo for a few seconds; only an action you can't reverse (removing a Feed, deleting an Account) asks first. The Undo is announced to TalkBack and reachable without the gesture. | Asking before every small action is friction; acting at once with Undo is faster and just as safe (`docs/design-references/todoist.md`). Sharpens Q32. | UI | Screen tests that each reversible action shows Undo and that Undo restores the state; the Q32 tests that removing still asks first. |
 
 ## Budgets
 
