@@ -20,3 +20,15 @@ test.each(sourceFiles(SRC).filter((f) => !f.startsWith(join(SRC, 'theme'))).map(
     expect(text).not.toMatch(/roboto/i);
   },
 );
+
+// Q19 (FEE-74): depth comes only from the theme's levels, so no control invents its own shadow or highlight.
+test.each(sourceFiles(SRC).filter((f) => !f.startsWith(join(SRC, 'theme'))).map((f) => relative(SRC, f)))(
+  '%s makes no shadow or elevation of its own',
+  (file) => {
+    const text = readFileSync(join(SRC, file), 'utf8');
+    // As a style key, a JSX prop or an assignment.
+    expect(text).not.toMatch(/\b(boxShadow|shadowColor|shadowOpacity|shadowRadius|shadowOffset|textShadow\w*|elevation)\s*[:=]/);
+    // As a Tailwind class: shadow, shadow-md, shadow-[…], drop-shadow…, inside a className.
+    expect(text).not.toMatch(/className=[{'"`][^\n]*\b(drop-)?shadow(\b(?!-)|-\[|-(2xs|xs|sm|md|lg|xl|2xl|inner)\b)/);
+  },
+);

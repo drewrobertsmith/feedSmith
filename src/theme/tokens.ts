@@ -1,9 +1,12 @@
 /**
  * feedSmith's colour tokens (D2–D5). The single source for every colour in the app:
- * `src/global.css` mirrors these as Uniwind themes, and a test keeps the two in step.
+ * `src/global.css` mirrors the themes' roles as Uniwind themes, and a test keeps the two in step.
+ * Palette colours used only through the theme's own modules (the depth faces, D27) aren't mirrored.
  */
 export const palette = {
   midnight: '#1D2532',
+  /** Between Midnight and Navy: the face of a soft control on Midnight (FEE-74). */
+  dusk: '#272F40',
   navy: '#333D5F',
   forest: '#2D423E',
   sage: '#50716C',
@@ -13,6 +16,14 @@ export const palette = {
   cream: '#F3ECDD',
   creamMuted: '#B9B2A4',
   sand: '#E8DECA',
+  /** A step lighter than cream: the face of a soft control on cream (FEE-74). */
+  paper: '#F9F5EC',
+  /** Lighter still: the face of a raised control on cream. */
+  paperRaised: '#FDFBF6',
+  /** Light that falls on a face; in dark mode the light is cream. */
+  white: '#FFFFFF',
+  /** What a shadow is made of on Midnight. */
+  black: '#000000',
   slate: '#4A5468',
   /** Destroys data (D19): readable on Navy and Midnight. */
   brickLight: '#E8A08A',

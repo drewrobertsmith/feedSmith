@@ -10,6 +10,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { Uniwind } from 'uniwind';
 
 import { publishedAgo, publishedDate } from '@/feeds/format';
+import { depthStyle } from '@/theme/depth';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
 import {
@@ -188,12 +189,27 @@ describe('All', () => {
     scrollTo.mockRestore();
   });
 
-  test('unchosen chips are quieter than the chosen one: a hairline and muted text (FEE-44, Q14)', async () => {
-    await open({ colorScheme: 'dark', feeds: 'some' });
+  // FEE-74: chips are objects with depth, not outlines (D27). Each is checked as its level from the theme.
+  test.each(['dark', 'light'] as const)('in %s, the chosen chip is raised, the rest soft, and none has an outline', async (colorScheme) => {
+    await open({ colorScheme, feeds: 'some' });
     await screen.findAllByRole('tab');
-    const label = (name: string) => within(screen.getByRole('tab', { name })).getByText(name);
-    expect(label('Calm Notes')).toHaveProp('className', expect.stringContaining('text-text-muted'));
-    expect(label('All')).toHaveProp('className', expect.stringContaining('text-accent'));
+    const all = screen.getByRole('tab', { name: 'All' });
+    const calm = screen.getByRole('tab', { name: 'Calm Notes' });
+    expect(all).toHaveStyle(depthStyle(colorScheme, 'raised'));
+    expect(calm).toHaveStyle(depthStyle(colorScheme, 'soft'));
+    for (const chip of [all, calm]) expect(chip).not.toHaveStyle({ borderWidth: expect.any(Number) });
+    // Still quieter than the chosen one: muted text, with Gold only on the chosen label (D5).
+    expect(within(calm).getByText('Calm Notes')).toHaveProp('className', expect.stringContaining('text-text-muted'));
+    expect(within(all).getByText('All')).toHaveProp('className', expect.stringContaining('text-accent'));
+  });
+
+  test.each(['dark', 'light'] as const)('in %s, a chip under the finger sinks to the pressed level, and rises again when let go', async (colorScheme) => {
+    await open({ colorScheme, feeds: 'some' });
+    const calm = (await screen.findAllByRole('tab', { name: 'Calm Notes' }))[0];
+    await fireEvent(calm, 'pressIn');
+    expect(screen.getByRole('tab', { name: 'Calm Notes' })).toHaveStyle(depthStyle(colorScheme, 'pressed'));
+    await fireEvent(calm, 'pressOut');
+    expect(screen.getByRole('tab', { name: 'Calm Notes' })).toHaveStyle(depthStyle(colorScheme, 'soft'));
   });
 
   test("tapping a Feed's chip shows only its Articles; tapping All shows everything again", async () => {
@@ -665,8 +681,10 @@ describe('the Pinned group (FEE-60)', () => {
     await open({ colorScheme: 'dark', feeds: 'some', pins: 'two', feed: 'f1' });
     const pinned = await screen.findByRole('tab', { name: PINNED_CHIP });
     expect(pinned).not.toBeSelected();
-    // Full-strength text, not Gold: active, without competing with the chosen Feed.
+    // Full-strength text on a soft face, not Gold and not raised: active, without competing with the chosen Feed (D27).
     expect(within(pinned).getByText('Pinned', { includeHiddenElements: true })).toHaveProp('className', 'text-text');
+    expect(pinned).toHaveStyle(depthStyle('dark', 'soft'));
+    expect(screen.getByRole('tab', { name: 'The Verge, Pinned' })).toHaveStyle(depthStyle('dark', 'raised'));
     expect(within(screen.getByRole('tab', { name: 'The Verge, Pinned' })).getByText('The Verge', { includeHiddenElements: true })).toHaveProp(
       'className',
       'text-accent',
@@ -735,12 +753,13 @@ describe("the Pinned chip's stacked icons (FEE-61)", () => {
     expect(chip).toBeCollapsed();
   });
 
-  test('each circle is a disc ringed in the page colour, and every one after the first overlaps the one before', async () => {
+  test('each circle is a ringed disc, and every one after the first overlaps the one before', async () => {
     await open({ colorScheme: 'dark', feeds: 'some', pins: 'three' });
     const chip = await screen.findByRole('tab', { name: /^Pinned:/ });
     const rings = within(chip).getAllByTestId('pinned-stack-ring', { includeHiddenElements: true });
     expect(rings).toHaveLength(3);
-    for (const ring of rings) expect(ring).toHaveProp('className', expect.stringContaining('border-background'));
+    // Ringed in the chip's own face since FEE-74 (chip-row.test.tsx checks the colour).
+    for (const ring of rings) expect(ring).toHaveProp('className', expect.stringContaining('border-2'));
     expect(rings[0].props.className).not.toContain('-ml-');
     for (const ring of rings.slice(1)) expect(ring.props.className).toContain('-ml-inside');
   });

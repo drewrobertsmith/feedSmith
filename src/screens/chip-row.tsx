@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { createContext, use, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Pressable,
-  StyleSheet,
   View,
   type LayoutChangeEvent,
   type ScrollViewInstance,
@@ -16,6 +15,7 @@ import type { FeedChip } from '@/feeds/feeds-data';
 import { usePin } from '@/feeds/use-pin';
 import { PINNED } from '../../convex/lib/pinned';
 import { chipLabel, fadeRanges, hasPinnedView, revealOffset, transparent } from '@/screens/chip-row-layout';
+import { depth, depthStyle } from '@/theme/depth';
 import { motion } from '@/theme/motion';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
@@ -53,7 +53,10 @@ const FADE = spacing.section;
 /** Something a chip offers TalkBack besides choosing it (Q15): Pin, Unpin, Expand, Collapse. */
 type ChipAction = { name: string; label: string; run: () => void };
 
-/** One chip: a tab in the row. Chosen, it's Gold on the indicator pill (D5) and springs into place (D7). */
+/** The face colour of the chip something sits on, so what's drawn on it can ring itself in that colour. */
+const ChipFace = createContext<string | undefined>(undefined);
+
+/** One chip: a tab in the row. Chosen, it's raised with a Gold label (D5, D27) and springs into place (D7). */
 function Chip({
   label,
   accessibleName,
@@ -79,7 +82,9 @@ function Chip({
   actions?: ChipAction[];
   onLayout?: (event: LayoutChangeEvent) => void;
 }) {
-  const { reduceMotion } = useEnvironment();
+  const { reduceMotion, colorScheme } = useEnvironment();
+  const [pressed, setPressed] = useState(false);
+  const level = pressed ? 'pressed' : selected ? 'raised' : 'soft';
   const [scale] = useState(() => new Animated.Value(1));
   const wasSelected = useRef(selected);
 
@@ -109,25 +114,21 @@ function Chip({
         aria-expanded={expanded}
         onPress={onPress}
         onLongPress={onLongPress}
+        onPressIn={() => setPressed(true)}
+        onPressOut={() => setPressed(false)}
         // Long-press for touch, a named action for TalkBack: every action reachable without the gesture (Q15).
         accessibilityActions={actions?.map(({ name, label: actionLabel }) => ({ name, label: actionLabel }))}
         onAccessibilityAction={(event) => {
           actions?.find((action) => action.name === event.nativeEvent.actionName)?.run();
         }}
-        // Chosen: Gold on the indicator pill (D5). Unchosen: quiet, a hairline and muted text (FEE-44), so the row
-        // never competes with the Articles; the hairline is the muted text colour, which keeps 3:1 (Q14).
-        // Every chip has the hairline (transparent when chosen), so choosing one never changes its size.
-        // Active (a Pinned Feed chosen): full-strength hairline and text, so the group reads as the one you're in.
-        className={
-          selected
-            ? 'flex-row items-center gap-inside rounded-full border-transparent bg-indicator px-group py-related'
-            : active
-              ? 'flex-row items-center gap-inside rounded-full border-text px-group py-related'
-              : 'flex-row items-center gap-inside rounded-full border-text-muted px-group py-related'
-        }
-        style={{ borderWidth: StyleSheet.hairlineWidth }}
+        // Every chip is an object, not an outline (FEE-74, D27): soft, the chosen one raised with its Gold label
+        // (D5), and one under the finger sinks to pressed. Unchosen labels stay muted so the row never competes with
+        // the Articles (FEE-44); the label is what identifies a chip, at 4.5:1 on every face (Q14, D26).
+        // Active (a Pinned Feed chosen): full-strength text, so the group reads as the one you're in.
+        className="flex-row items-center gap-inside rounded-full px-group py-related"
+        style={depthStyle(colorScheme, level)}
       >
-        {icon}
+        <ChipFace value={depth[colorScheme][level].face}>{icon}</ChipFace>
         <AppText
           variant="label"
           className={selected ? 'text-accent' : active ? 'text-text' : 'text-text-muted'}
@@ -149,6 +150,8 @@ function Chip({
  * every icon beside text (Q16). TalkBack hears the chip's name, which lists the Feeds, not the icons.
  */
 function PinnedStack({ chips }: { chips: FeedChip[] }) {
+  // Ringed in the chip's own face, so on it each icon reads as a separate disc (D25, FEE-74).
+  const ring = use(ChipFace);
   return (
     <View className="flex-row items-center" importantForAccessibility="no-hide-descendants">
       {chips.map((chip, i) => (
@@ -158,9 +161,10 @@ function PinnedStack({ chips }: { chips: FeedChip[] }) {
           // A surface backdrop, so a transparent logo still reads as a disc; overlapping by one inside step keeps each glyph whole.
           className={
             i === 0
-              ? 'items-center justify-center overflow-hidden rounded-full border-2 border-background bg-surface'
-              : 'items-center justify-center overflow-hidden rounded-full border-2 border-background bg-surface -ml-inside'
+              ? 'items-center justify-center overflow-hidden rounded-full border-2 bg-surface'
+              : 'items-center justify-center overflow-hidden rounded-full border-2 bg-surface -ml-inside'
           }
+          style={{ borderColor: ring }}
         >
           <FeedIcon key={chip.faviconUrl} url={chip.faviconUrl} title={chip.title} size={ICON} testID={`pinned-stack-${chip.id}`} />
         </View>
@@ -272,14 +276,16 @@ export function ChipRow({
           {/* Every chip stays mounted: the reveal needs each one measured, and a person's Feeds are tens of small pills. */}
           {/* react-doctor-disable-next-line react-doctor/rn-no-scrollview-mapped-list */}
           {shownChips.map((chip) => (
-            // The group's chips fade in from the Pinned chip, and the rest move over with them; Remove animations makes it instant (Q17).
+            // The group's chips fade in from the Pinned chip, and the rest move over with them. Remove animations (Q17)
+            // takes the animations away entirely, read from the environment like all motion here: Reanimated's own
+            // reduced-motion skip left a revealed chip's gradient face invisible on Android (FEE-74).
             // Measured here, on the chip's place in the row, so a chosen chip scrolls into view (D18).
             <Reanimated.View
               key={chip.id}
-              entering={REVEAL}
-              exiting={FOLD}
+              entering={reduceMotion ? undefined : REVEAL}
+              exiting={reduceMotion ? undefined : FOLD}
               // Chosen as the row changes: open makes room at once, folding closes up after the fade.
-              layout={groupOpen ? MAKE_ROOM : CLOSE_UP}
+              layout={reduceMotion ? undefined : groupOpen ? MAKE_ROOM : CLOSE_UP}
               onLayout={(event) => chipAt.current.set(chip.id, event.nativeEvent.layout)}
             >
               <Chip

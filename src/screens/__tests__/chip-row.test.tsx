@@ -5,6 +5,7 @@ import { EnvironmentProvider } from '@/environment';
 import { FeedsContext, type FeedChip } from '@/feeds/feeds-data';
 import { ChipRow } from '@/screens/chip-row';
 import { worldEnvironment, worldFeeds } from '@/worlds/world';
+import { depth } from '@/theme/depth';
 import { PINNED } from '../../../convex/lib/pinned';
 
 const spec = { colorScheme: 'dark', feeds: 'some' } as const;
@@ -61,5 +62,51 @@ describe('the Pinned group follows Pins as they change (FEE-60)', () => {
     expect(names()).toEqual(['All', 'Pinned: The Verge, Daring Fireball', 'Calm Notes']);
     expect(chosen()).toBe('Calm Notes');
     expect(screen.getByRole('tab', { name: /^Pinned:/ })).toBeCollapsed();
+  });
+});
+
+describe('the stacked icons ring in the Pinned chip\'s own face, so each stays a separate disc on it (FEE-74)', () => {
+  test.each([
+    ['chosen, the raised face', PINNED, depth.dark.raised.face],
+    ['not chosen, the soft face', null, depth.dark.soft.face],
+  ])('%s', async (_name, selected, face) => {
+    await render(<Row chips={row(['f1', 'f3'])} selected={selected} />);
+    for (const ring of screen.getAllByTestId('pinned-stack-ring', { includeHiddenElements: true })) expect(ring).toHaveStyle({ borderColor: face });
+  });
+});
+
+// FEE-74 bug: with Android's animations off, Reanimated's own reduced-motion skip left a revealed chip with a gradient
+// face invisible. Remove animations (Q17) is read from the environment like every other motion in the app: the
+// group's chips then take no layout animation at all, and simply appear and disappear.
+describe('with Remove animations on, the Pinned group opens and folds with no animation (Q17, D24)', () => {
+  function Still({ selected }: { selected: string | null }) {
+    const still = { ...spec, reduceMotion: true };
+    return (
+      <EnvironmentProvider environment={worldEnvironment(still)}>
+        <UndoProvider>
+          <FeedsContext value={worldFeeds(still)}>
+            <ChipRow chips={row(['f1', 'f3'])} selected={selected} onSelect={() => {}} />
+          </FeedsContext>
+        </UndoProvider>
+      </EnvironmentProvider>
+    );
+  }
+
+  /** The layout animations on the Reanimated view that wraps a chip in the row, if any. */
+  const animationsOf = (tab: ReturnType<typeof screen.getByRole>) => {
+    for (let node = tab.parent; node; node = node.parent) {
+      if ('layout' in node.props || 'entering' in node.props) return [node.props.entering, node.props.exiting, node.props.layout];
+    }
+    return [];
+  };
+
+  test('with motion on, the group\'s chips do animate (so the check below can fail)', async () => {
+    await render(<Row chips={row(['f1', 'f3'])} selected={PINNED} />);
+    expect(animationsOf(screen.getByRole('tab', { name: 'The Verge, Pinned' })).filter(Boolean).length).toBeGreaterThan(0);
+  });
+
+  test.each([PINNED, null])('selected %s', async (selected) => {
+    await render(<Still selected={selected} />);
+    for (const tab of screen.getAllByRole('tab').slice(2)) expect(animationsOf(tab).filter(Boolean)).toEqual([]);
   });
 });
