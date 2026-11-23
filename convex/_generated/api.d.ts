@@ -15,6 +15,7 @@ import type * as extract from "../extract.js";
 import type * as extractPages from "../extractPages.js";
 import type * as feeds from "../feeds.js";
 import type * as http from "../http.js";
+import type * as lib_account from "../lib/account.js";
 import type * as lib_appReturn from "../lib/appReturn.js";
 import type * as lib_authErrors from "../lib/authErrors.js";
 import type * as lib_currentUser from "../lib/currentUser.js";
@@ -49,6 +50,7 @@ declare const fullApi: ApiFromModules<{
   extractPages: typeof extractPages;
   feeds: typeof feeds;
   http: typeof http;
+  "lib/account": typeof lib_account;
   "lib/appReturn": typeof lib_appReturn;
   "lib/authErrors": typeof lib_authErrors;
   "lib/currentUser": typeof lib_currentUser;
