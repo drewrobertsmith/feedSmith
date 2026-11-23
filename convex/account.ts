@@ -31,6 +31,12 @@ export const deleteAccount = mutation({
       .withIndex('by_user_url', (q) => q.eq('userId', userId))
       .collect();
     await Promise.all(feeds.map((feed) => ctx.db.delete(feed._id)));
+    // Each Feed's fetch schedule goes with it (FEE-54): one per Feed, so as few as the Feeds.
+    const schedules = await ctx.db
+      .query('feedSchedules')
+      .withIndex('by_user', (q) => q.eq('userId', userId))
+      .collect();
+    await Promise.all(schedules.map((schedule) => ctx.db.delete(schedule._id)));
 
     await ctx.runMutation(components.authGoogle.provider.deleteUser, { userId });
     const sessions = await ctx.runQuery(components.auth.public.listSessions, { userId });

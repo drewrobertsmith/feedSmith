@@ -56,10 +56,28 @@ async function setup() {
 async function follow(s: Awaited<ReturnType<typeof setup>>, items: { guid: string; ago: number }[], headers = {}) {
   network.mockImplementation(async () => new Response(rss(items), { headers }));
   expect(await s.a.action(api.feeds.add, { url: URL_A })).toEqual({ ok: true });
-  return await s.t.run(async (ctx) => (await ctx.db.query('feeds').first())!);
+  const stored = await s.t.run(async (ctx) => (await ctx.db.query('feeds').first())!);
+  return (await feedOf(s, stored._id))!;
 }
 
-const feedOf = (s: Awaited<ReturnType<typeof setup>>, id: Id<'feeds'>) => s.t.run((ctx) => ctx.db.get(id));
+/** A Feed with its fetch schedule (FEE-54) read alongside, as one record. */
+const feedOf = (s: Awaited<ReturnType<typeof setup>>, id: Id<'feeds'>) =>
+  s.t.run(async (ctx) => {
+    const feed = await ctx.db.get(id);
+    const schedule = await ctx.db.query('feedSchedules').withIndex('by_feed', (q) => q.eq('feedId', id)).unique();
+    if (!feed || !schedule) return feed;
+    const { nextFetchAt, lastFetchedAt, failures, etag, lastModified } = schedule;
+    return { ...feed, nextFetchAt, lastFetchedAt, failures, etag, lastModified };
+  });
+
+/** Feeds stored straight in the table, each with a schedule that's due now. */
+const insertDueFeeds = (s: Awaited<ReturnType<typeof setup>>, count: number) =>
+  s.t.run(async (ctx) => {
+    for (let i = 0; i < count; i++) {
+      const feedId = await ctx.db.insert('feeds', { userId: s.userA, url: `https://f${i}.example.com/feed`, title: `F${i}` });
+      await ctx.db.insert('feedSchedules', { feedId, userId: s.userA, nextFetchAt: 0, failures: 0 });
+    }
+  });
 const refresh = (s: Awaited<ReturnType<typeof setup>>, feedId: Id<'feeds'>) =>
   s.t.action(internal.refresh.refreshFeed, { feedId });
 
@@ -218,9 +236,7 @@ describe('fetches that overlap or misbehave', () => {
 
   test('a tick with more due Feeds than it starts at once comes back for the rest', async () => {
     const s = await setup();
-    await s.t.run(async (ctx) => {
-      for (let i = 0; i < 60; i++) await ctx.db.insert('feeds', { userId: s.userA, url: `https://f${i}.example.com/feed`, title: `F${i}` });
-    });
+    await insertDueFeeds(s, 60);
     network.mockImplementation(async () => new Response(rss([])));
     await s.t.mutation(internal.refresh.scheduleDue, {});
     await s.t.finishAllScheduledFunctions(vi.runAllTimers);
@@ -243,9 +259,7 @@ describe('pulling down fetches every Feed now', () => {
 
   test('a pull fetches at most a few Feeds at a time', async () => {
     const s = await setup();
-    await s.t.run(async (ctx) => {
-      for (let i = 0; i < 12; i++) await ctx.db.insert('feeds', { userId: s.userA, url: `https://f${i}.example.com/feed`, title: `F${i}` });
-    });
+    await insertDueFeeds(s, 12);
     // Answers are held open until released, so overlapping fetches pile up here.
     const waiting: (() => void)[] = [];
     network.mockImplementation(() => new Promise((resolve) => waiting.push(() => resolve(new Response(rss([]))))));

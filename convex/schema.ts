@@ -19,20 +19,39 @@ export default defineSchema({
     iconUrl: v.optional(v.string()),
     /** Set when Pinned (P9): Pinned chips follow All in this order, at most three. */
     pinOrder: v.optional(v.number()),
-    /** Whether its last fetch worked (P15). Optional only for Feeds stored before FEE-24. */
+    /**
+     * Whether its last fetch worked (P15), for Manage Feeds. Written only when it changes, so a
+     * routine check never touches the Feed (FEE-54). Optional only for Feeds stored before FEE-24.
+     */
     status: v.optional(v.union(v.literal('working'), v.literal('failing'))),
-    /** Failed fetches in a row; each backs the next try off further (Q7). */
+    /** Deprecated (FEE-54): moved to `feedSchedules` by `migrations.moveFeedSchedules`; removed once every deployment has run it. */
     failures: v.optional(v.number()),
     lastFetchedAt: v.optional(v.number()),
-    /** When it's next due (T19). Unset means due now. */
     nextFetchAt: v.optional(v.number()),
-    /** What the Feed said about its version last time, sent back on the next check (T19). */
     etag: v.optional(v.string()),
     lastModified: v.optional(v.string()),
   })
     .index('by_user_url', ['userId', 'url'])
-    .index('by_user_pin', ['userId', 'pinOrder'])
-    .index('by_next_fetch', ['nextFetchAt']),
+    .index('by_user_pin', ['userId', 'pinOrder']),
+  /**
+   * When each Feed is next fetched, and what its last fetch learned (T19, FEE-54). Kept apart from
+   * the Feed so a check, every few minutes, re-runs nothing the screens read.
+   */
+  feedSchedules: defineTable({
+    feedId: v.id('feeds'),
+    userId: v.id('users'),
+    /** When it's next due; a lease pushes it out while a fetch runs. 0 means due now. */
+    nextFetchAt: v.number(),
+    lastFetchedAt: v.optional(v.number()),
+    /** Failed fetches in a row; each backs the next try off further (Q7). */
+    failures: v.number(),
+    /** What the Feed said about its version last time, sent back on the next check (T19). */
+    etag: v.optional(v.string()),
+    lastModified: v.optional(v.string()),
+  })
+    .index('by_feed', ['feedId'])
+    .index('by_next_fetch', ['nextFetchAt'])
+    .index('by_user', ['userId']),
   /** A User's Articles: what All lists. Their content lives in `articleBodies`. */
   articles: defineTable({
     userId: v.id('users'),
