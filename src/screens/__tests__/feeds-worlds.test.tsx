@@ -15,9 +15,11 @@ import { themes } from '@/theme/tokens';
 import {
   ADD_FEED_WORLDS,
   ALL_WORLDS,
+  PINNED_WORLDS,
   READING_WORLDS,
   type AddFeedWorldId,
   type AllWorldId,
+  type PinnedWorldId,
   type ReadingWorldId,
 } from '@/worlds/catalog';
 import {
@@ -532,6 +534,80 @@ describe('All', () => {
       await userEvent.press(within(await screen.findByTestId('undo-toast')).getByRole('button', { name: 'Undo' }));
       expect(w.feedsLog.restores).toEqual([]);
     });
+  });
+});
+
+describe('the Pinned view (FEE-59)', () => {
+  type Shows = {
+    /** The chips in order, by TalkBack name. */
+    chips: string[];
+    /** The chosen chip's TalkBack name. */
+    selected: string;
+    /** The rows' Feeds, in order. */
+    rows: string[];
+    empty: boolean;
+  };
+  const PINNED_CHIP = 'Pinned: The Verge, Daring Fireball';
+  const TWO_PIN_CHIPS = ['All', PINNED_CHIP, 'The Verge, Pinned', 'Daring Fireball, Pinned', 'Calm Notes'];
+  const ALL_ROWS = FIXTURE_ROWS.map((row) => row.feedTitle);
+  // The Verge's Articles, and not Calm Notes': Pinned is narrower than All.
+  const PINNED_ROWS = FIXTURE_ROWS.filter((row) => row.feedId === 'f1').map((row) => row.feedTitle);
+  const SHOWS: Record<PinnedWorldId, Shows> = {
+    'pinned-dark': { chips: TWO_PIN_CHIPS, selected: PINNED_CHIP, rows: PINNED_ROWS, empty: false },
+    'pinned-light': { chips: TWO_PIN_CHIPS, selected: PINNED_CHIP, rows: PINNED_ROWS, empty: false },
+    'pinned-empty': {
+      chips: ['All', 'Pinned: Daring Fireball, Kottke', 'Daring Fireball, Pinned', 'Kottke, Pinned', 'The Verge', 'Calm Notes'],
+      selected: 'Pinned: Daring Fireball, Kottke',
+      rows: [],
+      empty: true,
+    },
+    'pinned-all': { chips: TWO_PIN_CHIPS, selected: 'All', rows: ALL_ROWS, empty: false },
+    // One Pin makes no Pinned chip, so a link to Pinned lands on All (Q25).
+    'pinned-one-pin': { chips: ['All', 'The Verge, Pinned', 'Calm Notes', 'Daring Fireball'], selected: 'All', rows: ALL_ROWS, empty: false },
+    'pinned-hostile-link': { chips: TWO_PIN_CHIPS, selected: 'All', rows: ALL_ROWS, empty: false },
+    'pinned-largest-font': { chips: TWO_PIN_CHIPS, selected: PINNED_CHIP, rows: PINNED_ROWS, empty: false },
+  };
+
+  test.each(PINNED_WORLDS)('$label', async ({ id, spec }) => {
+    const shows = SHOWS[id];
+    await open(spec);
+    const tabs = await screen.findAllByRole('tab');
+    expect(tabs.map((tab) => tab.props.accessibilityLabel)).toEqual(shows.chips);
+    expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName(shows.selected);
+    const rows = screen.queryAllByRole('link').filter((row) => /ago|yesterday/.test(row.props.accessibilityLabel));
+    expect(rows).toHaveLength(shows.rows.length);
+    expect(screen.queryAllByText('No Articles from your Pinned Feeds in the last 30 days.')).toHaveLength(shows.empty ? 1 : 0);
+    expect(screen.queryAllByRole('button', { name: 'Manage Feeds' })).toHaveLength(shows.empty ? 1 : 0);
+  });
+
+  test('tapping the Pinned chip chooses Pinned, in the link, and All chooses everything again', async () => {
+    const user = userEvent.setup();
+    await open({ colorScheme: 'dark', feeds: 'some', pins: 'two' });
+    await user.press(await screen.findByRole('tab', { name: PINNED_CHIP }));
+    expect(screen).toHavePathname('/');
+    expect(screen).toHaveSearchParams({ feed: 'pinned' });
+    expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName(PINNED_CHIP);
+    await user.press(screen.getByRole('tab', { name: 'All' }));
+    expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName('All');
+  });
+
+  test('switching to and from Pinned tells the rows which way to slide, as other chips do (P20)', async () => {
+    const user = userEvent.setup();
+    await open({ colorScheme: 'dark', feeds: 'some', pins: 'two' });
+    await screen.findAllByRole('link');
+    expect(screen.getByTestId('chip-switch')).toHaveProp('index', 0);
+    // Pinned sits second, right after All.
+    await user.press(screen.getByRole('tab', { name: PINNED_CHIP }));
+    expect(screen.getByTestId('chip-switch')).toHaveProp('index', 1);
+    await user.press(screen.getByRole('tab', { name: 'Calm Notes' }));
+    expect(screen.getByTestId('chip-switch')).toHaveProp('index', 4);
+  });
+
+  test('empty Pinned leads to Manage Feeds (Q34)', async () => {
+    const user = userEvent.setup();
+    await open({ colorScheme: 'dark', feeds: 'some', pins: 'quiet', feed: 'pinned' });
+    await user.press(await screen.findByRole('button', { name: 'Manage Feeds' }));
+    expect(screen).toHavePathname('/manage-feeds');
   });
 });
 

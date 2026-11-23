@@ -41,3 +41,11 @@ export function transparent(colour: string): string {
   if (!/^#[0-9a-f]{6}$/i.test(colour)) throw new Error(`The chip row's fade needs a #RRGGBB colour, not ${colour}`);
   return `${colour}00`;
 }
+
+/**
+ * Whether the Pinned view exists (FEE-59): two or more Pinned Feeds. With one, its chip is enough;
+ * with none, there's nothing to read together.
+ */
+export function hasPinnedView(chips: readonly { pinned: boolean }[]): boolean {
+  return chips.filter((chip) => chip.pinned).length >= 2;
+}

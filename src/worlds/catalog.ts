@@ -214,3 +214,20 @@ export const SAVED_WORLDS = [
 ] as const satisfies readonly CatalogWorld[];
 
 export type SavedWorldId = (typeof SAVED_WORLDS)[number]['id'];
+
+/** The Pinned view (FEE-59): the Pinned Feeds' Articles together, chosen by the Pinned chip or a link. */
+export const PINNED_WORLDS = [
+  { id: 'pinned-dark', label: 'Pinned, dark', spec: { colorScheme: 'dark', feeds: 'some', pins: 'two', feed: 'pinned' } },
+  { id: 'pinned-light', label: 'Pinned, light', spec: { colorScheme: 'light', feeds: 'some', pins: 'two', feed: 'pinned' } },
+  { id: 'pinned-empty', label: 'Pinned, nothing new', spec: { colorScheme: 'dark', feeds: 'some', pins: 'quiet', feed: 'pinned' } },
+  { id: 'pinned-all', label: 'Two Pins, All chosen', spec: { colorScheme: 'dark', feeds: 'some', pins: 'two' } },
+  { id: 'pinned-one-pin', label: 'One Pin: no Pinned chip', spec: { colorScheme: 'dark', feeds: 'some', feed: 'pinned' } },
+  { id: 'pinned-hostile-link', label: 'A hostile link', spec: { colorScheme: 'dark', feeds: 'some', pins: 'two', feed: 'pinned"><b>' } },
+  {
+    id: 'pinned-largest-font',
+    label: 'Pinned, largest font size',
+    spec: { colorScheme: 'dark', feeds: 'some', pins: 'two', feed: 'pinned', fontScale: 2 },
+  },
+] as const satisfies readonly CatalogWorld[];
+
+export type PinnedWorldId = (typeof PINNED_WORLDS)[number]['id'];

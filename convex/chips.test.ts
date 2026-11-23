@@ -198,6 +198,58 @@ describe("one Feed's Articles (P5)", () => {
   });
 });
 
+describe('the Pinned view: the Pinned Feeds\' Articles together (FEE-59)', () => {
+  const four = [
+    { title: 'A', ago: HOUR },
+    { title: 'B', ago: 2 * HOUR },
+    { title: 'C', ago: 3 * HOUR },
+    { title: 'D', ago: 4 * HOUR },
+  ];
+  /** Gives each Feed a second, older Article, so Pinned has two per Feed to interleave. */
+  const withSecondArticles = async (s: Awaited<ReturnType<typeof setup>>) =>
+    s.t.run(async (ctx) => {
+      for (const [i, feedId] of s.feedIds.entries()) {
+        const feed = (await ctx.db.get(feedId))!;
+        await ctx.db.insert('articles', { userId: feed.userId, feedId, guid: `old${i}`, title: `${feed.title} older`, publishedAt: NOW - (10 + i) * HOUR });
+      }
+    });
+  const pinned = async (s: Awaited<ReturnType<typeof setup>>) =>
+    (await s.a.query(api.articles.all, { feedId: 'pinned' })).map((row) => row.title);
+
+  test("lists every Pinned Feed's Articles, interleaved newest first, and nothing else", async () => {
+    const s = await setup(four);
+    await withSecondArticles(s);
+    for (const id of [s.feedIds[2], s.feedIds[0]]) await s.a.mutation(api.feeds.setPinned, { id, pinned: true });
+    expect(await pinned(s)).toEqual(['A news', 'C news', 'A older', 'C older']);
+  });
+
+  test('with no Pins, it has nothing', async () => {
+    const s = await setup(four);
+    expect(await pinned(s)).toEqual([]);
+  });
+
+  test("unpinning takes a Feed's Articles out of it at once", async () => {
+    const s = await setup(four);
+    for (const id of s.feedIds.slice(0, 2)) await s.a.mutation(api.feeds.setPinned, { id, pinned: true });
+    await s.a.mutation(api.feeds.setPinned, { id: s.feedIds[0], pinned: false });
+    expect(await pinned(s)).toEqual(['B news']);
+  });
+
+  test("another User's Pinned Feeds never appear, and it's refused signed out (Q10)", async () => {
+    const s = await setup(four);
+    await s.a.mutation(api.feeds.setPinned, { id: s.feedIds[0], pinned: true });
+    // User B follows and Pins a Feed of their own.
+    await s.t.run(async (ctx) => {
+      const b = (await ctx.db.query('users').collect()).find((u) => u.email === 'b@example.com')!._id;
+      const feedId = await ctx.db.insert('feeds', { userId: b, url: 'https://b.example.com/feed', title: 'Theirs', pinOrder: 1 });
+      await ctx.db.insert('articles', { userId: b, feedId, guid: 'b1', title: 'Their news', publishedAt: NOW });
+    });
+    expect(await pinned(s)).toEqual(['A news']);
+    expect((await s.b.query(api.articles.all, { feedId: 'pinned' })).map((row) => row.title)).toEqual(['Their news']);
+    await expect(s.t.query(api.articles.all, { feedId: 'pinned' })).rejects.toThrow(/SIGNED_OUT/);
+  });
+});
+
 describe('more Feeds than the row shows (P9)', () => {
   test('Pinned Feeds and the Pin limit hold past the first 200', async () => {
     const s = await setup([]);

@@ -13,11 +13,13 @@ import { TopBar, TopBarIcon } from '@/components/top-bar';
 import { UndoToastHost } from '@/components/undo-toast';
 import { useEnvironment, useMinuteClock } from '@/environment';
 import { useAll, useChips, useLastUpdated, useRefresh } from '@/feeds/feeds-data';
+import { PINNED } from '../../convex/lib/pinned';
 import { publishedAgo } from '@/feeds/format';
 import { useSaveAndDone } from '@/feeds/use-save-and-done';
 import { useShownRows } from '@/feeds/use-shown-rows';
 import { AccountButton } from '@/screens/account/account-sheet';
 import { ChipRow } from '@/screens/chip-row';
+import { hasPinnedView } from '@/screens/chip-row-layout';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
 
@@ -49,12 +51,19 @@ export function FeedsScreen({ feed, accountOpen }: { feed?: string; accountOpen?
   const insets = useSafeAreaInsets();
   const chipsView = useChips();
   const chips = chipsView.status === 'ready' ? chipsView.chips : [];
+  // With two or more Pinned Feeds, Pinned is a view of its own (FEE-59); with fewer, a link to it means All.
+  const pinnedView = hasPinnedView(chips);
   const selectedChip = chips.find((chip) => chip.id === feed) ?? null;
-  const all = useAll(selectedChip?.id ?? null);
+  const selection = feed === PINNED && pinnedView ? PINNED : (selectedChip?.id ?? null);
+  const all = useAll(selection);
   // The chosen chip's place in the row: All is 0, then each chip in order.
-  const chipIndex = selectedChip ? chips.indexOf(selectedChip) + 1 : 0;
+  const order = ['', ...(pinnedView ? [PINNED] : []), ...chips.map((chip) => chip.id)];
+  const chipIndex = order.indexOf(selection ?? '');
   // What the list shows: the last ready rows while a newly chosen Feed's load (FEE-42).
   const shown = useShownRows(all, chipIndex);
+  // All and Pinned mix Feeds, so their rows name theirs; one Feed's chip already names it (P20).
+  const shownSelection = order[shown.index];
+  const rowsNameFeeds = shownSelection === '' || shownSelection === PINNED;
   const { refreshing, refresh } = useRefresh();
   const updated = useUpdatedLine(refreshing);
   const { colorScheme } = useEnvironment();
@@ -74,8 +83,17 @@ export function FeedsScreen({ feed, accountOpen }: { feed?: string; accountOpen?
         action={chips.length > 0 ? <TopBarIcon label="Add a Feed" icon={{ ios: 'plus', android: 'add' }} onPress={addFeed} /> : undefined}
         trailing={<AccountButton initiallyOpen={accountOpen} />}
       />
-      {chips.length > 0 ? <ChipRow chips={chips} selected={selectedChip?.id ?? null} onSelect={select} /> : null}
-      {selectedChip && empty ? (
+      {chips.length > 0 ? <ChipRow chips={chips} selected={selection} onSelect={select} /> : null}
+      {selection === PINNED && empty ? (
+        // Never a dead end (Q34): the Pinned Feeds are chosen in Manage Feeds.
+        <View className="gap-group px-edge">
+          <AppText variant="reading" className="text-text-muted">
+            No Articles from your Pinned Feeds in the last 30 days.
+          </AppText>
+          <AppButton label="Manage Feeds" onPress={manageFeeds} />
+        </View>
+      ) : null}
+      {selectedChip && selection === selectedChip.id && empty ? (
         // Never a dead end (Q34): a quiet way to check the Feed, rename it or remove it.
         <View className="gap-group px-edge">
           <AppText variant="reading" className="text-text-muted">
@@ -117,7 +135,7 @@ export function FeedsScreen({ feed, accountOpen }: { feed?: string; accountOpen?
               leaves={false}
               onCommit={() => saveOrDone(item.id, rowAction(item), { haptic: false })}
             >
-              <ArticleRow article={item} feedNamed={shown.index === 0} savedMark onAction={(action) => saveOrDone(item.id, action)} />
+              <ArticleRow article={item} feedNamed={rowsNameFeeds} savedMark onAction={(action) => saveOrDone(item.id, action)} />
             </SwipeRow>
           </SlideRow>
         )}

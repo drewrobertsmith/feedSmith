@@ -208,7 +208,7 @@ export async function ownFeed(ctx: QueryCtx, userId: Id<'users'>, rawId: string)
 }
 
 /** The User's Pinned Feeds in their order, read straight from the Pin index. */
-function pinnedFeeds(ctx: QueryCtx, userId: Id<'users'>) {
+export function pinnedFeeds(ctx: QueryCtx, userId: Id<'users'>) {
   return ctx.db
     .query('feeds')
     .withIndex('by_user_pin', (q) => q.eq('userId', userId).gte('pinOrder', 0))
