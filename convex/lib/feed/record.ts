@@ -42,11 +42,11 @@ export async function storeNewArticles(
         .first();
       if (existing) {
         // Stored before lead images or authors were kept: fill them in, and nothing else changes.
-        const missing = {
+        const backfill = {
           ...(!existing.imageUrl && fields.imageUrl ? { imageUrl: fields.imageUrl } : {}),
           ...(!existing.authors && fields.authors ? { authors: fields.authors } : {}),
         };
-        if (Object.keys(missing).length > 0) await ctx.db.patch(existing._id, missing);
+        if (Object.keys(backfill).length > 0) await ctx.db.patch(existing._id, backfill);
         return false;
       }
       const articleId = await ctx.db.insert('articles', { userId, feedId, ...fields });

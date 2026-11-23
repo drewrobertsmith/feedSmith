@@ -99,7 +99,8 @@ function withoutEmail(text: string): string {
   if (!text.match(EMAIL)) return text;
   const rest = squash(text.replace(EMAIL, '').replace(/\(\s*\)/g, ''));
   const bracketed = rest.match(/^\((.*)\)$/);
-  return squash(bracketed ? bracketed[1] : rest);
+  // What separated the name from its email ("Jane Doe, jane@…") goes with it.
+  return squash(bracketed ? bracketed[1] : rest).replace(/^[\s,;:<>-]+|[\s,;:<>-]+$/g, '');
 }
 
 /**

@@ -174,6 +174,8 @@ describe("an Article's authors (FEE-41)", () => {
     ['a name with markup and spacing', rssItem('<dc:creator><![CDATA[  <b>Emma</b>   Roth ]]></dc:creator>'), ['Emma Roth']],
     ['a name with a role in brackets, kept as written', rssItem('<dc:creator>Jane Doe (Editor)</dc:creator>'), ['Jane Doe (Editor)']],
     ['a name followed by its email in brackets', rssItem('<dc:creator>Emma Roth (emma@example.com)</dc:creator>'), ['Emma Roth']],
+    ['a name, then its email after a comma', rssItem('<dc:creator>Emma Roth, emma@example.com</dc:creator>'), ['Emma Roth']],
+    ['a name with its email in angle brackets', rssItem('<dc:creator>Emma Roth &lt;emma@example.com&gt;</dc:creator>'), ['Emma Roth']],
   ])('reads %s', (_case, xml, authors) => {
     expect(authorsOf(xml)).toEqual(authors);
   });
