@@ -1,10 +1,10 @@
 import { router } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
 import { useEffect, useEffectEvent } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/app-button';
+import { AppSymbol } from '@/components/app-symbol';
 import { AppText } from '@/components/app-text';
 import { DepthPressable } from '@/components/depth-pressable';
 import { SharedTitle, SharedTitleScreen } from '@/components/shared-title';
@@ -91,10 +91,10 @@ function SaveOrDone({ id, saved }: { id: string; saved: boolean }) {
         className="flex-row items-center gap-related rounded-full px-group"
         style={{ minHeight: PILL_HEIGHT * scale }}
       >
-        <SymbolView
+        <AppSymbol
           testID="save-icon"
           name={saved ? { ios: 'bookmark.fill', android: 'bookmark_added' } : { ios: 'bookmark', android: 'bookmark' }}
-          size={PILL_ICON * scale}
+          size={PILL_ICON}
           tintColor={saved ? theme.accent : theme.text}
           accessible={false}
         />

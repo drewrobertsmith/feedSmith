@@ -1,13 +1,13 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
 import { Pressable, View, type AccessibilityActionEvent } from 'react-native';
 
+import { AppSymbol } from '@/components/app-symbol';
 import { AppText } from '@/components/app-text';
 import { SharedTitle } from '@/components/shared-title';
 import { FeedIcon } from '@/components/feed-icon';
 import { ROW_ACTIONS, rowAction, type RowActionName } from '@/components/row-action';
-import { useEnvironment, useSizeScale } from '@/environment';
+import { useEnvironment } from '@/environment';
 import type { ArticleRow as Row } from '@/feeds/feeds-data';
 import { byline, publishedAgo } from '@/feeds/format';
 import { themes } from '@/theme/tokens';
@@ -38,7 +38,6 @@ export function ArticleRow({
   onAction: (action: RowActionName) => void;
 }) {
   const { colorScheme, fontScale, now } = useEnvironment();
-  const scale = useSizeScale();
   const theme = themes[colorScheme];
   const ago = publishedAgo(article.publishedAt, now());
   const credit = byline(article.authors);
@@ -88,10 +87,10 @@ export function ArticleRow({
           </AppText>
           {/* Yours (D5): Gold, the one accent, and a bookmark with a tick, so it reads without colour too (Q14). */}
           {showMark ? (
-            <SymbolView
+            <AppSymbol
               testID="row-saved-mark"
               name={{ ios: 'bookmark.fill', android: 'bookmark_added' }}
-              size={SAVED_MARK * scale}
+              size={SAVED_MARK}
               tintColor={theme.accent}
               accessible={false}
             />

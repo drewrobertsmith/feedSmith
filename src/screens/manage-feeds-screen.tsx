@@ -1,8 +1,8 @@
-import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
 import { Alert, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AppSymbol } from '@/components/app-symbol';
 import { AppText } from '@/components/app-text';
 import { DragList, DragRow } from '@/components/drag-row';
 import { FeedIcon } from '@/components/feed-icon';
@@ -189,7 +189,7 @@ export function ManageFeedsScreen() {
                   onDrop={(to) => move(index, to)}
                   handle={
                     <View className="pr-related">
-                      <SymbolView
+                      <AppSymbol
                         name={{
                           ios: 'line.3.horizontal',
                           android: 'drag_indicator',
