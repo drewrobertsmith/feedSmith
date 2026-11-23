@@ -1,6 +1,8 @@
 import { isTag, isText, type ChildNode, type Element } from 'domhandler';
 import { parseDocument } from 'htmlparser2';
 
+import { boundNesting } from './nesting';
+
 /**
  * An Article's content as feedSmith stores it (T17): a few kinds of block, never HTML.
  * The block format is the allowlist, so nothing else from a page can reach the app (Q8).
@@ -262,8 +264,11 @@ export function htmlToBlocks(html: string, base: string): Content {
     }
   };
 
-  blockWalk(parseDocument(html, { decodeEntities: true }).children, 0);
+  // Nesting past any real page's is cut before parsing, and what it cut is noted as left out (FEE-57).
+  const bounded = boundNesting(html);
+  blockWalk(parseDocument(bounded, { decodeEntities: true }).children, 0);
   flush();
+  if (bounded.length < html.length) markFull();
   return { blocks, omitted };
 }
 

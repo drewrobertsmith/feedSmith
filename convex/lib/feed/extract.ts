@@ -6,6 +6,7 @@ import { htmlToBlocks, httpsUrl } from './blocks';
 import { FeedHttp } from './http';
 import { MAX_IMAGE_URL } from './parse';
 import type { ExtractOutcome } from './validators';
+import { boundNesting } from './nesting';
 
 export type { ExtractOutcome };
 
@@ -57,7 +58,8 @@ function paywalled(document: Document): boolean {
  */
 export function extractFromPage(html: string, url: string): ExtractOutcome {
   try {
-    const { document } = parseHTML(html);
+    // Hostile nesting is cut first: linkedom's parser costs the square of the depth (FEE-57, Q8).
+    const { document } = parseHTML(boundNesting(html));
     // The page's own image, when it has one, serves the Article either way (and the fallback, Q6).
     const imageUrl = pageImage(document, url);
     const image = imageUrl ? { imageUrl } : {};

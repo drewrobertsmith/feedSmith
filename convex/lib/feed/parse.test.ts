@@ -62,6 +62,15 @@ describe('Atom', () => {
 });
 
 describe('untrusted feeds', () => {
+  test('a feed nested 50,000 deep is read in a blink, never at the parser\'s quadratic cost (FEE-57)', () => {
+    const items = '<item><title>One</title><guid>1</guid></item>';
+    const xml = `<rss><channel><title>T</title>${items}${'<x>'.repeat(50_000)}deep${'</x>'.repeat(50_000)}</channel></rss>`;
+    const start = performance.now();
+    const feed = parse(xml);
+    expect(performance.now() - start).toBeLessThan(250);
+    expect(feed.articles.map((article) => article.title)).toEqual(['One']);
+  });
+
   test.each([
     ['an HTML page', '<!doctype html><html><head><title>Site</title></head><body><p>Hi</p></body></html>'],
     ['plain text', 'just some words'],
