@@ -52,6 +52,9 @@ export const FIXTURE_ARTICLE: ReadingArticle = {
   feedTitle: VERGE,
   publishedAt: day(21),
   link: 'https://www.theverge.com/tech/1039554/un-regulations-killer-robots',
+  subtitle: 'Countries agreed only to start discussing options for autonomous weapons.',
+  // The Feed's lead image is also the first image in its text: the Reading view shows it once.
+  imageUrl: 'https://platform.theverge.com/wp-content/uploads/sites/2/chorus/uploads/chorus_asset/file/13611631/503831564.jpg.jpg',
   omitted: [],
   blocks: [
     {
@@ -87,6 +90,19 @@ export const FIXTURE_ARTICLE: ReadingArticle = {
     },
     { type: 'paragraph', spans: [{ text: 'Talks resume next year.' }] },
   ],
+};
+
+/** An Article with no lead image: its text starts straight after the meta (P13). */
+export const FIXTURE_NO_LEAD_IMAGE_ARTICLE: ReadingArticle = {
+  ...FIXTURE_ARTICLE,
+  imageUrl: undefined,
+  blocks: FIXTURE_ARTICLE.blocks.filter((block) => block.type !== 'image'),
+};
+
+/** A Feed whose name won't fit on one line, as The Verge's subscriber Feed names itself. */
+export const FIXTURE_LONG_FEED_ARTICLE: ReadingArticle = {
+  ...FIXTURE_ARTICLE,
+  feedTitle: 'The Verge - Full RSS for subscribers | The Verge',
 };
 
 const CALM_SUBTITLE = 'Why reading slowly is worth it, and how to start.';
