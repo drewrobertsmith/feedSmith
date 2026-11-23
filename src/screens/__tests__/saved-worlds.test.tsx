@@ -1,11 +1,20 @@
 import { act, fireEvent, userEvent, waitFor, within } from '@testing-library/react-native';
+import * as Haptics from 'expo-haptics';
 import { screen } from 'expo-router/testing-library';
+import { State, type LegacyPanGesture } from 'react-native-gesture-handler';
+import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
+import { Dimensions } from 'react-native';
 import { Uniwind } from 'uniwind';
 
 import { SAVED_WORLDS, type SavedWorldId } from '@/worlds/catalog';
 import { FIXTURE_SAVED_ROWS } from '@/worlds/fixtures';
 import { createWorld, type World, type WorldSpec } from '@/worlds/world';
 import { layOutList, renderWorld } from '../../../test/world-router';
+
+jest.mock('expo-haptics', () => ({
+  ...jest.requireActual('expo-haptics'),
+  performAndroidHapticsAsync: jest.fn(() => Promise.resolve()),
+}));
 
 let world: World | undefined;
 const open = async (spec: WorldSpec) => {
@@ -109,5 +118,76 @@ describe('Saved (FEE-30)', () => {
       expect(titles()).toEqual(FIXTURE_SAVED_ROWS.map((r) => r.title));
       expect(screen.queryByTestId('undo-toast')).not.toBeOnTheScreen();
     });
+  });
+});
+
+describe('swiping a row left (FEE-30)', () => {
+  const swipe = async (id: string, translationX: number, velocityX = 0) => {
+    const gesture = getByGestureTestId(`swipe-${id}`);
+    await act(async () =>
+      fireGestureHandler<LegacyPanGesture>(gesture, [
+        { state: State.BEGAN, translationX: 0 },
+        { state: State.ACTIVE, translationX: -20 },
+        { translationX },
+        { state: State.END, translationX, velocityX },
+      ]),
+    );
+  };
+
+  // Reanimated's animations run on Jest's fake timers (T31): the slide away, the spring home.
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.mocked(Haptics.performAndroidHapticsAsync).mockClear();
+  });
+  afterEach(() => jest.useRealTimers());
+  const settle = () => act(async () => jest.advanceTimersByTime(1000));
+
+  test('past the commit point marks it Done, with one tick as it crosses (Q3, Q18)', async () => {
+    const w = await open({ colorScheme: 'dark', section: 'saved', feeds: 'some' });
+    await screen.findByRole('heading', { name: 'Saved' });
+    const [first] = FIXTURE_SAVED_ROWS;
+    await swipe(first.id, -0.6 * Dimensions.get('window').width);
+    await settle();
+
+    expect(w.feedsLog.dones).toEqual([first.id]);
+    expect(jest.mocked(Haptics.performAndroidHapticsAsync).mock.calls).toEqual([[Haptics.AndroidHaptics.Segment_Tick]]);
+    expect(within(await screen.findByTestId('undo-toast')).getByText('Marked Done.')).toBeOnTheScreen();
+  });
+
+  test('let go early, it snaps back and nothing happens', async () => {
+    const w = await open({ colorScheme: 'dark', section: 'saved', feeds: 'some' });
+    await screen.findByRole('heading', { name: 'Saved' });
+    await swipe(FIXTURE_SAVED_ROWS[0].id, -60);
+    await settle();
+    expect(w.feedsLog.dones).toEqual([]);
+    expect(Haptics.performAndroidHapticsAsync).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('undo-toast')).not.toBeOnTheScreen();
+  });
+
+  test('a quick flick is enough', async () => {
+    const w = await open({ colorScheme: 'dark', section: 'saved', feeds: 'some' });
+    await screen.findByRole('heading', { name: 'Saved' });
+    await swipe(FIXTURE_SAVED_ROWS[1].id, -70, -1800);
+    await settle();
+    expect(w.feedsLog.dones).toEqual([FIXTURE_SAVED_ROWS[1].id]);
+  });
+
+  test("a Done that doesn't go through brings the row back, never leaves it off the screen", async () => {
+    const w = await open({ colorScheme: 'dark', section: 'saved', feeds: 'some', savedWrites: 'fail' });
+    await screen.findByRole('heading', { name: 'Saved' });
+    const [first] = FIXTURE_SAVED_ROWS;
+    await swipe(first.id, -0.6 * Dimensions.get('window').width);
+    // It slides away, waits for the change, then springs home.
+    await settle();
+    await settle();
+    await settle();
+    expect(w.feedsLog.dones).toEqual([]);
+    expect(screen.getByTestId(`swipe-row-${first.id}`)).toHaveAnimatedStyle({ transform: [{ translateX: 0 }] });
+  });
+
+  test('the panel behind says what letting go will do', async () => {
+    await open({ colorScheme: 'dark', section: 'saved', feeds: 'some' });
+    await screen.findByRole('heading', { name: 'Saved' });
+    expect(screen.getAllByTestId('swipe-panel-done', { includeHiddenElements: true }).length).toBe(FIXTURE_SAVED_ROWS.length);
   });
 });

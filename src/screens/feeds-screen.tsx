@@ -6,7 +6,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppButton } from '@/components/app-button';
 import { AppText } from '@/components/app-text';
 import { ChipSwitch, SlideRow } from '@/components/chip-switch';
-import { ArticleRow } from '@/components/article-row';
+import { ArticleRow, rowAction } from '@/components/article-row';
+import { SwipeRow } from '@/components/swipe-row';
 import { TopBar, TopBarIcon } from '@/components/top-bar';
 import { UndoToastHost } from '@/components/undo-toast';
 import { useEnvironment, useMinuteClock } from '@/environment';
@@ -108,7 +109,15 @@ export function FeedsScreen({ feed, accountOpen }: { feed?: string; accountOpen?
         keyExtractor={(article) => article.id}
         renderItem={({ item }) => (
           <SlideRow>
-            <ArticleRow article={item} feedNamed={shown.index === 0} savedMark onAction={(action) => saveOrDone(item.id, action)} />
+            {/* Save, or Done once Saved: either way the row stays in Feeds, so it springs back. */}
+            <SwipeRow
+              id={item.id}
+              action={rowAction(item)}
+              leaves={false}
+              onCommit={() => saveOrDone(item.id, rowAction(item).name, { haptic: false })}
+            >
+              <ArticleRow article={item} feedNamed={shown.index === 0} savedMark onAction={(action) => saveOrDone(item.id, action)} />
+            </SwipeRow>
           </SlideRow>
         )}
         estimatedItemSize={ESTIMATED_ROW}

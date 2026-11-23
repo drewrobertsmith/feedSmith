@@ -1,7 +1,11 @@
 import { act, fireEvent, userEvent, waitFor, within } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
 import { renderRouter, screen } from 'expo-router/testing-library';
-import { Animated, ScrollView, ToastAndroid } from 'react-native';
+import { Animated, Dimensions, ScrollView, ToastAndroid } from 'react-native';
+import { State, type LegacyPanGesture } from 'react-native-gesture-handler';
+import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
+import { getAnimatedStyle as untypedGetAnimatedStyle } from 'react-native-reanimated';
+import type { getAnimatedStyle as GetAnimatedStyle } from 'react-native-reanimated/lib/typescript/jestUtils/index.native';
 import * as WebBrowser from 'expo-web-browser';
 import { Uniwind } from 'uniwind';
 
@@ -37,6 +41,8 @@ import {
 import { createWorld, type World, type WorldSpec } from '@/worlds/world';
 
 jest.mock('expo-web-browser', () => ({ openBrowserAsync: jest.fn() }));
+// Reanimated's real one, as its native typings describe it (T31).
+const getAnimatedStyle = untypedGetAnimatedStyle as unknown as typeof GetAnimatedStyle;
 jest.mock('expo-haptics', () => ({
   ...jest.requireActual('expo-haptics'),
   performAndroidHapticsAsync: jest.fn(() => Promise.resolve()),
@@ -447,6 +453,58 @@ describe('All', () => {
     await open({ colorScheme: 'dark', feeds });
     await user.press(await screen.findByRole('button', { name: 'Add a Feed' }));
     expect(await screen.findByRole('heading', { name: 'Add a Feed' })).toBeOnTheScreen();
+  });
+
+  describe('swiping a row left in Feeds (FEE-30)', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+      jest.mocked(Haptics.performAndroidHapticsAsync).mockClear();
+    });
+    afterEach(() => jest.useRealTimers());
+    const width = () => Dimensions.get('window').width;
+    const swipe = async (id: string, translationX: number) =>
+      act(async () =>
+        fireGestureHandler<LegacyPanGesture>(getByGestureTestId(`swipe-${id}`), [
+          { state: State.BEGAN, translationX: 0 },
+          { state: State.ACTIVE, translationX: -20 },
+          { translationX },
+          { state: State.END, translationX, velocityX: 0 },
+        ]),
+      );
+    const translateX = (id: string) => {
+      const style = getAnimatedStyle(screen.getByTestId(`swipe-row-${id}`)) as { transform?: { translateX: number }[] };
+      return style.transform?.[0]?.translateX ?? 0;
+    };
+
+    test('Saves it; the row springs back and stays, now marked in Gold, with Undo', async () => {
+      const w = await open({ colorScheme: 'dark', feeds: 'some' });
+      const [first] = FIXTURE_ROWS;
+      await screen.findByRole('heading', { name: 'Feeds' });
+      await swipe(first.id, -0.6 * width());
+      await act(async () => jest.advanceTimersByTime(1000));
+
+      expect(w.feedsLog.saves).toEqual([first.id]);
+      expect(jest.mocked(Haptics.performAndroidHapticsAsync).mock.calls).toEqual([[Haptics.AndroidHaptics.Segment_Tick]]);
+      expect(translateX(first.id)).toBe(0);
+      expect(screen.getByRole('link', { name: new RegExp(`^${first.title.slice(0, 20)}.*, Saved$`) })).toBeOnTheScreen();
+      expect(screen.getByTestId('undo-toast')).toBeOnTheScreen();
+      // The panel behind it said Save, in Gold.
+      expect(screen.getAllByTestId('swipe-panel-save', { includeHiddenElements: true }).length).toBeGreaterThan(0);
+    });
+
+    test.each([
+      ['springs home', false, true],
+      ['is home at once with Remove animations (Q17)', true, false],
+    ])('let go early, the row %s', async (_name, reduceMotion, moving) => {
+      await open({ colorScheme: 'dark', feeds: 'some', reduceMotion });
+      const [first] = FIXTURE_ROWS;
+      await screen.findByRole('heading', { name: 'Feeds' });
+      await swipe(first.id, -0.2 * width());
+      await act(async () => jest.advanceTimersByTime(16));
+      expect(translateX(first.id) !== 0).toBe(moving);
+      await act(async () => jest.advanceTimersByTime(1000));
+      expect(translateX(first.id)).toBe(0);
+    });
   });
 
   describe('Save and Done from a row (FEE-30)', () => {
