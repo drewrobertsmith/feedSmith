@@ -50,3 +50,33 @@ export const moveFeedSchedules = internalMutation({
     return null;
   },
 });
+
+/**
+ * FEE-62: moves each Article's page-reading state off the Article into `pageReads`, so reading
+ * pages stops re-running All. `extracted` needs no row (its text is whole). Keeps every state
+ * exactly; safe to run more than once. Run once on each deployment straight after the deploy that
+ * adds the table: `bunx convex run migrations:movePageReads`.
+ */
+export const movePageReads = internalMutation({
+  args: { cursor: v.optional(v.union(v.string(), v.null())) },
+  returns: v.null(),
+  handler: async (ctx, { cursor }) => {
+    const page = await ctx.db.query('articles').paginate({ cursor: cursor ?? null, numItems: BATCH });
+    for (const article of page.page) {
+      if (article.extraction === undefined) continue;
+      const state = article.extraction;
+      if (state !== 'extracted') {
+        const existing = await ctx.db
+          .query('pageReads')
+          .withIndex('by_article', (q) => q.eq('articleId', article._id))
+          .unique();
+        if (!existing) {
+          await ctx.db.insert('pageReads', { articleId: article._id, feedId: article.feedId, userId: article.userId, state });
+        }
+      }
+      await ctx.db.patch(article._id, { extraction: undefined });
+    }
+    if (!page.isDone) await ctx.scheduler.runAfter(0, internal.migrations.movePageReads, { cursor: page.continueCursor });
+    return null;
+  },
+});

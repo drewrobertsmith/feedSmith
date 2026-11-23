@@ -39,6 +39,7 @@ async function seedUser(t: ReturnType<typeof convexTest>, email: string, googleI
     for (const guid of ['one', 'two']) {
       const articleId = await ctx.db.insert('articles', { userId: id, feedId, guid, title: guid, publishedAt: Date.now() });
       await ctx.db.insert('articleBodies', { userId: id, articleId, blocks: [], omitted: [] });
+      await ctx.db.insert('pageReads', { articleId, feedId, userId: id, state: 'pending' });
     }
     return id;
   });
@@ -67,13 +68,14 @@ async function holdings(t: ReturnType<typeof convexTest>, userId: Id<'users'>, g
     feedSchedules: (await ctx.db.query('feedSchedules').collect()).filter((row) => row.userId === userId).length,
     articles: (await ctx.db.query('articles').collect()).filter((row) => row.userId === userId).length,
     articleBodies: (await ctx.db.query('articleBodies').collect()).filter((row) => row.userId === userId).length,
+    pageReads: (await ctx.db.query('pageReads').collect()).filter((row) => row.userId === userId).length,
     sessions: (await ctx.runQuery(components.auth.public.listSessions, { userId })).length,
     googleLink: (await ctx.runQuery(components.authGoogle.provider.getUserIdByAccount, { providerAccountId: googleId })) === null ? 0 : 1,
   }));
 }
 
-const NOTHING = { users: 0, feeds: 0, feedSchedules: 0, articles: 0, articleBodies: 0, sessions: 0, googleLink: 0 };
-const EVERYTHING = { users: 1, feeds: 1, feedSchedules: 1, articles: 2, articleBodies: 2, sessions: 1, googleLink: 1 };
+const NOTHING = { users: 0, feeds: 0, feedSchedules: 0, articles: 0, articleBodies: 0, pageReads: 0, sessions: 0, googleLink: 0 };
+const EVERYTHING = { users: 1, feeds: 1, feedSchedules: 1, articles: 2, articleBodies: 2, pageReads: 2, sessions: 1, googleLink: 1 };
 
 async function setup() {
   const t = convexTest(schema, modules);

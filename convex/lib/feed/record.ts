@@ -29,13 +29,13 @@ export async function storeNewArticles(
   const reading = await Promise.all(
     (['pending', 'reading'] as const).map((state) =>
       ctx.db
-        .query('articles')
-        .withIndex('by_feed_extraction', (q) => q.eq('feedId', feedId).eq('extraction', state))
+        .query('pageReads')
+        .withIndex('by_feed_state', (q) => q.eq('feedId', feedId).eq('state', state))
         .first(),
     ),
   );
   const stored = await Promise.all(
-    articles.map(async ({ blocks, omitted, ...fields }) => {
+    articles.map(async ({ blocks, omitted, extraction, ...fields }) => {
       if (fields.publishedAt < now - RETENTION) return false;
       const existing = await ctx.db
         .query('articles')
@@ -52,7 +52,10 @@ export async function storeNewArticles(
       }
       const articleId = await ctx.db.insert('articles', { userId, feedId, ...fields });
       await ctx.db.insert('articleBodies', { userId, articleId, blocks, omitted });
-      return fields.extraction === 'pending';
+      if (extraction !== 'pending') return false;
+      // Its page is read later, tracked apart from the Article so All doesn't re-run meanwhile (FEE-62).
+      await ctx.db.insert('pageReads', { articleId, feedId, userId, state: 'pending' });
+      return true;
     }),
   );
   if (stored.some(Boolean) && !reading.some(Boolean)) await ctx.scheduler.runAfter(0, internal.extractPages.run, { feedId });

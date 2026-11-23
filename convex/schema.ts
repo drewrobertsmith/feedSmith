@@ -74,17 +74,26 @@ export default defineSchema({
     authors: v.optional(v.array(v.string())),
     /** When the User first opened it (P7). */
     readAt: v.optional(v.number()),
-    /**
-     * Reading a summary-only Article in full from its page (T8, FEE-25): `pending`, `reading`
-     * while one run has it, then `extracted` or `failed`. Absent when the Feed carries its full text.
-     */
+    /** Deprecated (FEE-62): moved to `pageReads` by `migrations.movePageReads`; removed with FEE-56. */
     extraction: v.optional(vExtraction),
   })
     .index('by_user_published', ['userId', 'publishedAt'])
-    .index('by_feed_extraction', ['feedId', 'extraction'])
     .index('by_feed_guid', ['feedId', 'guid'])
     .index('by_feed_published', ['feedId', 'publishedAt'])
     .index('by_published', ['publishedAt']),
+  /**
+   * Reading a summary-only Article in full from its page (T8, T24): `pending`, `reading` while
+   * one run has it, or `failed`. No row once its text is whole, or when its Feed carried full
+   * text. Kept apart from the Article so reading pages re-runs nothing All shows (FEE-62).
+   */
+  pageReads: defineTable({
+    articleId: v.id('articles'),
+    feedId: v.id('feeds'),
+    userId: v.id('users'),
+    state: v.union(v.literal('pending'), v.literal('reading'), v.literal('failed')),
+  })
+    .index('by_article', ['articleId'])
+    .index('by_feed_state', ['feedId', 'state']),
   /**
    * An Article's content as cleaned blocks (T17), apart from the Article so All reads
    * only titles and dates, never the bodies.

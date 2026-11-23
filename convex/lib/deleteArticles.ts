@@ -14,6 +14,12 @@ export async function deleteArticles(ctx: MutationCtx, articles: Doc<'articles'>
         .withIndex('by_article', (q) => q.eq('articleId', article._id))
         .take(10);
       await Promise.all(bodies.map((body) => ctx.db.delete(body._id)));
+      // Its page-reading row, if its page was still being read or couldn't be (FEE-62).
+      const read = await ctx.db
+        .query('pageReads')
+        .withIndex('by_article', (q) => q.eq('articleId', article._id))
+        .unique();
+      if (read) await ctx.db.delete(read._id);
       await ctx.db.delete(article._id);
     }),
   );
