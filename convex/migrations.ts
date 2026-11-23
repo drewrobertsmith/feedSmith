@@ -2,6 +2,7 @@ import { v } from 'convex/values';
 
 import { internal } from './_generated/api';
 import { internalMutation } from './_generated/server';
+import { ensureFetchBooked } from './lib/feed/timer';
 
 const BATCH = 100;
 
@@ -43,6 +44,8 @@ export const moveFeedSchedules = internalMutation({
         });
       }
     }
+    // Moved Feeds are due when they were: the fetch scheduler wakes for them (FEE-55).
+    await ensureFetchBooked(ctx);
     if (!page.isDone) await ctx.scheduler.runAfter(0, internal.migrations.moveFeedSchedules, { cursor: page.continueCursor });
     return null;
   },

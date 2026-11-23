@@ -2,6 +2,8 @@
 import { convexTest } from 'convex-test';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
+import { runScheduledNow } from '../test/convex-scheduled';
+
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import article from './lib/feed/fixtures/page-article.html?raw';
@@ -67,7 +69,7 @@ async function follow(items: Item[]) {
   const idOf = (guid: string) =>
     t.run(async (ctx) => (await ctx.db.query('articles').withIndex('by_feed_guid', (q) => q.eq('feedId', feedId).eq('guid', guid)).first())?._id as Id<'articles'>);
   const open = async (guid: string) => owner.query(api.articles.get, { id: await idOf(guid) });
-  const finish = () => t.finishAllScheduledFunctions(vi.runAllTimers);
+  const finish = () => runScheduledNow(t);
   return { t, owner, other: t.withIdentity({ subject: b }), feedId, idOf, open, finish };
 }
 

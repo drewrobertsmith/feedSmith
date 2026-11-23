@@ -52,6 +52,13 @@ export default defineSchema({
     .index('by_feed', ['feedId'])
     .index('by_next_fetch', ['nextFetchAt'])
     .index('by_user', ['userId']),
+  /**
+   * The fetch scheduler's one booked run (FEE-55): at most one row, holding the scheduled
+   * `refresh.scheduleDue`, so it can be moved or cancelled instead of a second one piling up.
+   */
+  fetchTimer: defineTable({
+    scheduledId: v.id('_scheduled_functions'),
+  }),
   /** A User's Articles: what All lists. Their content lives in `articleBodies`. */
   articles: defineTable({
     userId: v.id('users'),
