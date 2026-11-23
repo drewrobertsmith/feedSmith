@@ -7,7 +7,7 @@ function backendFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
     const path = join(dir, name);
     if (statSync(path).isDirectory()) return name === '_generated' ? [] : backendFiles(path);
-    return /\.ts$/.test(name) && !/\.test\.ts$/.test(name) ? [path] : [];
+    return /\.(ts|tsx|js|mjs)$/.test(name) && !/\.test\.(ts|tsx)$/.test(name) ? [path] : [];
   });
 }
 
