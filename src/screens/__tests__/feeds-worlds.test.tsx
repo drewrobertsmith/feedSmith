@@ -1130,3 +1130,29 @@ test('Manage this Feed opens Manage Feeds from a Feed with nothing new (FEE-47, 
   await user.press(await screen.findByRole('button', { name: 'Manage this Feed' }));
   expect(await screen.findByRole('heading', { name: 'Manage Feeds' })).toBeOnTheScreen();
 });
+
+describe('buttons have depth, not outlines (FEE-75, D27)', () => {
+  test.each(['dark', 'light'] as const)('in %s, the Reading view\'s Save is soft above the page and sinks when pressed', async (colorScheme) => {
+    await open({ colorScheme, section: 'article' });
+    const save = await screen.findByRole('button', { name: 'Save' });
+    const pill = within(save).getByTestId('save-pill');
+    expect(pill).toHaveStyle(depthStyle(colorScheme, 'soft'));
+    expect(pill).not.toHaveStyle({ borderWidth: expect.any(Number) });
+    await fireEvent(save, 'pressIn');
+    expect(within(screen.getByRole('button', { name: 'Save' })).getByTestId('save-pill')).toHaveStyle(depthStyle(colorScheme, 'pressed'));
+  });
+
+  test('Done, on a Saved Article, is soft too', async () => {
+    await open({ colorScheme: 'dark', section: 'article', articleSaved: true });
+    const done = await screen.findByRole('button', { name: 'Done' });
+    expect(within(done).getByTestId('save-pill')).toHaveStyle(depthStyle('dark', 'soft'));
+  });
+
+  test.each([
+    ['Add a Feed', { colorScheme: 'dark', feeds: 'none' }],
+    ['Open original', { colorScheme: 'light', section: 'article', article: 'unextracted' }],
+  ] as const)('%s is soft', async (name, spec) => {
+    await open(spec);
+    expect(await screen.findByRole('button', { name })).toHaveStyle(depthStyle(spec.colorScheme, 'soft'));
+  });
+});

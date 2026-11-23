@@ -14,6 +14,7 @@ import { byline, publishedDate } from '@/feeds/format';
 import { openLink } from '@/feeds/open-link';
 import { useSaveAndDone } from '@/feeds/use-save-and-done';
 import { ArticleBlocks } from '@/screens/reading/article-blocks';
+import { depthStyle } from '@/theme/depth';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
 
@@ -92,9 +93,15 @@ function SaveOrDone({ id, saved }: { id: string; saved: boolean }) {
         onPressOut={() => setPressed(false)}
         hitSlop={spacing.related}
       >
+        {/* A soft object above the flat page (D27, D15), sinking to pressed under the finger. */}
         <Animated.View
-          style={[{ minHeight: PILL_HEIGHT * scale, transform: [{ scale: pressed && !reduceMotion ? 0.97 : 1 }] }, PRESS]}
-          className="flex-row items-center gap-related rounded-full border border-text-muted bg-background px-group"
+          testID="save-pill"
+          style={[
+            depthStyle(colorScheme, pressed ? 'pressed' : 'soft'),
+            { minHeight: PILL_HEIGHT * scale, transform: [{ scale: pressed && !reduceMotion ? 0.97 : 1 }] },
+            PRESS,
+          ]}
+          className="flex-row items-center gap-related rounded-full px-group"
         >
           <SymbolView
             testID="save-icon"

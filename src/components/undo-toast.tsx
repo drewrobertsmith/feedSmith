@@ -1,9 +1,12 @@
 import { useIsFocused } from 'expo-router';
 import { createContext, use, useEffect, useState, type ReactNode } from 'react';
-import { AccessibilityInfo, Pressable, View } from 'react-native';
+import { AccessibilityInfo, View } from 'react-native';
 import Animated, { Easing, FadeIn, FadeOut, ReduceMotion } from 'react-native-reanimated';
 
 import { AppText } from '@/components/app-text';
+import { DepthPressable } from '@/components/depth-pressable';
+import { useEnvironment } from '@/environment';
+import { depthStyle } from '@/theme/depth';
 import { spacing } from '@/theme/spacing';
 
 /** How long the toast stays: about four seconds, longer when TalkBack asks for more time. */
@@ -78,6 +81,7 @@ export function useUndo(): Show {
 export function UndoToastHost({ bottom = 0 }: { bottom?: number }) {
   const { toast, dismiss } = useUndoState();
   const focused = useIsFocused();
+  const { colorScheme, reduceMotion } = useEnvironment();
   if (!toast || !focused) return null;
   const { undo } = toast;
   return (
@@ -85,17 +89,22 @@ export function UndoToastHost({ bottom = 0 }: { bottom?: number }) {
       <Animated.View
         key={toast.key}
         testID="undo-toast"
-        entering={ENTER}
-        exiting={EXIT}
+        // Remove animations (Q17) is read from the environment, as all motion here is: Reanimated's own skip
+        // left a gradient face inside an entering animation invisible on Android (FEE-74).
+        entering={reduceMotion ? undefined : ENTER}
+        exiting={reduceMotion ? undefined : EXIT}
         accessibilityLiveRegion="polite"
-        className="flex-row items-center justify-between gap-group rounded-2xl bg-surface py-related pl-group pr-related"
+        // Raised: it rests over the content (D27).
+        className="flex-row items-center justify-between gap-group rounded-2xl py-related pl-group pr-related"
+        style={depthStyle(colorScheme, 'raised')}
       >
         <AppText variant="label" className="shrink text-text">
           {toast.message}
         </AppText>
-        {/* An outlined button, as the app's other quiet actions are (Open original). */}
+        {/* A soft button, as the app's other quiet actions are (Open original, D27). */}
         {undo ? (
-          <Pressable
+          <DepthPressable
+            level="soft"
             role="button"
             aria-label="Undo"
             onPress={() => {
@@ -103,12 +112,12 @@ export function UndoToastHost({ bottom = 0 }: { bottom?: number }) {
               undo();
             }}
             hitSlop={spacing.related}
-            className="rounded-full border border-text-muted px-group py-related"
+            className="rounded-full px-group py-related"
           >
             <AppText variant="label" className="text-text" accessible={false}>
               Undo
             </AppText>
-          </Pressable>
+          </DepthPressable>
         ) : null}
       </Animated.View>
     </View>

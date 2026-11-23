@@ -6,6 +6,7 @@ import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-han
 import { Dimensions } from 'react-native';
 import { Uniwind } from 'uniwind';
 
+import { depthStyle } from '@/theme/depth';
 import { SAVED_WORLDS, type SavedWorldId } from '@/worlds/catalog';
 import { FIXTURE_SAVED_ROWS } from '@/worlds/fixtures';
 import { createWorld, type World, type WorldSpec } from '@/worlds/world';
@@ -229,4 +230,38 @@ test("the Undo note's timer, and a swiped row's, go with the screen (Q20)", asyn
   } finally {
     jest.useRealTimers();
   }
+});
+
+describe('controls have depth, not outlines (FEE-75, D27)', () => {
+  const markDone = async () => {
+    const row = await screen.findByRole('link', { name: new RegExp(`^${FIXTURE_SAVED_ROWS[0].title.slice(0, 20)}`) });
+    await act(async () => fireEvent(row, 'accessibilityAction', { nativeEvent: { actionName: 'done' } }));
+    return screen.findByTestId('undo-toast');
+  };
+
+  test.each(['dark', 'light'] as const)('in %s, Go to Feeds is soft, sinks when pressed, and has no outline', async (colorScheme) => {
+    await open({ colorScheme, section: 'saved', feeds: 'some', saved: 'none' });
+    const button = await screen.findByRole('button', { name: 'Go to Feeds' });
+    expect(button).toHaveStyle(depthStyle(colorScheme, 'soft'));
+    expect(button).not.toHaveStyle({ borderWidth: expect.any(Number) });
+    await fireEvent(button, 'pressIn');
+    expect(screen.getByRole('button', { name: 'Go to Feeds' })).toHaveStyle(depthStyle(colorScheme, 'pressed'));
+  });
+
+  test.each(['dark', 'light'] as const)('in %s, the Undo note rests raised over the list, with a soft Undo on it', async (colorScheme) => {
+    await open({ colorScheme, section: 'saved', feeds: 'some' });
+    const toast = await markDone();
+    expect(toast).toHaveStyle(depthStyle(colorScheme, 'raised'));
+    expect(within(toast).getByRole('button', { name: 'Undo' })).toHaveStyle(depthStyle(colorScheme, 'soft'));
+  });
+
+  // A gradient face inside a Reanimated entering animation never showed when Reanimated skipped motion itself (FEE-74).
+  test.each([
+    [false, 1],
+    [true, 0],
+  ])('with Remove animations %s, the Undo note has %i animations of its own (Q17)', async (reduceMotion, count) => {
+    await open({ colorScheme: 'dark', section: 'saved', feeds: 'some', reduceMotion });
+    const toast = await markDone();
+    expect([toast.props.entering, toast.props.exiting].filter(Boolean).length).toBe(count * 2);
+  });
 });

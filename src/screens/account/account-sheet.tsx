@@ -5,6 +5,7 @@ import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { useAuth } from '@/auth/auth-context';
 import { AppText } from '@/components/app-text';
+import { DepthPressable } from '@/components/depth-pressable';
 import { NativeSheet } from '@/components/native-sheet';
 import { useEnvironment, useSizeScale } from '@/environment';
 import { spacing } from '@/theme/spacing';
@@ -127,7 +128,7 @@ function AccountSheetContent({ onClose }: { onClose: () => void }) {
 
 /**
  * The account circle at the top right of Feeds and Saved (P17): the User's initial in D5's
- * "yours" colours (Gold on Navy, deep gold on sand). Tapping it opens the Account sheet.
+ * "yours" Gold, on a soft face (D27). Tapping it opens the Account sheet.
  * `initiallyOpen` is for the state gallery's open-sheet worlds.
  */
 export function AccountButton({ initiallyOpen = false }: { initiallyOpen?: boolean }) {
@@ -139,13 +140,15 @@ export function AccountButton({ initiallyOpen = false }: { initiallyOpen?: boole
 
   return (
     <>
-      <Pressable
+      <DepthPressable
+        level="soft"
         role="button"
         aria-label={account ? `Account, ${account.name ?? account.email}` : 'Account'}
         onPress={() => setOpen(true)}
         // With the hit slop the target reaches 48 dp (Q15).
         hitSlop={spacing.related}
-        className="items-center justify-center rounded-full bg-indicator"
+        // A soft object like the chips beside it (D27), its Gold initial saying "yours" (D5).
+        className="items-center justify-center rounded-full"
         style={{ width: size, height: size }}
       >
         {account ? (
@@ -153,7 +156,7 @@ export function AccountButton({ initiallyOpen = false }: { initiallyOpen?: boole
             {account.initial}
           </AppText>
         ) : null}
-      </Pressable>
+      </DepthPressable>
       <NativeSheet open={open} onClose={close}>
         <AccountSheetContent onClose={close} />
       </NativeSheet>
