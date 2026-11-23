@@ -104,3 +104,13 @@ test('every world in the catalog is in the gallery, once, so the visual check wa
   expect(inGallery.toSorted()).toEqual(inCatalog.toSorted());
   expect(new Set(inGallery).size).toBe(inGallery.length);
 });
+
+test('a link with parameters the gallery doesn\'t know falls back to its defaults (Q25)', async () => {
+  await renderRouter(routes, { initialUrl: `/gallery?world=nope&theme=${'x'.repeat(500)}&capture=yes` });
+
+  // Not capture mode, the first world, and its own theme.
+  expect(await screen.findByRole('heading', { name: 'State gallery' })).toBeOnTheScreen();
+  expect(screen.getByRole('radio', { name: 'Dark, Feeds' })).toBeChecked();
+  expect(screen.getByRole('radio', { name: 'Dark' })).toBeChecked();
+  expect(Uniwind.currentTheme).toBe('dark');
+});

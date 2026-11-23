@@ -69,9 +69,10 @@ export function GalleryScreen() {
   const insets = useSafeAreaInsets();
   // The link is the single source of truth, so `feedsmith://gallery?world=…&theme=…`
   // switches an open gallery too. `capture=1` shows the world alone, filling the screen, for the visual check (FEE-70).
-  const params = useLocalSearchParams<{ world?: string; theme?: ThemeName; capture?: string }>();
+  const params = useLocalSearchParams<{ world?: string; theme?: string; capture?: string }>();
   const selected = ALL.find(({ world }) => world.id === params.world) ?? ALL[0];
-  const theme = params.theme ?? selected.world.spec.colorScheme;
+  // Link parameters are untrusted (Q25): anything but a known theme means the world's own.
+  const theme = params.theme === 'dark' || params.theme === 'light' ? params.theme : selected.world.spec.colorScheme;
 
   if (params.capture === '1') {
     return (

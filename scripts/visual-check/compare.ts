@@ -58,10 +58,16 @@ export function halve(png: Buffer): Buffer {
   return PNG.sync.write(half, { colorType: 2, deflateLevel: 9 });
 }
 
-/** Drops a PNG's top `rows`: the status bar, whose icons come from the system, not the app. */
-export function cropTop(png: Buffer, rows: number): Buffer {
+/**
+ * Drops a PNG's `top` rows and `right` columns: the status bar, whose icons come from the system, and the
+ * edge where a scroll indicator sometimes lingers once animations are off. No screen draws there.
+ */
+export function crop(png: Buffer, { top, right }: { top: number; right: number }): Buffer {
   const source = PNG.sync.read(png);
-  const cropped = new PNG({ width: source.width, height: source.height - rows });
-  source.data.copy(cropped.data, 0, rows * source.width * 4);
+  const width = source.width - right;
+  const cropped = new PNG({ width, height: source.height - top });
+  for (let y = 0; y < cropped.height; y++) {
+    source.data.copy(cropped.data, y * width * 4, ((y + top) * source.width) * 4, ((y + top) * source.width + width) * 4);
+  }
   return PNG.sync.write(cropped);
 }

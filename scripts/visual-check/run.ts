@@ -9,14 +9,15 @@
  * A check never writes an approved picture. It needs the debug build running against Metro, since the
  * gallery is dev-only (T13). For the run it turns animations off and puts the status bar in demo mode
  * (a fixed clock and battery), and it puts both back afterwards, even when stopped with Ctrl-C. The status
- * bar is cropped off every picture anyway, since other apps' notification icons show there.
+ * bar is cropped off every picture anyway, since other apps' notification icons show there, and so is the
+ * right edge, where a scroll indicator sometimes lingers with animations off.
  */
 import { spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import * as catalog from '../../src/worlds/catalog';
-import { compare, cropTop, halve } from './compare';
+import { compare, crop, halve } from './compare';
 
 const APP = 'com.mediatedreality.feedsmith';
 const APPROVED = 'test/visual/approved';
@@ -25,6 +26,8 @@ const DIFF = '.visual-check/diff';
 const THEMES = ['dark', 'light'] as const;
 /** The share of pixels that may change before a world counts as different: about one line of anti-aliasing. */
 const TOLERANCE = 0.001;
+/** Pixels cropped off the right edge, where a scroll indicator sometimes lingers; content keeps its margin clear of it. */
+const SCROLL_INDICATOR = 16;
 const ANIMATION_SETTINGS = ['animator_duration_scale', 'transition_animation_scale', 'window_animation_scale'];
 
 const WORLD_IDS: string[] = Object.values(catalog).flatMap((worlds) => worlds.map((world) => world.id));
@@ -43,32 +46,46 @@ const demo = (command: string, extras: string[] = []) =>
 
 /** Turns animations off and fixes the status bar; returns what puts the device back. */
 function prepareDevice(): () => void {
-  const before = ANIMATION_SETTINGS.map((name) => [name, shell('settings', 'get', 'global', name)] as const);
-  const demoAllowed = shell('settings', 'get', 'global', 'sysui_demo_allowed');
-  for (const name of ANIMATION_SETTINGS) shell('settings', 'put', 'global', name, '0');
-  shell('settings', 'put', 'global', 'sysui_demo_allowed', '1');
-  demo('enter');
-  demo('clock', ['-e', 'hhmm', '1200']);
-  demo('battery', ['-e', 'level', '100', '-e', 'plugged', 'false']);
-  demo('network', ['-e', 'wifi', 'show', '-e', 'level', '4']);
-  demo('network', ['-e', 'mobile', 'hide']);
-  demo('notifications', ['-e', 'visible', 'false']);
-
+  // Read everything first, so whatever happens next, the device can be put back as it was.
+  const before = [...ANIMATION_SETTINGS, 'sysui_demo_allowed'].map((name) => [name, shell('settings', 'get', 'global', name)] as const);
   let restored = false;
-  return () => {
+  const restore = () => {
     if (restored) return;
     restored = true;
-    demo('exit');
-    shell('settings', 'put', 'global', 'sysui_demo_allowed', demoAllowed === 'null' ? '0' : demoAllowed);
-    for (const [name, value] of before) {
-      if (value === 'null') shell('settings', 'delete', 'global', name);
-      else shell('settings', 'put', 'global', name, value);
+    // Each step on its own, so one that fails doesn't leave the rest changed.
+    const steps = [
+      () => demo('exit'),
+      ...before.map(([name, value]) => () =>
+        value === 'null' ? shell('settings', 'delete', 'global', name) : shell('settings', 'put', 'global', name, value),
+      ),
+    ];
+    for (const step of steps) {
+      try {
+        step();
+      } catch (error) {
+        console.error(`Couldn't put the device back: ${error instanceof Error ? error.message : error}`);
+      }
     }
   };
+
+  try {
+    for (const name of ANIMATION_SETTINGS) shell('settings', 'put', 'global', name, '0');
+    shell('settings', 'put', 'global', 'sysui_demo_allowed', '1');
+    demo('enter');
+    demo('clock', ['-e', 'hhmm', '1200']);
+    demo('battery', ['-e', 'level', '100', '-e', 'plugged', 'false']);
+    demo('network', ['-e', 'wifi', 'show', '-e', 'level', '4']);
+    demo('network', ['-e', 'mobile', 'hide']);
+    demo('notifications', ['-e', 'visible', 'false']);
+  } catch (error) {
+    restore();
+    throw error;
+  }
+  return restore;
 }
 
-/** Waits without leaving the synchronous loop. */
-const pause = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+/** Waits, letting a Ctrl-C or kill be handled meanwhile. */
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const screenshot = () => adb(['exec-out', 'screencap', '-p'], true);
 
@@ -80,41 +97,46 @@ function statusBarRows(): number {
 }
 
 /** Opens a world and captures it once two screenshots in a row agree, so loading and settling are over. */
-function capture(world: string, theme: string, statusBar: number): Buffer {
+async function capture(world: string, theme: string, statusBar: number): Promise<Buffer> {
   const link = `feedsmith://gallery?world=${world}&theme=${theme}&capture=1`;
   shell('am', 'start', '-W', '-a', 'android.intent.action.VIEW', '-d', `'${link}'`, APP);
   let last = screenshot();
   for (let attempt = 0; attempt < 12; attempt++) {
-    pause(attempt === 0 ? 700 : 400);
+    await pause(attempt === 0 ? 700 : 400);
     const next = screenshot();
-    if (next.equals(last)) return halve(cropTop(next, statusBar));
+    if (next.equals(last)) return halve(crop(next, { top: statusBar, right: SCROLL_INDICATOR }));
     last = next;
   }
   console.warn(`  ${world} (${theme}) never stopped changing; comparing its last frame`);
-  return halve(cropTop(last, statusBar));
+  return halve(crop(last, { top: statusBar, right: SCROLL_INDICATOR }));
 }
 
-function check(only: string[]) {
+async function check(only: string[]) {
   const unknown = only.filter((id) => !WORLD_IDS.includes(id));
   if (unknown.length) throw new Error(`No such world: ${unknown.join(', ')}`);
   const worlds = only.length ? only : WORLD_IDS;
+  // Only this check's pictures are left to approve, never an earlier run's.
   rmSync(DIFF, { recursive: true, force: true });
+  rmSync(LATEST, { recursive: true, force: true });
   mkdirSync(LATEST, { recursive: true });
   mkdirSync(DIFF, { recursive: true });
 
   const statusBar = statusBarRows();
   const restore = prepareDevice();
+  // A Ctrl-C or kill stops the run after the picture in hand, and `finally` puts the device back.
+  let interrupted = false;
   const stop = () => {
-    restore();
-    process.exit(130);
+    interrupted = true;
   };
   process.on('SIGINT', stop);
+  process.on('SIGTERM', stop);
   const report: { name: string; verdict: string }[] = [];
   try {
     for (const world of worlds) {
       for (const theme of THEMES) {
+        if (interrupted) break;
         const name = `${world}-${theme}`;
-        const picture = capture(world, theme, statusBar);
+        const picture = await capture(world, theme, statusBar);
         writeFileSync(join(LATEST, `${name}.png`), picture);
         const approvedPath = join(APPROVED, `${name}.png`);
         if (!existsSync(approvedPath)) {
@@ -134,7 +156,13 @@ function check(only: string[]) {
     }
   } finally {
     process.off('SIGINT', stop);
+    process.off('SIGTERM', stop);
     restore();
+  }
+  if (interrupted) {
+    console.log('\nStopped; the device is back as it was.');
+    process.exitCode = 130;
+    return;
   }
 
   const total = worlds.length * THEMES.length;
@@ -154,7 +182,7 @@ function approve(args: string[]) {
   const chosen = args.includes('--all')
     ? captured
     : captured.filter((file) => args.some((id) => THEMES.some((theme) => file === `${id}-${theme}.png`)));
-  const missing = args.filter((id) => id !== '--all' && !chosen.some((file) => file.startsWith(`${id}-`)));
+  const missing = args.filter((id) => id !== '--all' && !THEMES.some((theme) => chosen.includes(`${id}-${theme}.png`)));
   if (missing.length) throw new Error(`The last check didn't capture: ${missing.join(', ')}`);
   mkdirSync(APPROVED, { recursive: true });
   for (const file of chosen) copyFileSync(join(LATEST, file), join(APPROVED, file));
@@ -163,7 +191,7 @@ function approve(args: string[]) {
 
 const [command, ...rest] = process.argv.slice(2);
 try {
-  if (command === 'check') check(rest);
+  if (command === 'check') await check(rest);
   else if (command === 'approve') approve(rest);
   else {
     console.error('Usage: bun scripts/visual-check/run.ts check [world-id …] | approve <world-id …> | approve --all');

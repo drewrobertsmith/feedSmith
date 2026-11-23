@@ -1,6 +1,6 @@
 import { PNG } from 'pngjs';
 
-import { compare, cropTop, halve } from '../scripts/visual-check/compare';
+import { compare, crop, halve } from '../scripts/visual-check/compare';
 
 /** A `width`×`height` PNG of one colour, with `paint` changing pixels by position. */
 function png(width: number, height: number, colour: number[], paint?: (x: number, y: number) => number[] | undefined) {
@@ -47,8 +47,9 @@ test('halving averages each two-by-two block', () => {
   expect(Array.from(half.data.subarray(0, 4))).toEqual([100, 50, 25, 255]);
 });
 
-test('cropping the top drops the status bar and keeps the rest as it was', () => {
-  const cropped = PNG.sync.read(cropTop(png(3, 5, MIDNIGHT, (_x, y) => (y < 2 ? [255, 255, 255] : undefined)), 2));
-  expect([cropped.width, cropped.height]).toEqual([3, 3]);
-  expect(Array.from(cropped.data.subarray(0, 3))).toEqual(MIDNIGHT);
+test('cropping drops the status bar and the scroll indicator\'s edge, and keeps the rest as it was', () => {
+  const edges = (x: number, y: number) => (y < 2 || x > 3 ? [255, 255, 255] : undefined);
+  const cropped = PNG.sync.read(crop(png(5, 5, MIDNIGHT, edges), { top: 2, right: 1 }));
+  expect([cropped.width, cropped.height]).toEqual([4, 3]);
+  expect(Array.from(cropped.data)).toEqual(Array.from({ length: 12 }, () => [...MIDNIGHT, 255]).flat());
 });
