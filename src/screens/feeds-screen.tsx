@@ -130,12 +130,24 @@ export function FeedsScreen({ feed }: { feed?: string }) {
           Feeds
         </AppText>
         {chips.length > 0 ? (
-          <Pressable role="button" aria-label="Manage Feeds" onPress={manageFeeds} hitSlop={spacing.related} className="p-inside">
-            <SymbolView name={{ ios: 'slider.horizontal.3', android: 'tune' }} size={MANAGE_ICON} tintColor={theme.text} />
-          </Pressable>
+          <View className="flex-row items-center gap-related">
+            {/* Adding a Feed is always here, in the same place (Q31, FEE-44); Manage Feeds moves to the Account sheet with FEE-35 (D17). */}
+            <Pressable role="button" aria-label="Add a Feed" onPress={addFeed} hitSlop={spacing.related} className="p-inside">
+              <SymbolView name={{ ios: 'plus', android: 'add' }} size={MANAGE_ICON} tintColor={theme.text} />
+            </Pressable>
+            <Pressable
+              role="button"
+              aria-label="Manage Feeds"
+              onPress={manageFeeds}
+              hitSlop={spacing.related}
+              className="p-inside"
+            >
+              <SymbolView name={{ ios: 'slider.horizontal.3', android: 'tune' }} size={MANAGE_ICON} tintColor={theme.text} />
+            </Pressable>
+          </View>
         ) : null}
       </View>
-      {chips.length > 0 ? <ChipRow chips={chips} selected={selectedChip?.id ?? null} onSelect={select} onAdd={addFeed} /> : null}
+      {chips.length > 0 ? <ChipRow chips={chips} selected={selectedChip?.id ?? null} onSelect={select} /> : null}
       {selectedChip && empty ? (
         <AppText variant="reading" className="px-edge text-text-muted">
           {`No Articles from ${selectedChip.title} in the last 30 days.`}

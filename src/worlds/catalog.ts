@@ -45,6 +45,12 @@ export const ALL_WORLDS = [
   { id: 'all-feed', label: 'One Feed chosen', spec: { colorScheme: 'dark', feeds: 'some', feed: 'f1' } },
   { id: 'all-feed-light', label: 'One Feed chosen, light', spec: { colorScheme: 'light', feeds: 'some', feed: 'f2' } },
   { id: 'all-feed-empty', label: 'A Feed with nothing new', spec: { colorScheme: 'dark', feeds: 'some', feed: 'f3' } },
+  { id: 'all-many-feeds', label: 'Many Feeds, one long name', spec: { colorScheme: 'dark', feeds: 'some', chips: 'many' } },
+  {
+    id: 'all-many-feeds-largest-font',
+    label: 'Many Feeds, largest font size',
+    spec: { colorScheme: 'light', feeds: 'some', chips: 'many', fontScale: 2 },
+  },
   {
     id: 'all-remove-animations',
     label: 'All, Remove animations',
