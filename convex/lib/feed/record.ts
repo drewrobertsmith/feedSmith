@@ -78,7 +78,10 @@ async function setStatus(ctx: MutationCtx, feed: Doc<'feeds'>, status: 'working'
   if (feed.status !== status) await ctx.db.patch(feed._id, { status });
 }
 
-/** Marks a Feed working and sets its next check from its pace (T19). */
+/**
+ * Marks a Feed working and sets its next check from its pace (T19). Callers check first that no
+ * newer fetch has finished (`recordFetch`, `recordNotModified`), so an older result never wins.
+ */
 export async function markWorking(ctx: MutationCtx, feedId: Id<'feeds'>, now: number, validators?: Validators) {
   const feed = await ctx.db.get(feedId);
   if (!feed) return;

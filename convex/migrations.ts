@@ -31,13 +31,17 @@ export const moveFeedSchedules = internalMutation({
           lastModified: feed.lastModified,
         });
       }
-      await ctx.db.patch(feed._id, {
-        nextFetchAt: undefined,
-        lastFetchedAt: undefined,
-        failures: undefined,
-        etag: undefined,
-        lastModified: undefined,
-      });
+      // Only a Feed that still has them: rewriting the rest would re-run every open chip row.
+      const moved = ['nextFetchAt', 'lastFetchedAt', 'failures', 'etag', 'lastModified'] as const;
+      if (moved.some((field) => feed[field] !== undefined)) {
+        await ctx.db.patch(feed._id, {
+          nextFetchAt: undefined,
+          lastFetchedAt: undefined,
+          failures: undefined,
+          etag: undefined,
+          lastModified: undefined,
+        });
+      }
     }
     if (!page.isDone) await ctx.scheduler.runAfter(0, internal.migrations.moveFeedSchedules, { cursor: page.continueCursor });
     return null;

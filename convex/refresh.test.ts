@@ -65,7 +65,9 @@ const feedOf = (s: Awaited<ReturnType<typeof setup>>, id: Id<'feeds'>) =>
   s.t.run(async (ctx) => {
     const feed = await ctx.db.get(id);
     const schedule = await ctx.db.query('feedSchedules').withIndex('by_feed', (q) => q.eq('feedId', id)).unique();
-    if (!feed || !schedule) return feed;
+    if (!feed) return feed;
+    // Every stored Feed has a schedule; a missing one is a bug, not a Feed to read without it.
+    if (!schedule) throw new Error(`Feed ${id} has no schedule`);
     const { nextFetchAt, lastFetchedAt, failures, etag, lastModified } = schedule;
     return { ...feed, nextFetchAt, lastFetchedAt, failures, etag, lastModified };
   });

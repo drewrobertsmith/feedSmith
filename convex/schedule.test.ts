@@ -135,9 +135,10 @@ describe("a Feed's fetch schedule lives apart from the Feed (FEE-54)", () => {
 
 describe('moving existing Feeds onto schedules (FEE-54 migration)', () => {
   /** A Feed stored before FEE-54, with its schedule on the Feed itself. */
+  let feeds = 0;
   const oldFeed = (userId: Id<'users'>, fields: Record<string, unknown>) => ({
     userId,
-    url: `https://old-${Math.random()}.example.com/feed`,
+    url: `https://old-${(feeds += 1)}.example.com/feed`,
     title: 'Old',
     status: 'working' as const,
     ...fields,
@@ -175,10 +176,41 @@ describe('moving existing Feeds onto schedules (FEE-54 migration)', () => {
     await t.run((ctx) => ctx.db.insert('feeds', oldFeed(userId, {})));
 
     await t.mutation(internal.migrations.moveFeedSchedules, {});
+    const afterFirst = await t.run((ctx) => ctx.db.query('feeds').collect());
     await t.mutation(internal.migrations.moveFeedSchedules, {});
 
+    // The second run rewrites nothing, so no open chip row re-runs.
+    expect(await t.run((ctx) => ctx.db.query('feeds').collect())).toEqual(afterFirst);
     const schedules = await t.run((ctx) => ctx.db.query('feedSchedules').collect());
     expect(schedules).toHaveLength(1);
     expect(schedules[0]).toMatchObject({ nextFetchAt: 0, failures: 0 });
   });
+});
+
+test('more Feeds than one batch are all moved, across scheduled runs', async () => {
+  const t = convexTest(schema, modules);
+  const userId = await t.run((ctx) => ctx.db.insert('users', { email: 'a@example.com' }));
+  await t.run(async (ctx) => {
+    for (let i = 0; i < 230; i++) {
+      await ctx.db.insert('feeds', { userId, url: `https://f${i}.example.com/feed`, title: `F${i}`, nextFetchAt: i });
+    }
+  });
+
+  await t.mutation(internal.migrations.moveFeedSchedules, {});
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+  const schedules = await t.run((ctx) => ctx.db.query('feedSchedules').collect());
+  expect(schedules).toHaveLength(230);
+  expect(new Set(schedules.map((s) => s.nextFetchAt)).size).toBe(230);
+});
+
+test("an add that finishes after its Account was deleted stores nothing (P18)", async () => {
+  const t = convexTest(schema, modules);
+  const userId = await t.run((ctx) => ctx.db.insert('users', { email: 'a@example.com' }));
+  await t.run((ctx) => ctx.db.delete(userId));
+
+  await t.mutation(internal.feeds.store, { userId, url: 'https://late.example.com/feed', title: 'Late', articles: [], now: START });
+
+  expect(await t.run((ctx) => ctx.db.query('feeds').collect())).toEqual([]);
+  expect(await t.run((ctx) => ctx.db.query('feedSchedules').collect())).toEqual([]);
 });

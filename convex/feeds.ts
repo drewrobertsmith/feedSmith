@@ -170,6 +170,8 @@ export const store = internalMutation({
       .withIndex('by_user_url', (q) => q.eq('userId', userId).eq('url', url))
       .first();
     if (existing) return { title: existing.title, feedId: existing._id };
+    // The Account was deleted while this add was fetching: store nothing for it (P18, Q28).
+    if ((await ctx.db.get(userId)) === null) return null;
     const feedId = await ctx.db.insert('feeds', { userId, url, title, siteUrl, iconUrl });
     await storeNewArticles(ctx, userId, feedId, articles, now);
     await markWorking(ctx, feedId, now, { etag, lastModified });
