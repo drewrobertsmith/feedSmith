@@ -3,6 +3,21 @@
 // tests assert what it receives.
 jest.mock('@/environment/motion-config', () => ({ MotionConfig: jest.fn(() => null) }));
 
+// The chip switch's slide needs Reanimated too (FEE-42): it becomes a plain wrapper that shows
+// which chip's rows are shown.
+jest.mock('@/components/chip-switch', () => {
+  const { View } = require('react-native');
+  return {
+    // The slide can't run here (FEE-33); `index` shows which chip the rows slide for.
+    ChipSwitch: ({ index, children }) => (
+      <View testID="chip-switch" index={index}>
+        {children}
+      </View>
+    ),
+    SlideRow: ({ children }) => children,
+  };
+});
+
 // The drag gesture needs Reanimated too (D13): its one adapter becomes a plain row whose handle
 // carries `onDrop`, so tests drop a row where a drag would.
 jest.mock('@/components/drag-row', () => {

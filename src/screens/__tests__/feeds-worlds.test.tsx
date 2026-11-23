@@ -89,22 +89,24 @@ describe('All', () => {
     theme: 'dark' | 'light';
     titleSize: number;
     selected: string;
+    /** Rows that name their Feed: none when one Feed is chosen, since its chip names it (FEE-42). */
+    feedNames: number;
   };
   const ROWS = FIXTURE_ROWS.length;
   const READ = FIXTURE_ROWS.filter((r) => r.read).length;
   const VERGE_ROWS = FIXTURE_ROWS.filter((r) => r.feedId === 'f1').length;
   const SHOWS: Record<AllWorldId, Shows> = {
-    'all-dark': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All' },
-    'all-light': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'light', titleSize: 24, selected: 'All' },
-    'all-read': { rows: ROWS, read: ROWS, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All' },
-    'all-empty': { rows: 0, read: 0, empty: true, refreshing: false, theme: 'dark', titleSize: 24, selected: '' },
-    'all-loading': { rows: 0, read: 0, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: '' },
-    'all-refreshing': { rows: ROWS, read: READ, empty: false, refreshing: true, theme: 'light', titleSize: 24, selected: 'All' },
-    'all-largest-font': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 48, selected: 'All' },
-    'all-feed': { rows: VERGE_ROWS, read: 1, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'The Verge, Pinned' },
-    'all-feed-light': { rows: 1, read: 0, empty: false, refreshing: false, theme: 'light', titleSize: 24, selected: 'Calm Notes' },
-    'all-feed-empty': { rows: 0, read: 0, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'Daring Fireball' },
-    'all-remove-animations': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All' },
+    'all-dark': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All', feedNames: ROWS },
+    'all-light': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'light', titleSize: 24, selected: 'All', feedNames: ROWS },
+    'all-read': { rows: ROWS, read: ROWS, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All', feedNames: ROWS },
+    'all-empty': { rows: 0, read: 0, empty: true, refreshing: false, theme: 'dark', titleSize: 24, selected: '', feedNames: 0 },
+    'all-loading': { rows: 0, read: 0, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: '', feedNames: 0 },
+    'all-refreshing': { rows: ROWS, read: READ, empty: false, refreshing: true, theme: 'light', titleSize: 24, selected: 'All', feedNames: ROWS },
+    'all-largest-font': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 48, selected: 'All', feedNames: ROWS },
+    'all-feed': { rows: VERGE_ROWS, read: 1, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'The Verge, Pinned', feedNames: 0 },
+    'all-feed-light': { rows: 1, read: 0, empty: false, refreshing: false, theme: 'light', titleSize: 24, selected: 'Calm Notes', feedNames: 0 },
+    'all-feed-empty': { rows: 0, read: 0, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'Daring Fireball', feedNames: 0 },
+    'all-remove-animations': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All', feedNames: ROWS },
   };
 
   test.each(ALL_WORLDS)('$label', async ({ id, spec }) => {
@@ -123,6 +125,7 @@ describe('All', () => {
       expect(screen.getByTestId('all-list').props.refreshControl.props.refreshing).toBe(shows.refreshing);
     }
     if (shows.selected) expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName(shows.selected);
+    expect(screen.queryAllByTestId('row-feed-name')).toHaveLength(shows.feedNames);
     expect(Uniwind.currentTheme).toBe(shows.theme);
   });
 
@@ -294,6 +297,38 @@ describe('All', () => {
     await screen.findAllByRole('link');
     await act(async () => fireEvent(screen.getAllByTestId('row-favicon')[0], 'error', { nativeEvent: { error: 'failed' } }));
     expect(screen.getByText('T')).toBeOnTheScreen();
+  });
+
+  test("a row's meta, byline and Subtitle are three voices: muted sans, full sans, muted Literata (Q29, FEE-42)", async () => {
+    await open({ colorScheme: 'dark', feeds: 'some' });
+    await screen.findAllByRole('link');
+    const [first] = FIXTURE_ROWS;
+    expect(screen.getAllByTestId('row-feed-name')[0]).toHaveStyle({ fontFamily: 'InstrumentSans' });
+    expect(screen.getAllByTestId('row-feed-name')[0]).toHaveProp('className', expect.stringContaining('text-text-muted'));
+    expect(screen.getByText(first.title)).toHaveStyle({ fontFamily: 'Literata' });
+    const credit = screen.getByText('By Terrence O’Brien');
+    expect(credit).toHaveStyle({ fontFamily: 'InstrumentSans' });
+    expect(credit).not.toHaveProp('className', expect.stringContaining('text-text-muted'));
+    const summary = screen.getByText(first.subtitle!);
+    expect(summary).toHaveStyle({ fontFamily: 'Literata', fontSize: 15 });
+    expect(summary).toHaveProp('className', expect.stringContaining('text-text-muted'));
+  });
+
+  test("with one Feed chosen, rows don't repeat its name, to the eye or to TalkBack (FEE-42)", async () => {
+    await open({ colorScheme: 'dark', feeds: 'some', feed: 'f1' });
+    const [first] = FIXTURE_ROWS;
+    const row = (await screen.findAllByRole('link'))[0];
+    expect(row).toHaveAccessibleName(`${first.title}, By Terrence O’Brien, ${publishedAgo(first.publishedAt, FIXTURE_NOW)}`);
+    expect(screen.getAllByTestId('row-favicon').length).toBeGreaterThan(0);
+  });
+
+  test('switching chips tells the rows which way to slide (FEE-42)', async () => {
+    const user = userEvent.setup();
+    await open({ colorScheme: 'dark', feeds: 'some' });
+    await screen.findAllByRole('link');
+    expect(screen.getByTestId('chip-switch')).toHaveProp('index', 0);
+    await user.press(screen.getByRole('tab', { name: 'Calm Notes' }));
+    expect(screen.getByTestId('chip-switch')).toHaveProp('index', 2);
   });
 
   test('a Subtitle is two lines at most', async () => {

@@ -14,6 +14,8 @@ export const typeScale = {
   headline: { fontFamily: 'Literata', fontWeight: '600', fontSize: 30, lineHeight: 38 },
   /** An Article's Subtitle under its headline. */
   deck: { fontFamily: 'Literata', fontWeight: '400', fontSize: 20, lineHeight: 30 },
+  /** An Article's Subtitle in a list row: the author's words, small (FEE-42, Q29). */
+  summary: { fontFamily: 'Literata', fontWeight: '400', fontSize: 15, lineHeight: 22 },
   /** A heading inside an Article's text. */
   subhead: { fontFamily: 'Literata', fontWeight: '600', fontSize: 22, lineHeight: 30 },
 } as const satisfies Record<string, TextStyle>;
