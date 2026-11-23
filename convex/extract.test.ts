@@ -254,12 +254,41 @@ describe('moving page-reading state off the Article (FEE-62 migration)', () => {
     await t.mutation(internal.migrations.movePageReads, {});
 
     const [articles, reads] = await t.run(async (ctx) => [await ctx.db.query('articles').collect(), await ctx.db.query('pageReads').collect()]);
+    // A claim made by the code before this move belongs to a run that's gone: its page is read again.
     expect(Object.fromEntries(reads.map((read) => [read.articleId, read.state]))).toEqual({
       [ids.pending]: 'pending',
-      [ids.reading]: 'reading',
+      [ids.reading]: 'pending',
       [ids.failed]: 'failed',
     });
     for (const article of articles) expect(article).not.toHaveProperty('extraction');
     expect([articles, reads]).toEqual(afterFirst);
   });
+});
+
+test("a Feed whose pages were waiting when the code changed has them read, not stranded (FEE-62 migration)", async () => {
+  const t = convexTest(schema, modules);
+  pages['https://calmnotes.example/waiting'] = article;
+  const articleId = await t.run(async (ctx) => {
+    const userId = await ctx.db.insert('users', { email: 'a@example.com' });
+    const feedId = await ctx.db.insert('feeds', { userId, url: FEED, title: 'Calm Notes' });
+    const id = await ctx.db.insert('articles', {
+      userId,
+      feedId,
+      guid: 'waiting',
+      title: 'waiting',
+      link: 'https://calmnotes.example/waiting',
+      publishedAt: NOW,
+      extraction: 'reading',
+    });
+    await ctx.db.insert('articleBodies', { userId, articleId: id, blocks: [], omitted: [] });
+    return id;
+  });
+
+  await t.mutation(internal.migrations.movePageReads, {});
+  await runScheduledNow(t);
+
+  expect(network.mock.calls.map(([url]) => url)).toContain('https://calmnotes.example/waiting');
+  expect(await t.run((ctx) => ctx.db.query('pageReads').collect())).toEqual([]);
+  const body = await t.run((ctx) => ctx.db.query('articleBodies').withIndex('by_article', (q) => q.eq('articleId', articleId)).unique());
+  expect(body!.blocks.length).toBeGreaterThan(0);
 });
