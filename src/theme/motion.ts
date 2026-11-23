@@ -20,4 +20,12 @@ export const motion = {
    * faded, on the fast-start, gentle-settle curve (FEE-42). The header stays still.
    */
   chipSwitch: { distance: 24, duration: 200, fadeFrom: 0.6, easing: [0.16, 1, 0.3, 1] },
+  /**
+   * The Pinned group opening and folding (FEE-60), tapped as often as any chip, so quiet, and never
+   * two things in one place. Opening: the chips after the group make room at once, and the Pinned
+   * Feeds' chips fade in `delay` later, travelling `distance` out from the Pinned chip, into space
+   * already opened. Folding: they fade back toward it over `exit`, and only then does the row close
+   * up. One curve, the fast-start, gentle-settle one; no scale, no bounce. About 260 ms each way.
+   */
+  groupReveal: { distance: 8, delay: 60, duration: 200, exit: 90, easing: [0.16, 1, 0.3, 1] },
 } as const;

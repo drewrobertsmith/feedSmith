@@ -7,7 +7,7 @@ import {
   type LayoutChangeEvent,
   type ScrollViewInstance,
 } from 'react-native';
-import Reanimated, { Easing, FadeOut, LinearTransition, ReduceMotion, ZoomIn } from 'react-native-reanimated';
+import Reanimated, { Easing, Keyframe, LayoutAnimationConfig, LinearTransition, ReduceMotion } from 'react-native-reanimated';
 
 import { AppText } from '@/components/app-text';
 import { FeedIcon } from '@/components/feed-icon';
@@ -21,15 +21,31 @@ import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
 
 const ICON = 16;
-/** A revealed chip grows in from slightly smaller, as a chosen chip springs (D12), and fades. */
-const REVEAL = ZoomIn.springify()
-  .damping(motion.chipSelect.damping)
-  .stiffness(motion.chipSelect.stiffness)
+const GROUP_EASING = Easing.bezier(...motion.groupReveal.easing);
+/** A revealed chip fades in, travelling a few points out from the Pinned chip (motion.groupReveal). */
+const REVEAL = new Keyframe({
+  0: { opacity: 0, transform: [{ translateX: -motion.groupReveal.distance }] },
+  100: { opacity: 1, transform: [{ translateX: 0 }], easing: GROUP_EASING },
+})
+  .duration(motion.groupReveal.duration)
+  // The chips after the group move first, fast at the start, so the Pinned Feeds appear where room has opened.
+  .delay(motion.groupReveal.delay)
   .reduceMotion(ReduceMotion.System);
-const FOLD = FadeOut.duration(150).reduceMotion(ReduceMotion.System);
-/** The chips after the group move over to make room, on the row's quick, settled curve (D13). */
-const MAKE_ROOM = LinearTransition.duration(motion.rowMakeRoom.duration)
-  .easing(Easing.bezier(...motion.rowMakeRoom.easing))
+/** Folding mirrors it: a quick fade, drifting back toward the Pinned chip, before anything closes up. */
+const FOLD = new Keyframe({
+  0: { opacity: 1, transform: [{ translateX: 0 }] },
+  100: { opacity: 0, transform: [{ translateX: -motion.groupReveal.distance }], easing: GROUP_EASING },
+})
+  .duration(motion.groupReveal.exit)
+  .reduceMotion(ReduceMotion.System);
+/** Opening: the chips after the group make room at once, on the reveal's own curve and timing. */
+const MAKE_ROOM = LinearTransition.duration(motion.groupReveal.duration)
+  .easing(GROUP_EASING)
+  .reduceMotion(ReduceMotion.System);
+/** Folding: they close up only once the group's chips have gone, so nothing slides over a fading chip. */
+const CLOSE_UP = LinearTransition.duration(motion.groupReveal.duration)
+  .delay(motion.groupReveal.exit)
+  .easing(GROUP_EASING)
   .reduceMotion(ReduceMotion.System);
 /** How wide the fade is where the row runs off-screen (FEE-44). */
 const FADE = spacing.section;
@@ -201,50 +217,54 @@ export function ChipRow({
         contentContainerClassName="items-center gap-related px-edge"
         contentContainerStyle={{ paddingBottom: spacing.related }}
       >
-        <Chip
-          label="All"
-          accessibleName="All"
-          selected={selected === null}
-          onPress={() => onSelect(null)}
-          onLayout={(event) => chipAt.current.set('', event.nativeEvent.layout)}
-        />
-        {/* Two or more Pinned Feeds read together, right after All (FEE-59). It names them for TalkBack. */}
-        {grouped ? (
+        {/* The row draws still the first time; only a real reveal moves (FEE-60). */}
+        <LayoutAnimationConfig skipEntering>
           <Chip
-            label="Pinned"
-            accessibleName={`Pinned: ${pinned.map((chip) => chip.title).join(', ')}`}
-            selected={selected === PINNED}
-            active={groupOpen && selected !== PINNED}
-            expanded={groupOpen}
-            onPress={() => onSelect(PINNED)}
-            // Open and folded follow the chosen view (FEE-60): expanding chooses Pinned, collapsing chooses All.
-            actions={[groupOpen ? { name: 'collapse', label: 'Collapse', run: () => onSelect(null) } : { name: 'expand', label: 'Expand', run: () => onSelect(PINNED) }]}
-            onLayout={(event) => chipAt.current.set(PINNED, event.nativeEvent.layout)}
+            label="All"
+            accessibleName="All"
+            selected={selected === null}
+            onPress={() => onSelect(null)}
+            onLayout={(event) => chipAt.current.set('', event.nativeEvent.layout)}
           />
-        ) : null}
-        {/* Every chip stays mounted: the reveal needs each one measured, and a person's Feeds are tens of small pills. */}
-        {/* react-doctor-disable-next-line react-doctor/rn-no-scrollview-mapped-list */}
-        {shownChips.map((chip) => (
-          // The group's chips grow and fade in from the Pinned chip, and the rest move over (D12); Remove animations makes it instant (Q17).
-          // Measured here, on the chip's place in the row, so a chosen chip scrolls into view (D18).
-          <Reanimated.View
-            key={chip.id}
-            entering={REVEAL}
-            exiting={FOLD}
-            layout={MAKE_ROOM}
-            onLayout={(event) => chipAt.current.set(chip.id, event.nativeEvent.layout)}
-          >
+          {/* Two or more Pinned Feeds read together, right after All (FEE-59). It names them for TalkBack. */}
+          {grouped ? (
             <Chip
-              label={chip.title}
-              accessibleName={chip.pinned ? `${chip.title}, Pinned` : chip.title}
-              selected={selected === chip.id}
-              icon={<FeedIcon key={chip.faviconUrl} url={chip.faviconUrl} title={chip.title} size={ICON} fallback="none" />}
-              onPress={() => onSelect(chip.id)}
-              onLongPress={() => void togglePin(chip)}
-              actions={[{ name: 'pin', label: chip.pinned ? 'Unpin' : 'Pin', run: () => void togglePin(chip) }]}
+              label="Pinned"
+              accessibleName={`Pinned: ${pinned.map((chip) => chip.title).join(', ')}`}
+              selected={selected === PINNED}
+              active={groupOpen && selected !== PINNED}
+              expanded={groupOpen}
+              onPress={() => onSelect(PINNED)}
+              // Open and folded follow the chosen view (FEE-60): expanding chooses Pinned, collapsing chooses All.
+              actions={[groupOpen ? { name: 'collapse', label: 'Collapse', run: () => onSelect(null) } : { name: 'expand', label: 'Expand', run: () => onSelect(PINNED) }]}
+              onLayout={(event) => chipAt.current.set(PINNED, event.nativeEvent.layout)}
             />
-          </Reanimated.View>
-        ))}
+          ) : null}
+          {/* Every chip stays mounted: the reveal needs each one measured, and a person's Feeds are tens of small pills. */}
+          {/* react-doctor-disable-next-line react-doctor/rn-no-scrollview-mapped-list */}
+          {shownChips.map((chip) => (
+            // The group's chips fade in from the Pinned chip, and the rest move over with them; Remove animations makes it instant (Q17).
+            // Measured here, on the chip's place in the row, so a chosen chip scrolls into view (D18).
+            <Reanimated.View
+              key={chip.id}
+              entering={REVEAL}
+              exiting={FOLD}
+              // Chosen as the row changes: open makes room at once, folding closes up after the fade.
+              layout={groupOpen ? MAKE_ROOM : CLOSE_UP}
+              onLayout={(event) => chipAt.current.set(chip.id, event.nativeEvent.layout)}
+            >
+              <Chip
+                label={chip.title}
+                accessibleName={chip.pinned ? `${chip.title}, Pinned` : chip.title}
+                selected={selected === chip.id}
+                icon={<FeedIcon key={chip.faviconUrl} url={chip.faviconUrl} title={chip.title} size={ICON} fallback="none" />}
+                onPress={() => onSelect(chip.id)}
+                onLongPress={() => void togglePin(chip)}
+                actions={[{ name: 'pin', label: chip.pinned ? 'Unpin' : 'Pin', run: () => void togglePin(chip) }]}
+              />
+            </Reanimated.View>
+          ))}
+        </LayoutAnimationConfig>
       </Animated.ScrollView>
       {/* More chips lie past a faded edge; the fade is the page's own colour, so it never greys. */}
       {fades ? (
