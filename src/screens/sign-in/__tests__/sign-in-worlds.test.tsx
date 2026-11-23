@@ -8,10 +8,10 @@ import SavedRoute from '@/app/(tabs)/saved';
 import AuthReturnRoute from '@/app/auth';
 import GalleryRoute from '@/app/gallery';
 import SignInRoute from '@/app/sign-in';
-import { MotionConfig } from '@/environment/motion-config';
 import { AppRoot } from '@/navigation/app-root';
 import { SIGN_IN_WORLDS, type SignInWorldId } from '@/worlds/catalog';
 import { createWorld, type World } from '@/worlds/world';
+import { reanimatedReducesMotion } from '../../../../test/reduced-motion';
 
 function renderWorld(world: World, initialUrl: string = world.initialUrl) {
   return renderRouter(
@@ -58,7 +58,8 @@ test.each(SIGN_IN_WORLDS)('$label', async ({ id, spec }) => {
   if (shows.error) expect(screen.getByRole('alert')).toHaveTextContent(shows.error);
   else expect(screen.queryByRole('alert')).not.toBeOnTheScreen();
   expect(Uniwind.currentTheme).toBe(shows.theme);
-  expect(jest.mocked(MotionConfig)).toHaveBeenLastCalledWith({ reduceMotion: shows.reduceMotion }, undefined);
+  // Reanimated itself reduces motion exactly when the world's Remove animations is on (Q17).
+  expect(reanimatedReducesMotion()).toBe(shows.reduceMotion);
   // Signed out, the sections stay out of reach.
   expect(screen.queryByRole('heading', { name: 'Feeds' })).not.toBeOnTheScreen();
   world.dispose();

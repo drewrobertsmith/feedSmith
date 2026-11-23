@@ -1,14 +1,17 @@
-// Reanimated 4.7.1 can't start under Jest (its native initializer calls `setCSSEventHandler`,
-// which its JS implementation throws on). The app's one Reanimated adapter is mocked instead;
-// tests assert what it receives.
-jest.mock('@/environment/motion-config', () => ({ MotionConfig: jest.fn(() => null) }));
+// Reanimated runs for real under Jest (FEE-33): its own resolver (package.json `jest.resolver`)
+// loads its web initializers instead of the native ones, and this adds its matchers
+// (`toHaveAnimatedStyle`) and fake-timer support.
+require('react-native-reanimated').setUpTests();
+// Expo Router's testing library would swap them back for mocks: its mocks file, without those two.
+jest.mock('expo-router/build/testing-library/mocks', () => require('./expo-router-test-mocks'));
 
-// The chip switch's slide needs Reanimated too (FEE-42): it becomes a plain wrapper that shows
-// which chip's rows are shown.
+// The chip switch (FEE-42) is a plain wrapper in tests that shows which chip's rows are shown.
+// Reanimated itself runs for real now (FEE-33); this double stays because the Feeds tests read
+// its `index`, and can move to the real slide with `toHaveAnimatedStyle` when they're next reworked.
 jest.mock('@/components/chip-switch', () => {
   const { View } = require('react-native');
   return {
-    // The slide can't run here (FEE-33); `index` shows which chip the rows slide for.
+    // `index` shows which chip the rows slide for.
     ChipSwitch: ({ index, children }) => (
       <View testID="chip-switch" index={index}>
         {children}
@@ -18,13 +21,13 @@ jest.mock('@/components/chip-switch', () => {
   };
 });
 
-// The drag gesture needs Reanimated too (D13): its one adapter becomes a plain row whose handle
+// The drag gesture (D13) is a plain row in tests whose handle
 // carries `onDrop`, so tests drop a row where a drag would.
 jest.mock('@/components/drag-row', () => {
   const { View } = require('react-native');
   return {
     DragList: ({ gap, children }) => <View style={{ gap }}>{children}</View>,
-    // The gesture can't run here (FEE-33); the handle keeps its TalkBack props, and `onDrop` stands in for a drag.
+    // A drag can't be driven through Jest's renderer, so the handle keeps its TalkBack props, and `onDrop` stands in for one.
     DragRow: ({ index, count, handle, handleLabel, onDrop, children }) => (
       <View style={{ flexDirection: 'row' }}>
         <View {...require('@/components/reorder-handle').reorderHandleProps({ index, count, label: handleLabel, onDrop })} onDrop={onDrop}>
