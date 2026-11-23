@@ -9,8 +9,10 @@ import {
   FIXTURE_CHIPS,
   FIXTURE_CHOICES,
   FIXTURE_EXTRACTING_ARTICLE,
+  FIXTURE_LONG_FEED_ARTICLE,
   FIXTURE_MANAGE,
   FIXTURE_MANAGE_PINNED,
+  FIXTURE_NO_LEAD_IMAGE_ARTICLE,
   FIXTURE_NOW,
   FIXTURE_OMITTED_ARTICLE,
   FIXTURE_READ_ROWS,
@@ -50,7 +52,16 @@ export type WorldSpec = {
   /** Manage Feeds' writes don't reach the server, or the server refuses the name. */
   manageWrites?: 'fail' | 'invalid';
   /** The Article the Reading view opens. Defaults to one with every kind of block. */
-  article?: 'full' | 'omitted' | 'extracting' | 'unextracted' | 'unextracted-no-image' | 'missing' | 'loading';
+  article?:
+    | 'full'
+    | 'no-lead-image'
+    | 'long-feed-name'
+    | 'omitted'
+    | 'extracting'
+    | 'unextracted'
+    | 'unextracted-no-image'
+    | 'missing'
+    | 'loading';
 };
 
 /** What a world's fake Feeds were asked to do. */
@@ -72,6 +83,8 @@ export type SignInLog = { starts: number; completions: { code?: string; error?: 
 /** The Article each Reading world shows. */
 const READING_FIXTURES = {
   full: FIXTURE_ARTICLE,
+  'no-lead-image': FIXTURE_NO_LEAD_IMAGE_ARTICLE,
+  'long-feed-name': FIXTURE_LONG_FEED_ARTICLE,
   omitted: FIXTURE_OMITTED_ARTICLE,
   extracting: FIXTURE_EXTRACTING_ARTICLE,
   unextracted: FIXTURE_UNEXTRACTED_ARTICLE,

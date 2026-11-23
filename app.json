@@ -61,6 +61,19 @@
                   {
                     "path": "./node_modules/@expo-google-fonts/literata/400Regular/Literata_400Regular.ttf",
                     "weight": 400
+                  },
+                  {
+                    "path": "./node_modules/@expo-google-fonts/literata/400Regular_Italic/Literata_400Regular_Italic.ttf",
+                    "weight": 400,
+                    "style": "italic"
+                  },
+                  {
+                    "path": "./node_modules/@expo-google-fonts/literata/600SemiBold/Literata_600SemiBold.ttf",
+                    "weight": 600
+                  },
+                  {
+                    "path": "./node_modules/@expo-google-fonts/literata/700Bold/Literata_700Bold.ttf",
+                    "weight": 700
                   }
                 ]
               }

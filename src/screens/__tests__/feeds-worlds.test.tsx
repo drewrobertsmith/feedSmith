@@ -12,7 +12,7 @@ import ArticleRoute from '@/app/article/[id]';
 import AuthReturnRoute from '@/app/auth';
 import GalleryRoute from '@/app/gallery';
 import SignInRoute from '@/app/sign-in';
-import { publishedAgo } from '@/feeds/format';
+import { publishedAgo, publishedDate } from '@/feeds/format';
 import { AppRoot } from '@/navigation/app-root';
 import {
   ADD_FEED_WORLDS,
@@ -414,19 +414,23 @@ describe('the Reading view', () => {
   const MISSING = 'This Article isn’t available.';
   const BRINGING = 'Bringing in the full Article from its page…';
   const UNREAD = 'This Article couldn’t be brought in from its page.';
-  const full = { omittedLines: 0, titleSize: 24, note: null, openButton: false, leadImage: false } as const;
-  const fallback = { heading: CALM, body: SUBTITLE, omittedLines: 0, titleSize: 24, note: UNREAD, openButton: true, leadImage: true } as const;
+  // An Article's headline is Literata 30 (D6); "not available" is the app speaking, in the interface's title.
+  // Every Article with a link ends with Open original; the fallback offers it as its main action instead.
+  const full = { omittedLines: 0, titleSize: 30, note: null, openButton: true, leadImage: false } as const;
+  const fallback = { heading: CALM, body: SUBTITLE, omittedLines: 0, titleSize: 30, note: UNREAD, openButton: true, leadImage: true } as const;
   const SHOWS: Record<ReadingWorldId, Shows> = {
     'reading-dark': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'dark' },
     'reading-light': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'light' },
+    'reading-no-lead-image': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'dark' },
+    'reading-long-feed-name': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'light' },
     'reading-omitted': { ...full, heading: ARTICLE, body: 'And how the prices compare:', omittedLines: 2, theme: 'dark' },
-    'reading-missing': { ...full, heading: MISSING, body: null, theme: 'dark' },
+    'reading-missing': { ...full, heading: MISSING, body: null, titleSize: 24, openButton: false, theme: 'dark' },
     'reading-extracting': { ...full, heading: CALM, body: SUBTITLE, note: BRINGING, theme: 'dark' },
     'reading-unextracted': { ...fallback, theme: 'dark' },
     'reading-unextracted-no-image': { ...fallback, leadImage: false, theme: 'dark' },
     'reading-unextracted-light': { ...fallback, theme: 'light' },
-    'reading-unextracted-largest-font': { ...fallback, titleSize: 48, theme: 'dark' },
-    'reading-largest-font': { ...full, heading: ARTICLE, body: 'Talks resume next year.', titleSize: 48, theme: 'dark' },
+    'reading-unextracted-largest-font': { ...fallback, titleSize: 60, theme: 'dark' },
+    'reading-largest-font': { ...full, heading: ARTICLE, body: 'Talks resume next year.', titleSize: 60, theme: 'dark' },
   };
 
   test.each(READING_WORLDS)('$label', async ({ id, spec }) => {
@@ -439,8 +443,64 @@ describe('the Reading view', () => {
     else expect(screen.queryByText(new RegExp(`${BRINGING}|${UNREAD}`))).not.toBeOnTheScreen();
     expect(screen.queryAllByRole('button', { name: 'Open original' })).toHaveLength(shows.openButton ? 1 : 0);
     // The fallback draws only the lead image, when there is one.
-    if (shows.openButton) expect(screen.queryAllByTestId('block-image')).toHaveLength(shows.leadImage ? 1 : 0);
+    if (shows.note === UNREAD) expect(screen.queryAllByTestId('block-image')).toHaveLength(shows.leadImage ? 1 : 0);
     expect(Uniwind.currentTheme).toBe(shows.theme);
+  });
+
+  /** Every text on screen, in the order TalkBack reaches it. */
+  const readingOrder = () => screen.getAllByText(/.+/).map((node) => node.props.children).filter((text) => typeof text === 'string');
+
+  test('reads in order: headline, Subtitle, Feed, date, then the text (P13, Q15)', async () => {
+    await open({ colorScheme: 'dark', section: 'article' });
+    await screen.findByRole('heading', { name: ARTICLE });
+    const order = readingOrder();
+    const at = (text: string) => order.indexOf(text);
+    expect(at(ARTICLE)).toBeLessThan(at(FIXTURE_ARTICLE.subtitle!));
+    expect(at(FIXTURE_ARTICLE.subtitle!)).toBeLessThan(at(FIXTURE_ARTICLE.feedTitle));
+    expect(at(FIXTURE_ARTICLE.feedTitle)).toBeLessThan(at('Talks resume next year.'));
+  });
+
+  test("the Article is set for reading: Literata for its own words, the app's meta in Instrument Sans (D6)", async () => {
+    await open({ colorScheme: 'dark', section: 'article' });
+    expect(await screen.findByRole('heading', { name: ARTICLE })).toHaveStyle({ fontFamily: 'Literata', fontWeight: '600' });
+    expect(screen.getByText(FIXTURE_ARTICLE.subtitle!)).toHaveStyle({ fontFamily: 'Literata', fontSize: 20 });
+    expect(screen.getByRole('heading', { name: 'What was on the table' })).toHaveStyle({ fontFamily: 'Literata', fontSize: 22 });
+    expect(screen.getByText(FIXTURE_ARTICLE.feedTitle)).toHaveStyle({ fontFamily: 'InstrumentSans' });
+  });
+
+  test("the lead image shows once, even when it's also the first image in the text", async () => {
+    await open({ colorScheme: 'dark', section: 'article' });
+    await screen.findByRole('heading', { name: ARTICLE });
+    expect(screen.getAllByTestId('block-image')).toHaveLength(1);
+  });
+
+  test('an Article without a lead image goes straight from its meta to its text', async () => {
+    await open({ colorScheme: 'dark', section: 'article', article: 'no-lead-image' });
+    await screen.findByRole('heading', { name: ARTICLE });
+    expect(screen.queryAllByTestId('block-image')).toHaveLength(0);
+    expect(screen.queryByTestId('lead-image')).not.toBeOnTheScreen();
+  });
+
+  test("a long Feed name stays on one line, and the date is never cut", async () => {
+    await open({ colorScheme: 'light', section: 'article', article: 'long-feed-name' });
+    expect(await screen.findByText('The Verge - Full RSS for subscribers | The Verge')).toHaveProp('numberOfLines', 1);
+    expect(screen.getByText(publishedDate(FIXTURE_ARTICLE.publishedAt))).not.toHaveProp('numberOfLines');
+  });
+
+  test("scrolled text passes under a still, page-coloured backing, never under the status bar's icons (Q18)", async () => {
+    await open({ colorScheme: 'dark', section: 'article' });
+    await screen.findByRole('heading', { name: ARTICLE });
+    const backing = screen.getByTestId('status-bar-backing');
+    expect(backing).toHaveProp('pointerEvents', 'none');
+    expect(backing).toHaveProp('className', expect.stringContaining('bg-background'));
+  });
+
+  test('the Article ends plainly: a rule, then Open original, as a button (Q8)', async () => {
+    const user = userEvent.setup();
+    await open({ colorScheme: 'dark', section: 'article' });
+    await user.press(await screen.findByRole('button', { name: 'Open original' }));
+    expect(WebBrowser.openBrowserAsync).toHaveBeenLastCalledWith(FIXTURE_ARTICLE.link);
+    expect(screen.getByTestId('article-end')).toBeOnTheScreen();
   });
 
   test("when the page couldn't be read, Open original opens it in the browser (Q6)", async () => {
@@ -483,7 +543,7 @@ describe('the Reading view', () => {
     await open({ colorScheme: 'dark', section: 'article' });
     await user.press(await screen.findByRole('link', { name: 'Reuters reports' }));
     expect(WebBrowser.openBrowserAsync).toHaveBeenLastCalledWith('https://www.reuters.com/');
-    await user.press(screen.getByRole('link', { name: 'Open original' }));
+    await user.press(screen.getByRole('button', { name: 'Open original' }));
     expect(WebBrowser.openBrowserAsync).toHaveBeenLastCalledWith(FIXTURE_ARTICLE.link);
   });
 

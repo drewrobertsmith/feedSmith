@@ -75,6 +75,12 @@ export type AddFeedWorldId = (typeof ADD_FEED_WORLDS)[number]['id'];
 export const READING_WORLDS = [
   { id: 'reading-dark', label: 'Reading, dark', spec: { colorScheme: 'dark', section: 'article' } },
   { id: 'reading-light', label: 'Reading, light', spec: { colorScheme: 'light', section: 'article' } },
+  { id: 'reading-no-lead-image', label: 'No lead image', spec: { colorScheme: 'dark', section: 'article', article: 'no-lead-image' } },
+  {
+    id: 'reading-long-feed-name',
+    label: 'A long Feed name',
+    spec: { colorScheme: 'light', section: 'article', article: 'long-feed-name' },
+  },
   { id: 'reading-omitted', label: 'A video and a table left out', spec: { colorScheme: 'dark', section: 'article', article: 'omitted' } },
   { id: 'reading-missing', label: 'Article not available', spec: { colorScheme: 'dark', section: 'article', article: 'missing' } },
   { id: 'reading-extracting', label: 'Bringing in from the page', spec: { colorScheme: 'dark', section: 'article', article: 'extracting' } },

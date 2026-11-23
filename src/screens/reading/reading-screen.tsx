@@ -1,10 +1,11 @@
 import { router } from 'expo-router';
 import { useEffect, useEffectEvent } from 'react';
-import { ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/app-button';
 import { AppText } from '@/components/app-text';
+import { useSizeScale } from '@/environment';
 import { useArticle, useMarkRead, type Block, type ReadingArticle } from '@/feeds/feeds-data';
 import { publishedDate } from '@/feeds/format';
 import { openLink } from '@/feeds/open-link';
@@ -46,9 +47,73 @@ function PageUnavailable({ article }: { article: ReadingArticle }) {
   );
 }
 
-/** The Reading view: one Article's title, Feed, date and text (P13; polish comes in FEE-28). */
+/** About 34em of reading text: the column stops widening on wide screens (D6). */
+const MEASURE = 680;
+/** Room kept under every Article, the fallback too, for Save and Done (FEE-30). */
+const SAVE_AND_DONE_ROOM = spacing.section * 3;
+
+const textOf = (block: Block | undefined) =>
+  block?.type === 'paragraph'
+    ? block.spans
+        .map((span) => span.text)
+        .join('')
+        .trim()
+    : undefined;
+
+/** The Article's headline, Subtitle and meta: the deck is left out where the text already says it. */
+function ArticleHeader({ article }: { article: ReadingArticle }) {
+  const { title, subtitle, feedTitle, publishedAt, page, blocks } = article;
+  // A summary-only Article's text is its Subtitle; a Feed's text often opens with it too.
+  const deck = subtitle && !page && textOf(blocks[0]) !== subtitle.trim() ? subtitle : undefined;
+  return (
+    <View className="gap-related">
+      <AppText variant="headline">{title}</AppText>
+      {deck ? (
+        <AppText variant="deck" className="text-text-muted">
+          {deck}
+        </AppText>
+      ) : null}
+      <View className="flex-row items-baseline gap-related pt-inside">
+        <View className="shrink">
+          <AppText variant="label" className="text-text-muted" numberOfLines={1}>
+            {feedTitle}
+          </AppText>
+        </View>
+        <AppText variant="label" className="text-text-muted">
+          {publishedDate(publishedAt)}
+        </AppText>
+      </View>
+    </View>
+  );
+}
+
+/** Where an Article ends: a short rule and the way to the original. */
+function ArticleEnd({ link }: { link: string }) {
+  return (
+    <View testID="article-end" className="items-start gap-group">
+      <View className="h-px w-12 bg-decor" />
+      <Pressable
+        role="button"
+        aria-label="Open original"
+        onPress={() => openLink(link)}
+        className="rounded-full border border-text-muted px-group py-related"
+      >
+        <AppText variant="label" className="text-text" accessible={false}>
+          Open original
+        </AppText>
+      </Pressable>
+    </View>
+  );
+}
+
+/**
+ * The Reading view (P13, D6, D7): headline, Subtitle, Feed and date, the lead image, then the
+ * text, and a plain end. Literata for everything the author wrote, Instrument Sans for what
+ * the app says. The page itself never moves.
+ */
 export function ReadingScreen({ id }: { id: string }) {
   const insets = useSafeAreaInsets();
+  const scale = useSizeScale();
   const view = useArticle(id);
   const markRead = useMarkRead();
   const ready = view.status === 'ready';
@@ -61,37 +126,51 @@ export function ReadingScreen({ id }: { id: string }) {
   if (view.status === 'missing') return <ArticleMissing />;
   if (view.status === 'loading') return <View className="flex-1 bg-background" />;
   const { article } = view;
+  // The lead image, unless the text opens with an image of its own (often the same one, resized).
+  const lead = article.imageUrl && article.blocks[0]?.type !== 'image' ? article.imageUrl : undefined;
 
   return (
-    <ScrollView
-      className="flex-1 bg-background"
-      contentContainerClassName="gap-section px-edge"
-      contentContainerStyle={{ paddingTop: insets.top + spacing.section, paddingBottom: insets.bottom + spacing.section }}
-    >
-      <View className="gap-related">
-        <AppText variant="title">{article.title}</AppText>
-        <View className="flex-row flex-wrap gap-related">
-          <AppText variant="label" className="text-text-muted">
-            {article.feedTitle}
-          </AppText>
-          <AppText variant="label" className="text-text-muted">
-            {publishedDate(article.publishedAt)}
-          </AppText>
+    <View className="flex-1 bg-background">
+      <ScrollView
+        className="flex-1"
+        contentContainerClassName="items-center px-edge"
+        contentContainerStyle={{
+          paddingTop: insets.top + spacing.section,
+          paddingBottom: insets.bottom + spacing.section + SAVE_AND_DONE_ROOM,
+        }}
+      >
+        <View className="w-full gap-section" style={{ maxWidth: MEASURE * scale }}>
+          <ArticleHeader article={article} />
+          {article.page === 'unavailable' ? (
+            <PageUnavailable article={article} />
+          ) : (
+            <>
+              {lead ? (
+                <View testID="lead-image">
+                  <ArticleBlocks blocks={[{ type: 'image', src: lead }]} />
+                </View>
+              ) : null}
+              <View className="gap-group">
+                {article.page === 'extracting' ? (
+                  // Announced when it goes: the full text replaces the Subtitle as soon as it's read.
+                  <AppText variant="label" className="text-text-muted" accessibilityLiveRegion="polite">
+                    Bringing in the full Article from its page…
+                  </AppText>
+                ) : null}
+                <ArticleBlocks blocks={article.blocks} link={article.link} />
+              </View>
+              {article.link ? <ArticleEnd link={article.link} /> : null}
+            </>
+          )}
         </View>
-      </View>
-      {article.page === 'unavailable' ? (
-        <PageUnavailable article={article} />
-      ) : (
-        <View className="gap-group">
-          {article.page === 'extracting' ? (
-            // Announced when it goes: the full text replaces the Subtitle as soon as it's read.
-            <AppText variant="label" className="text-text-muted" accessibilityLiveRegion="polite">
-              Bringing in the full Article from its page…
-            </AppText>
-          ) : null}
-          <ArticleBlocks blocks={article.blocks} link={article.link} />
-        </View>
-      )}
-    </ScrollView>
+      </ScrollView>
+      {/* Edge-to-edge (Q18): the text scrolls behind the status bar, and this still strip keeps its icons legible. */}
+      <View
+        testID="status-bar-backing"
+        pointerEvents="none"
+        className="absolute left-0 right-0 top-0 bg-background"
+        style={{ height: insets.top }}
+      />
+    </View>
   );
 }

@@ -47,10 +47,13 @@ function BlockView({ block, link }: { block: Block; link?: string }) {
         </AppText>
       );
     case 'heading':
+      // A section starts with more room above it than between paragraphs (D9).
       return (
-        <AppText variant="title">
-          <Spans spans={block.spans} />
-        </AppText>
+        <View className="pt-group">
+          <AppText variant="subhead">
+            <Spans spans={block.spans} />
+          </AppText>
+        </View>
       );
     case 'list':
       return (
@@ -109,14 +112,16 @@ function BlockView({ block, link }: { block: Block; link?: string }) {
   }
 }
 
-/** An Article's blocks, drawn with the app's own components; never a WebView (T17, Q8). */
+/**
+ * An Article's blocks, drawn with the app's own components; never a WebView (T17, Q8). `link`
+ * is offered beside anything left out; the way to the original at the end is the screen's.
+ */
 export function ArticleBlocks({ blocks, link }: { blocks: Block[]; link?: string }) {
   return (
     <View className="gap-group">
       {blocks.map((block, i) => (
         <BlockView key={i} block={block} link={link} />
       ))}
-      {link ? <OpenOriginal link={link} /> : null}
     </View>
   );
 }

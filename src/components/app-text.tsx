@@ -9,6 +9,9 @@ type AppTextProps = Omit<TextProps, 'style'> & {
   className?: string;
 };
 
+/** The variants TalkBack announces as headings (Q15). */
+const HEADINGS = new Set<TypeVariant>(['title', 'headline', 'subhead']);
+
 /** All text in feedSmith. Android's font size setting applies on top (allowFontScaling stays on). */
 export function AppText({ variant, className = 'text-text', ...props }: AppTextProps) {
   const { fontScale } = useEnvironment();
@@ -16,7 +19,7 @@ export function AppText({ variant, className = 'text-text', ...props }: AppTextP
 
   return (
     <Text
-      role={variant === 'title' ? 'heading' : undefined}
+      role={HEADINGS.has(variant) ? 'heading' : undefined}
       className={className}
       style={{ ...face, fontSize: fontSize * fontScale, lineHeight: lineHeight * fontScale }}
       {...props}
