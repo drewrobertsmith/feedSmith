@@ -59,7 +59,6 @@ const SAVE_AND_DONE_ROOM = spacing.section * 3;
 /** Save and Done's height at the default type size: a 48 dp touch target. */
 const PILL_HEIGHT = 48;
 const PILL_ICON = 20;
-/** Press feedback: a near-imperceptible squeeze, quick enough for something tapped often. */
 const leave = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
 /**
@@ -169,16 +168,7 @@ function ArticleEnd({ link }: { link: string }) {
   return (
     <View testID="article-end" className="items-start gap-group">
       <View className="h-px w-12 bg-decor" />
-      <Pressable
-        role="button"
-        aria-label="Open original"
-        onPress={() => openLink(link)}
-        className="rounded-full border border-text-muted px-group py-related"
-      >
-        <AppText variant="label" className="text-text" accessible={false}>
-          Open original
-        </AppText>
-      </Pressable>
+      <AppButton label="Open original" onPress={() => openLink(link)} />
     </View>
   );
 }

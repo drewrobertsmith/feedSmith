@@ -1150,6 +1150,8 @@ describe('buttons have depth, not outlines (FEE-75, D27)', () => {
   test.each([
     ['Add a Feed', { colorScheme: 'dark', feeds: 'none' }],
     ['Open original', { colorScheme: 'light', section: 'article', article: 'unextracted' }],
+    // The way to the original at the end of an Article that was read in full.
+    ['Open original', { colorScheme: 'dark', section: 'article' }],
   ] as const)('%s is soft', async (name, spec) => {
     await open(spec);
     expect(faceOf(await screen.findByRole('button', { name }))).toMatchObject(depthStyle(spec.colorScheme, 'soft'));

@@ -1,5 +1,5 @@
 import { createContext, use, useState, type ReactNode } from 'react';
-import { Pressable, View, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, View, type GestureResponderEvent, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useEnvironment } from '@/environment';
 import { depth, depthStyle, rippleColor, type DepthLevel } from '@/theme/depth';
@@ -19,10 +19,14 @@ const ROUND = 9999;
  * A pressable control with depth (D27), in Android's terms (D29): a rounded face at its `level` at
  * rest, sinking to pressed, flat, while the finger is down, with Android's ripple over the face.
  *
- * The face and its shadow are drawn by a rounded frame that clips what's inside it, because Android
- * draws a ripple as the pressable's own drawable, square, and no style on the pressable itself rounds
- * it; the frame's own shadow is drawn outside it, so the clip keeps it. `frameClassName` places the
- * frame (`self-start`); `className` and `style` lay out the pressable and its content.
+ * Three layers, because Android draws a ripple as the pressable's own square drawable, and only a
+ * clipping parent rounds it, while a clipping parent also cuts off any touch area beyond its edge:
+ * - the control: a pressable that doesn't clip, holding the role, label, hit slop (Q15) and handlers,
+ *   and placed by `frameClassName` (`self-start`);
+ * - the face: a rounded view drawing the level's face and shadow, clipping what's inside (its own
+ *   shadow is drawn outside it, so the clip keeps it);
+ * - the ripple: a pressable inside the face, laid out by `className` and `style`, hidden from TalkBack,
+ *   with the same handlers, so a touch on the face ripples and a touch in the slop still counts.
  *
  * Pressing is tracked here, through `onPressIn` and `onPressOut`, rather than Pressable's internal
  * state, so tests can see it; a press that turns into a scroll still ends with `onPressOut`. The face
@@ -31,39 +35,54 @@ const ROUND = 9999;
 export function DepthPressable({
   level,
   frameClassName,
+  className,
   style,
+  onPress,
+  onLongPress,
   onPressIn,
   onPressOut,
+  disabled,
   children,
   ...props
 }: Omit<PressableProps, 'style' | 'children'> & {
   /** How it sits at rest: soft for buttons and chips, raised for the chosen chip (D27). */
   level: Exclude<DepthLevel, 'pressed'>;
-  /** Classes for the frame around the control, such as where it sits in its parent. */
+  /** Classes placing the control in its parent, such as `self-start`. */
   frameClassName?: string;
+  /** Classes laying out the control's content inside its face. */
+  className?: string;
   style?: StyleProp<ViewStyle>;
   children?: ReactNode;
 }) {
   const { colorScheme } = useEnvironment();
   const [pressed, setPressed] = useState(false);
   const shown: DepthLevel = pressed ? 'pressed' : level;
+  const handlers = {
+    onPress,
+    onLongPress,
+    disabled,
+    onPressIn: (event: GestureResponderEvent) => {
+      setPressed(true);
+      onPressIn?.(event);
+    },
+    onPressOut: (event: GestureResponderEvent) => {
+      setPressed(false);
+      onPressOut?.(event);
+    },
+  };
   return (
-    <View className={frameClassName} style={[depthStyle(colorScheme, shown), { borderRadius: ROUND, overflow: 'hidden' }]}>
-      <Pressable
-        {...props}
-        android_ripple={{ color: rippleColor(colorScheme), borderless: false }}
-        onPressIn={(event) => {
-          setPressed(true);
-          onPressIn?.(event);
-        }}
-        onPressOut={(event) => {
-          setPressed(false);
-          onPressOut?.(event);
-        }}
-        style={style}
-      >
-        <ControlFace value={depth[colorScheme][shown].face}>{children}</ControlFace>
-      </Pressable>
-    </View>
+    <Pressable {...props} {...handlers} className={frameClassName}>
+      <View style={[depthStyle(colorScheme, shown), { borderRadius: ROUND, overflow: 'hidden' }]}>
+        <Pressable
+          {...handlers}
+          accessible={false}
+          android_ripple={{ color: rippleColor(colorScheme), borderless: false }}
+          className={className}
+          style={style}
+        >
+          <ControlFace value={depth[colorScheme][shown].face}>{children}</ControlFace>
+        </Pressable>
+      </View>
+    </Pressable>
   );
 }
