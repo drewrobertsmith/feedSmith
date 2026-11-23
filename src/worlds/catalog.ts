@@ -252,3 +252,14 @@ export const PINNED_GROUP_WORLDS = [
 ] as const satisfies readonly CatalogWorld[];
 
 export type PinnedGroupWorldId = (typeof PINNED_GROUP_WORLDS)[number]['id'];
+
+/** The Pinned chip's stacked icons (FEE-61): one overlapping, ringed circle per Pinned Feed, in Pin order. */
+export const PINNED_STACK_WORLDS = [
+  { id: 'stack-three-dark', label: 'Three Pins, dark', spec: { colorScheme: 'dark', feeds: 'some', pins: 'three' } },
+  { id: 'stack-three-light', label: 'Three Pins, light', spec: { colorScheme: 'light', feeds: 'some', pins: 'three' } },
+  { id: 'stack-initial', label: 'A Pinned Feed with no icon', spec: { colorScheme: 'dark', feeds: 'some', pins: 'quiet' } },
+  { id: 'stack-two', label: 'Two Pins', spec: { colorScheme: 'dark', feeds: 'some', pins: 'two' } },
+  { id: 'stack-largest-font', label: 'Three Pins, largest font size', spec: { colorScheme: 'dark', feeds: 'some', pins: 'three', fontScale: 2 } },
+] as const satisfies readonly CatalogWorld[];
+
+export type PinnedStackWorldId = (typeof PINNED_STACK_WORLDS)[number]['id'];

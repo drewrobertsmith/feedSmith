@@ -142,6 +142,28 @@ function Chip({
 }
 
 /**
+ * The Pinned chip's Feeds at a glance (FEE-61): one circle per Pinned Feed, in Pin order, each its
+ * icon or its initial (D14), ringed in the page colour so overlapping circles read as separate, each
+ * after the first overlapping the one before, like a shared-avatar stack. Sized with the type like
+ * every icon beside text (Q16). TalkBack hears the chip's name, which lists the Feeds, not the icons.
+ */
+function PinnedStack({ chips }: { chips: FeedChip[] }) {
+  return (
+    <View className="flex-row items-center" importantForAccessibility="no-hide-descendants">
+      {chips.map((chip, i) => (
+        <View
+          key={chip.id}
+          testID="pinned-stack-ring"
+          className={i === 0 ? 'overflow-hidden rounded-full border-2 border-background' : 'overflow-hidden rounded-full border-2 border-background -ml-related'}
+        >
+          <FeedIcon key={chip.faviconUrl} url={chip.faviconUrl} title={chip.title} size={ICON} testID={`pinned-stack-${chip.id}`} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/**
  * The chip row under the Feeds top bar (P5, P9, D12): All, then the Feeds in the server's order
  * (Pinned first). Only for choosing what to read: adding a Feed is the top bar's + (FEE-44). Long-
  * press Pins or unpins. Where the row runs off-screen it fades, and a chip chosen from elsewhere
@@ -231,6 +253,7 @@ export function ChipRow({
             <Chip
               label="Pinned"
               accessibleName={`Pinned: ${pinned.map((chip) => chip.title).join(', ')}`}
+              icon={<PinnedStack chips={pinned} />}
               selected={selected === PINNED}
               active={groupOpen && selected !== PINNED}
               expanded={groupOpen}
