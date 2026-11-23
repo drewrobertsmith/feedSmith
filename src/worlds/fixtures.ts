@@ -169,6 +169,18 @@ export const FIXTURE_CHIPS: FeedChip[] = [
   { id: 'f3', title: 'Daring Fireball', faviconUrl: 'https://daringfireball.net/favicon.ico', pinned: false },
 ];
 
+/** Someone following eight Feeds, one with a long name: the chip row runs off-screen (FEE-44). */
+export const FIXTURE_MANY_CHIPS: FeedChip[] = [
+  { id: 'f1', title: 'The Verge - Full RSS for subscribers | The Verge', faviconUrl: 'https://www.theverge.com/favicon.ico', pinned: true },
+  { id: 'f2', title: 'Calm Notes', pinned: false },
+  { id: 'f3', title: 'Daring Fireball', faviconUrl: 'https://daringfireball.net/favicon.ico', pinned: false },
+  { id: 'f4', title: 'Farnam Street', pinned: false },
+  { id: 'f5', title: 'Stratechery', pinned: false },
+  { id: 'f6', title: 'Six Colors', pinned: false },
+  { id: 'f7', title: 'MacStories', pinned: false },
+  { id: 'f8', title: 'Kottke', pinned: false },
+];
+
 /** Manage Feeds (D13): one Pinned Feed, then the rest by name; Farnam Street has stopped working. */
 export const FIXTURE_MANAGE: ManagedFeed[] = [
   { id: 'f1', title: VERGE, faviconUrl: 'https://www.theverge.com/favicon.ico', host: 'www.theverge.com', pinned: true, working: true },

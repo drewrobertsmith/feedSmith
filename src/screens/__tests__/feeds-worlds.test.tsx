@@ -1,4 +1,4 @@
-import { act, fireEvent, userEvent } from '@testing-library/react-native';
+import { act, fireEvent, userEvent, within } from '@testing-library/react-native';
 import { renderRouter, screen } from 'expo-router/testing-library';
 import { Animated, ToastAndroid } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
@@ -106,6 +106,17 @@ describe('All', () => {
     'all-feed': { rows: VERGE_ROWS, read: 1, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'The Verge, Pinned', feedNames: 0 },
     'all-feed-light': { rows: 1, read: 0, empty: false, refreshing: false, theme: 'light', titleSize: 24, selected: 'Calm Notes', feedNames: 0 },
     'all-feed-empty': { rows: 0, read: 0, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'Daring Fireball', feedNames: 0 },
+    'all-many-feeds': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All', feedNames: ROWS },
+    'all-many-feeds-largest-font': {
+      rows: ROWS,
+      read: READ,
+      empty: false,
+      refreshing: false,
+      theme: 'light',
+      titleSize: 48,
+      selected: 'All',
+      feedNames: ROWS,
+    },
     'all-remove-animations': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All', feedNames: ROWS },
   };
 
@@ -129,14 +140,39 @@ describe('All', () => {
     expect(Uniwind.currentTheme).toBe(shows.theme);
   });
 
-  test('the chip row: All, the Pinned Feed, the rest, then + (P5, P9)', async () => {
+  test('the chip row: All, the Pinned Feed, then the rest; only Feeds, no + chip (P5, P9, FEE-44)', async () => {
     await open({ colorScheme: 'dark', feeds: 'some' });
     const tabs = await screen.findAllByRole('tab');
     const names = ['All', 'The Verge, Pinned', 'Calm Notes', 'Daring Fireball'];
     expect(tabs).toHaveLength(names.length);
     tabs.forEach((tab, i) => expect(tab).toHaveAccessibleName(names[i]));
-    // The "+" chip replaces the tracer bullet's top-bar button: one way to add.
+    expect(screen.queryByText('+')).not.toBeOnTheScreen();
+  });
+
+  test('the top bar: the Feeds title, then Add a Feed, then Manage Feeds; one way to add (Q31, FEE-44)', async () => {
+    await open({ colorScheme: 'dark', feeds: 'some' });
+    await screen.findAllByRole('tab');
+    expect(screen.getByRole('heading', { name: 'Feeds' })).toBeOnTheScreen();
+    const buttons = screen.getAllByRole('button');
+    const add = buttons.indexOf(screen.getByRole('button', { name: 'Add a Feed' }));
+    const manage = buttons.indexOf(screen.getByRole('button', { name: 'Manage Feeds' }));
+    expect([add, manage]).toEqual([0, 1]);
     expect(screen.getAllByRole('button', { name: 'Add a Feed' })).toHaveLength(1);
+  });
+
+  test("a long Feed name is short on its chip, but TalkBack hears all of it (FEE-44)", async () => {
+    await open({ colorScheme: 'dark', feeds: 'some', chips: 'many' });
+    const chip = await screen.findByRole('tab', { name: 'The Verge - Full RSS for subscribers | The Verge, Pinned' });
+    expect(chip).toBeOnTheScreen();
+    expect(screen.getByText('The Verge - Full…')).toBeOnTheScreen();
+  });
+
+  test('unchosen chips are quieter than the chosen one: a hairline and muted text (FEE-44, Q14)', async () => {
+    await open({ colorScheme: 'dark', feeds: 'some' });
+    await screen.findAllByRole('tab');
+    const label = (name: string) => within(screen.getByRole('tab', { name })).getByText(name);
+    expect(label('Calm Notes')).toHaveProp('className', expect.stringContaining('text-text-muted'));
+    expect(label('All')).toHaveProp('className', expect.stringContaining('text-accent'));
   });
 
   test("tapping a Feed's chip shows only its Articles; tapping All shows everything again", async () => {

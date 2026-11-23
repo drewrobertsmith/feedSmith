@@ -12,6 +12,7 @@ import {
   FIXTURE_LONG_FEED_ARTICLE,
   FIXTURE_MANAGE,
   FIXTURE_MANAGE_PINNED,
+  FIXTURE_MANY_CHIPS,
   FIXTURE_NO_AUTHOR_ARTICLE,
   FIXTURE_NO_LEAD_IMAGE_ARTICLE,
   FIXTURE_NOW,
@@ -38,6 +39,8 @@ export type WorldSpec = {
   auth?: 'signed-in' | 'signed-out' | 'signing-in' | 'not-allowed' | 'failed';
   /** What All holds. Defaults to no Feeds yet. `read` is every Article already Read. */
   feeds?: 'none' | 'loading' | 'some' | 'read';
+  /** Eight followed Feeds, one with a long name, instead of the usual three (FEE-44). */
+  chips?: 'many';
   /**
    * Where adding a Feed is up to. Defaults to idle, where adding succeeds. `choose`: a site with
    * several feeds. `already`: adding finds The Verge, already followed.
@@ -128,7 +131,7 @@ export function worldFeeds(
       return { status: 'ready', articles: feedId === null ? rows : rows.filter((row) => row.feedId === feedId) };
     },
     useChips: () =>
-      feeds === 'loading' ? { status: 'loading' } : { status: 'ready', chips: feeds === 'none' ? [] : FIXTURE_CHIPS },
+      feeds === 'loading' ? { status: 'loading' } : { status: 'ready', chips: feeds === 'none' ? [] : spec.chips === 'many' ? FIXTURE_MANY_CHIPS : FIXTURE_CHIPS },
     useManage: () =>
       manage === 'loading'
         ? { status: 'loading' }
