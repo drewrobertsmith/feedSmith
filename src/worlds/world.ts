@@ -45,6 +45,8 @@ export type WorldSpec = {
   accountSheet?: 'open';
   /** Signing out: `busy` is under way; `no-server` can't reach the server, and signs out anyway. */
   signOut?: 'busy' | 'no-server';
+  /** Deleting the Account: `busy` is under way; `failed` didn't reach the server. */
+  deleteAccount?: 'busy' | 'failed';
   /** What All holds. Defaults to no Feeds yet. `read` is every Article already Read. */
   feeds?: 'none' | 'loading' | 'some' | 'read';
   /** Eight followed Feeds, one with a long name, instead of the usual three (FEE-44). */
@@ -93,9 +95,9 @@ export type FeedsLog = {
 const emptyLog = (): FeedsLog => ({ added: [], refreshes: 0, read: [], pins: [], renames: [], removed: [], pinOrders: [] });
 
 /** What a world's fake auth was asked to do. */
-export type SignInLog = { starts: number; completions: { code?: string; error?: string }[]; signOuts: number };
+export type SignInLog = { starts: number; completions: { code?: string; error?: string }[]; signOuts: number; deletes: number };
 
-const emptySignInLog = (): SignInLog => ({ starts: 0, completions: [], signOuts: 0 });
+const emptySignInLog = (): SignInLog => ({ starts: 0, completions: [], signOuts: 0, deletes: 0 });
 
 /** The Article each Reading world shows. */
 const READING_FIXTURES = {
@@ -239,6 +241,10 @@ export function worldAuth(spec: WorldSpec, log: SignInLog = emptySignInLog()): A
       // With no server, the real adapter still clears the phone's tokens: the fake resolves as it does.
     },
     signingOut: spec.signOut === 'busy',
+    deleteAccount: async () => {
+      log.deletes += 1;
+    },
+    deletion: spec.deleteAccount === 'busy' ? 'deleting' : spec.deleteAccount === 'failed' ? 'failed' : 'idle',
     startSignIn: () => {
       log.starts += 1;
     },

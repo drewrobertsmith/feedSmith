@@ -163,6 +163,18 @@ export const ACCOUNT_WORLDS = [
     label: 'Account sheet, Remove animations',
     spec: { colorScheme: 'dark', feeds: 'some', accountSheet: 'open', reduceMotion: true },
   },
+  // Deleting the Account (FEE-36, P18). The confirmation is Android's own dialog, opened from the sheet.
+  { id: 'account-delete-confirm', label: 'Delete account, confirming', spec: { colorScheme: 'dark', feeds: 'some', accountSheet: 'open' } },
+  {
+    id: 'account-deleting',
+    label: 'Deleting the Account',
+    spec: { colorScheme: 'dark', feeds: 'some', accountSheet: 'open', deleteAccount: 'busy' },
+  },
+  {
+    id: 'account-delete-failed',
+    label: 'Deleting failed',
+    spec: { colorScheme: 'light', feeds: 'some', accountSheet: 'open', deleteAccount: 'failed' },
+  },
 ] as const satisfies readonly CatalogWorld[];
 
 export type AccountWorldId = (typeof ACCOUNT_WORLDS)[number]['id'];

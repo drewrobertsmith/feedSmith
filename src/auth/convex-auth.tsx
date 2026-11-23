@@ -1,12 +1,14 @@
 import { useSignInWithGoogle } from '@convex-dev/auth/methods/google/react';
 import { ConvexAuthProvider, useAuthActions } from '@convex-dev/auth/react';
-import { ConvexReactClient, useConvexAuth, useQuery } from 'convex/react';
+import { ConvexReactClient, useConvexAuth, useMutation, useQuery } from 'convex/react';
+import { ConvexError } from 'convex/values';
 import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
 import { useState, type ReactNode } from 'react';
 
 import { api } from '../../convex/_generated/api';
 import { APP_RETURN } from '../../convex/lib/appReturn';
+import { AUTH_ERRORS } from '../../convex/lib/authErrors';
 import { AuthContext, type Auth } from '@/auth/auth-context';
 import { signInOutcome, type SignInView } from '@/auth/sign-in-outcome';
 
@@ -30,6 +32,8 @@ function ConvexAuthBridge({ children }: { children: ReactNode }) {
   const account = useQuery(api.users.viewer, isAuthenticated ? {} : 'skip');
   const [view, setView] = useState<SignInView>({ status: 'idle' });
   const [signingOut, setSigningOut] = useState(false);
+  const deleteOnServer = useMutation(api.account.deleteAccount);
+  const [deletion, setDeletion] = useState<Auth['deletion']>('idle');
 
   const auth: Auth = {
     session: isLoading ? 'loading' : isAuthenticated ? 'signed-in' : 'signed-out',
@@ -44,6 +48,19 @@ function ConvexAuthBridge({ children }: { children: ReactNode }) {
       setSigningOut(false);
     },
     signingOut,
+    deleteAccount: async () => {
+      setDeletion('deleting');
+      const deleted = await deleteOnServer({}).then(
+        () => true,
+        // Already gone counts as deleted; anything else (no connection, a server error) leaves it all intact.
+        (error: unknown) => error instanceof ConvexError && error.data === AUTH_ERRORS.accountGone,
+      );
+      if (!deleted) return setDeletion('failed');
+      // The server has revoked every session; this clears the tokens on the phone (Q26).
+      await signOut().catch(() => null);
+      setDeletion('idle');
+    },
+    deletion,
     startSignIn: async () => {
       setView({ status: 'busy' });
       const start = await signIn({ redirectTo: SIGN_IN_FORWARDER });
