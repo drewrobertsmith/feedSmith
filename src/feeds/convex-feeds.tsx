@@ -113,8 +113,8 @@ function useSetPinned() {
 
 function useRestorePin() {
   const restorePin = useMutation(api.feeds.restorePin);
-  return async (id: string, place: number): Promise<PinOutcome> => {
-    const result = await restorePin({ id, place }).catch(() => null);
+  return async (id: string, place?: number): Promise<PinOutcome> => {
+    const result = await restorePin(place === undefined ? { id } : { id, place }).catch(() => null);
     if (!result) return 'not-found';
     return result.ok ? 'ok' : result.reason;
   };

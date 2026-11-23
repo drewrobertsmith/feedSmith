@@ -12,9 +12,13 @@ const ENTER = FadeIn.duration(200).easing(Easing.bezier(0.23, 1, 0.32, 1)).reduc
 const EXIT = FadeOut.duration(150).reduceMotion(ReduceMotion.System);
 
 type Toast = { key: number; message: string; undo?: () => void };
-type UndoState = { toast: Toast | null; show: (message: string, undo?: () => void) => void; dismiss: () => void };
+type Show = (message: string, undo?: () => void) => void;
+type UndoState = { toast: Toast | null; dismiss: () => void };
 
+/** The note on screen, for the hosts that draw it. */
 const UndoContext = createContext<UndoState | null>(null);
+/** Showing a note: never changes, so a list whose rows can show one doesn't re-render when one does. */
+const ShowContext = createContext<Show | null>(null);
 
 /**
  * Undo for reversible actions (Q35): an action happens at once, then a short note says what
@@ -42,12 +46,16 @@ export function UndoProvider({ children }: { children: ReactNode }) {
     };
   }, [toast]);
 
-  const state: UndoState = {
-    toast,
-    show: (message, undo) => setToast((last) => ({ key: (last?.key ?? 0) + 1, message, undo })),
-    dismiss: () => setToast(null),
-  };
-  return <UndoContext value={state}>{children}</UndoContext>;
+  const [show] = useState(() => {
+    const showNote: Show = (message, undo) => setToast((last) => ({ key: (last?.key ?? 0) + 1, message, undo }));
+    return showNote;
+  });
+  const state: UndoState = { toast, dismiss: () => setToast(null) };
+  return (
+    <ShowContext value={show}>
+      <UndoContext value={state}>{children}</UndoContext>
+    </ShowContext>
+  );
 }
 
 function useUndoState(): UndoState {
@@ -57,8 +65,10 @@ function useUndoState(): UndoState {
 }
 
 /** Shows what just happened, with Undo when it can be undone (Q35). */
-export function useUndo(): UndoState['show'] {
-  return useUndoState().show;
+export function useUndo(): Show {
+  const show = use(ShowContext);
+  if (!show) throw new Error('useUndo needs an <UndoProvider> above it');
+  return show;
 }
 
 /**

@@ -119,8 +119,8 @@ export type FeedsData = {
   useSavedActions: () => SavedActions;
   /** Pins or unpins a Feed, at once (optimistic). */
   useSetPinned: () => (id: string, pinned: boolean) => Promise<PinResult>;
-  /** Undo for Unpin: Pins a Feed again at its old place among the Pins (Q35). */
-  useRestorePin: () => (id: string, place: number) => Promise<PinOutcome>;
+  /** Undo for Unpin: Pins a Feed again at its old place among the Pins, or last with none (Q35). */
+  useRestorePin: () => (id: string, place?: number) => Promise<PinOutcome>;
   /** Manage Feeds' list, Pinned first in order (D13). */
   useManage: () => ManageView;
   /** Renaming, removing and ordering Pinned Feeds. */

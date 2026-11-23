@@ -275,6 +275,9 @@ export const chips = query({
   },
 });
 
+/** A Pin refused: a fourth Pin (P9), or a Feed that isn't the User's. */
+const vPinRefused = v.object({ ok: v.literal(false), reason: v.union(v.literal('pins-full'), v.literal('not-found')) });
+
 /**
  * Pins or unpins one of the signed-in User's Feeds (P9). A fourth Pin is refused. Unpinning says
  * where the Feed was among the Pins (`place`, from 0), so Undo can put it back there (Q35).
@@ -283,7 +286,7 @@ export const setPinned = mutation({
   args: { id: v.string(), pinned: v.boolean() },
   returns: v.union(
     v.object({ ok: v.literal(true), place: v.optional(v.number()) }),
-    v.object({ ok: v.literal(false), reason: v.union(v.literal('pins-full'), v.literal('not-found')) }),
+    vPinRefused,
   ),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
@@ -293,7 +296,8 @@ export const setPinned = mutation({
       if (feed.pinOrder === undefined) return { ok: true as const };
       const place = (await pinnedFeeds(ctx, userId)).findIndex((f) => f._id === feed._id);
       await ctx.db.patch(feed._id, { pinOrder: undefined });
-      return { ok: true as const, place };
+      // Past the Pin index's first few only with old, bad data: then there's no place to report.
+      return place >= 0 ? { ok: true as const, place } : { ok: true as const };
     }
     if (feed.pinOrder !== undefined) return { ok: true as const };
     const pins = (await pinnedFeeds(ctx, userId)).map((f) => f.pinOrder ?? 0);
@@ -303,18 +307,15 @@ export const setPinned = mutation({
   },
 });
 
-
 /**
  * Undo for Unpin (Q35): Pins a Feed again at `place` among the Pins (from 0), as near as the Pins
- * now allow, and renumbers them in that order. A place that's no place puts it last; a Feed already
- * Pinned stays put; a fourth Pin is still refused (P9).
+ * now allow, and renumbers them in that order. With no place, or one that's no place, it goes last;
+ * a Feed already Pinned stays put; a fourth Pin is still refused (P9). It's Pinning at a position,
+ * so it gives nothing `setPinned` and `orderPins` don't already.
  */
 export const restorePin = mutation({
-  args: { id: v.string(), place: v.number() },
-  returns: v.union(
-    v.object({ ok: v.literal(true) }),
-    v.object({ ok: v.literal(false), reason: v.union(v.literal('pins-full'), v.literal('not-found')) }),
-  ),
+  args: { id: v.string(), place: v.optional(v.number()) },
+  returns: v.union(v.object({ ok: v.literal(true) }), vPinRefused),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     const feed = await ownFeed(ctx, userId, args.id);
@@ -322,7 +323,8 @@ export const restorePin = mutation({
     if (feed.pinOrder !== undefined) return { ok: true as const };
     const pinned = await pinnedFeeds(ctx, userId);
     if (pinned.length >= MAX_PINS) return { ok: false as const, reason: 'pins-full' as const };
-    const place = Number.isInteger(args.place) && args.place >= 0 ? Math.min(args.place, pinned.length) : pinned.length;
+    const asked = args.place;
+    const place = asked !== undefined && Number.isInteger(asked) && asked >= 0 ? Math.min(asked, pinned.length) : pinned.length;
     const order = pinned.map((f) => f._id).toSpliced(place, 0, feed._id);
     await Promise.all(order.map((id, i) => ctx.db.patch(id, { pinOrder: i + 1 })));
     return { ok: true as const };

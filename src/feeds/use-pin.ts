@@ -22,7 +22,7 @@ export function usePin() {
     if (result.outcome !== 'ok') return;
     show(`${pinning ? 'Pinned' : 'Unpinned'} ${feed.title}.`, () => {
       // Back where it was; with no place known, last among the Pins.
-      void (pinning ? setPinned(feed.id, false) : restorePin(feed.id, result.place ?? -1));
+      void (pinning ? setPinned(feed.id, false) : restorePin(feed.id, result.place));
     });
   };
 }

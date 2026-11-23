@@ -138,11 +138,11 @@ describe('Undo for Pin and Unpin (FEE-46, Q35)', () => {
     expect((await titles(s)).slice(0, 3)).toEqual(['B', 'C', 'D']);
   });
 
-  test('a place that is no place puts it last; a Feed already Pinned stays where it is', async () => {
+  test('no place, or a place that is no place, puts it last; a Feed already Pinned stays where it is', async () => {
     const s = await setup(four);
     const [a, b, c] = s.feedIds;
     await pinAll(s, [b, c]);
-    for (const place of [Number.NaN, -3, 99]) {
+    for (const place of [Number.NaN, Number.POSITIVE_INFINITY, -3, 1.5, 99, undefined]) {
       await s.a.mutation(api.feeds.restorePin, { id: a, place });
       expect((await titles(s)).slice(0, 3)).toEqual(['B', 'C', 'A']);
       await s.a.mutation(api.feeds.setPinned, { id: a, pinned: false });

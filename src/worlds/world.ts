@@ -106,7 +106,7 @@ export type FeedsLog = {
   saves: string[];
   dones: string[];
   restores: { id: string; before: SavedBefore }[];
-  restoredPins: { id: string; place: number }[];
+  restoredPins: { id: string; place?: number }[];
 };
 
 const emptyLog = (): FeedsLog => ({
