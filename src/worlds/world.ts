@@ -107,6 +107,8 @@ export function worldFeeds(
 ): FeedsData {
   const manage = spec.manage ?? 'some';
   const feeds = spec.feeds ?? 'none';
+  /** The chips a world with Feeds shows: a few, or enough to run off the screen (FEE-44). */
+  const someChips = spec.chips === 'many' ? FIXTURE_MANY_CHIPS : FIXTURE_CHIPS;
   const addFeed = spec.addFeed ?? 'idle';
   const article = spec.article ?? 'full';
   const addView: AddFeedView =
@@ -130,8 +132,7 @@ export function worldFeeds(
       const rows = feeds === 'some' ? FIXTURE_ROWS : feeds === 'read' ? FIXTURE_READ_ROWS : [];
       return { status: 'ready', articles: feedId === null ? rows : rows.filter((row) => row.feedId === feedId) };
     },
-    useChips: () =>
-      feeds === 'loading' ? { status: 'loading' } : { status: 'ready', chips: feeds === 'none' ? [] : spec.chips === 'many' ? FIXTURE_MANY_CHIPS : FIXTURE_CHIPS },
+    useChips: () => (feeds === 'loading' ? { status: 'loading' } : { status: 'ready', chips: feeds === 'none' ? [] : someChips }),
     useManage: () =>
       manage === 'loading'
         ? { status: 'loading' }

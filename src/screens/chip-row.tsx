@@ -2,13 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Pressable,
-  ScrollView,
   StyleSheet,
   ToastAndroid,
   View,
   type LayoutChangeEvent,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
   type ScrollViewInstance,
 } from 'react-native';
 
@@ -16,7 +13,7 @@ import { AppText } from '@/components/app-text';
 import { FeedIcon } from '@/components/feed-icon';
 import { useEnvironment } from '@/environment';
 import { useSetPinned, type FeedChip } from '@/feeds/feeds-data';
-import { chipLabel, edgeFades } from '@/screens/chip-row-layout';
+import { chipLabel, fadeRanges, revealOffset, transparent } from '@/screens/chip-row-layout';
 import { motion } from '@/theme/motion';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
@@ -82,12 +79,13 @@ function Chip({
         }}
         // Chosen: Gold on the indicator pill (D5). Unchosen: quiet, a hairline and muted text (FEE-44), so the row
         // never competes with the Articles; the hairline is the muted text colour, which keeps 3:1 (Q14).
+        // Every chip has the hairline (transparent when chosen), so choosing one never changes its size.
         className={
           selected
-            ? 'flex-row items-center gap-inside rounded-full bg-indicator px-group py-related'
+            ? 'flex-row items-center gap-inside rounded-full border-transparent bg-indicator px-group py-related'
             : 'flex-row items-center gap-inside rounded-full border-text-muted px-group py-related'
         }
-        style={selected ? undefined : { borderWidth: StyleSheet.hairlineWidth }}
+        style={{ borderWidth: StyleSheet.hairlineWidth }}
       >
         {icon}
         <AppText variant="label" className={selected ? 'text-accent' : 'text-text-muted'} accessible={false} numberOfLines={1}>
@@ -118,20 +116,30 @@ export function ChipRow({
   const { colorScheme, reduceMotion } = useEnvironment();
   const background = themes[colorScheme].background;
   const scroller = useRef<ScrollViewInstance>(null);
-  /** Each chip's left edge in the row, by Feed id (All is ''), measured as it lays out. */
-  const chipX = useRef(new Map<string, number>());
-  const [row, setRow] = useState({ x: 0, width: 0, content: 0 });
-  /** Where the row is scrolled to, for the effect below: a user's own scroll must never re-run it. */
+  /** Each chip's place in the row, by Feed id (All is ''), measured as it lays out. */
+  const chipAt = useRef(new Map<string, { x: number; width: number }>());
+  const [row, setRow] = useState({ width: 0, content: 0 });
+  /** Where the row is scrolled to: native for the fades, a ref for the reveal (no React state on a scroll). */
+  const [scroll] = useState(() => new Animated.Value(0));
   const scrollX = useRef(0);
-  const fades = edgeFades(row.x, row.width, row.content);
+  const [onScroll] = useState(() =>
+    Animated.event([{ nativeEvent: { contentOffset: { x: scroll } } }], { useNativeDriver: true }),
+  );
+  const fades = fadeRanges(row.width, row.content, FADE);
+  /** The choice last brought into view; undefined until the row has laid out once. */
+  const revealed = useRef<string | null | undefined>(undefined);
 
-  // A chip chosen from elsewhere (a link) is brought into view; one tapped in the row already is. It runs when the
-  // choice changes or the row lays out, never on a scroll, so it can't pull the row back from under a finger.
+  // The chosen chip is brought wholly into view once per choice: a link's chip from past the edge, or a tapped one
+  // half under a fade. It never runs again for the same choice, so nothing (a scroll, a Feed added) pulls the row back.
   useEffect(() => {
-    const x = chipX.current.get(selected ?? '');
-    if (x === undefined) return;
-    if (x >= scrollX.current && x <= scrollX.current + row.width - FADE * 2) return;
-    scroller.current?.scrollTo({ x: Math.max(0, x - spacing.edge), animated: !reduceMotion });
+    if (revealed.current === selected) return;
+    const chip = chipAt.current.get(selected ?? '');
+    if (!chip || row.width === 0) return;
+    revealed.current = selected;
+    const to = revealOffset(chip, { scrollX: scrollX.current, width: row.width, fade: FADE, edge: spacing.edge });
+    if (to === null) return;
+    scroller.current?.scrollTo({ x: to, animated: !reduceMotion });
+    scrollX.current = Math.min(to, Math.max(0, row.content - row.width));
   }, [selected, reduceMotion, row.width, row.content]);
 
   const togglePin = async (chip: FeedChip) => {
@@ -145,28 +153,24 @@ export function ChipRow({
     if (note) ToastAndroid.show(note, ToastAndroid.SHORT);
   };
 
-  const scrolled = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const x = event.nativeEvent.contentOffset.x;
-    scrollX.current = x;
-    // Only a fade turning on or off re-renders the row, not every scroll tick.
-    setRow((now) => {
-      const was = edgeFades(now.x, now.width, now.content);
-      const will = edgeFades(x, now.width, now.content);
-      return was.start === will.start && was.end === will.end ? now : { ...now, x };
-    });
-  };
-
   return (
     <View>
-      <ScrollView
+      <Animated.ScrollView
         ref={scroller}
         horizontal
         showsHorizontalScrollIndicator={false}
         testID="chip-row"
         role="tablist"
         aria-label="Feeds"
-        onScroll={scrolled}
-        scrollEventThrottle={32}
+        onScroll={onScroll}
+        // Where a person's scroll comes to rest, for the reveal; the fades follow every frame natively.
+        onScrollEndDrag={(event) => {
+          scrollX.current = event.nativeEvent.contentOffset.x;
+        }}
+        onMomentumScrollEnd={(event) => {
+          scrollX.current = event.nativeEvent.contentOffset.x;
+        }}
+        scrollEventThrottle={16}
         onLayout={(event) => setRow((now) => ({ ...now, width: event.nativeEvent.layout.width }))}
         onContentSizeChange={(content) => setRow((now) => ({ ...now, content }))}
         contentContainerClassName="items-center gap-related px-edge"
@@ -177,8 +181,10 @@ export function ChipRow({
           accessibleName="All"
           selected={selected === null}
           onPress={() => onSelect(null)}
-          onLayout={(event) => chipX.current.set('', event.nativeEvent.layout.x)}
+          onLayout={(event) => chipAt.current.set('', event.nativeEvent.layout)}
         />
+        {/* Every chip stays mounted: the reveal needs each one measured, and a person's Feeds are tens of small pills. */}
+        {/* react-doctor-disable-next-line react-doctor/rn-no-scrollview-mapped-list */}
         {chips.map((chip) => (
           <Chip
             key={chip.id}
@@ -189,26 +195,34 @@ export function ChipRow({
             onPress={() => onSelect(chip.id)}
             onLongPress={() => void togglePin(chip)}
             pinLabel={chip.pinned ? 'Unpin' : 'Pin'}
-            onLayout={(event) => chipX.current.set(chip.id, event.nativeEvent.layout.x)}
+            onLayout={(event) => chipAt.current.set(chip.id, event.nativeEvent.layout)}
           />
         ))}
-      </ScrollView>
+      </Animated.ScrollView>
       {/* More chips lie past a faded edge; the fade is the page's own colour, so it never greys. */}
-      {fades.start ? (
-        <View
-          testID="chip-fade-start"
-          pointerEvents="none"
-          className="absolute bottom-0 left-0 top-0"
-          style={{ width: FADE, backgroundImage: `linear-gradient(to left, ${background}00, ${background})` }}
-        />
-      ) : null}
-      {fades.end ? (
-        <View
-          testID="chip-fade-end"
-          pointerEvents="none"
-          className="absolute bottom-0 right-0 top-0"
-          style={{ width: FADE, backgroundImage: `linear-gradient(to right, ${background}00, ${background})` }}
-        />
+      {fades ? (
+        <>
+          <Animated.View
+            testID="chip-fade-start"
+            pointerEvents="none"
+            className="absolute bottom-0 left-0 top-0"
+            style={{
+              width: FADE,
+              opacity: scroll.interpolate({ inputRange: fades.start, outputRange: [0, 1], extrapolate: 'clamp' }),
+              backgroundImage: `linear-gradient(to left, ${transparent(background)}, ${background})`,
+            }}
+          />
+          <Animated.View
+            testID="chip-fade-end"
+            pointerEvents="none"
+            className="absolute bottom-0 right-0 top-0"
+            style={{
+              width: FADE,
+              opacity: scroll.interpolate({ inputRange: fades.end, outputRange: [1, 0], extrapolate: 'clamp' }),
+              backgroundImage: `linear-gradient(to right, ${transparent(background)}, ${background})`,
+            }}
+          />
+        </>
       ) : null}
     </View>
   );

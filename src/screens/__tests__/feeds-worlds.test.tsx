@@ -168,20 +168,22 @@ describe('All', () => {
     expect(screen.getByText('The Verge - Full…')).toBeOnTheScreen();
   });
 
-  test("a scroll through the row stays put: the chosen chip never pulls it back (FEE-44)", async () => {
-    await open({ colorScheme: 'dark', feeds: 'some', chips: 'many' });
+  test('the chosen chip is brought into view once: a scroll or a Feed added later never pulls the row back (FEE-44)', async () => {
+    await open({ colorScheme: 'dark', feeds: 'some', chips: 'many' }, '/?feed=f8');
     await screen.findAllByRole('tab');
     const row = screen.getByTestId('chip-row');
     const scrollTo = jest.spyOn(ScrollView.prototype, 'scrollTo');
     const layout = (width: number, x = 0) => ({ nativeEvent: { layout: { x, y: 0, width, height: 48 } } });
-    // The chosen chip (All) sits at the row's start; the row shows 400 of 1200.
-    await fireEvent(screen.getByRole('tab', { name: 'All' }).parent!, 'layout', layout(60, 16));
+    await fireEvent(screen.getByRole('tab', { name: 'Kottke' }).parent!, 'layout', layout(90, 1100));
     await fireEvent(row, 'layout', layout(400));
     await fireEvent(row, 'contentSizeChange', 1200, 48);
+    expect(scrollTo).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('chip-fade-end')).toBeOnTheScreen();
     scrollTo.mockClear();
-    await fireEvent.scroll(row, { nativeEvent: { contentOffset: { x: 300, y: 0 } } });
-    expect(screen.getByTestId('chip-fade-start')).toBeOnTheScreen();
+    // The person scrolls back to the start, then a Feed is added: the row's size changes, and it stays where it was left.
+    await fireEvent(row, 'scrollEndDrag', { nativeEvent: { contentOffset: { x: 0, y: 0 } } });
+    await fireEvent(row, 'contentSizeChange', 1300, 48);
+    await fireEvent(row, 'layout', layout(420));
     expect(scrollTo).not.toHaveBeenCalled();
     scrollTo.mockRestore();
   });
