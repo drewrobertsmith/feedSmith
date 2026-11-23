@@ -129,7 +129,7 @@ export const hasStrong = internalQuery({
 });
 
 /**
- * Finds Feeds for a site's name by guessing its address and proving it (FEE-80, D32): a few sites
+ * Finds Feeds for a site's name by guessing its address and proving it (FEE-80, T35): a few sites
  * at a time, under one fetch budget and deadline, stopping once the site of that very name is
  * proven. Each proven Feed joins the catalog at once, so `search` shows it as it's found. Nothing
  * is guessed when the catalog already has a strong match. Returns the proven Feeds' addresses.
@@ -164,7 +164,7 @@ const searchTextOf = (name: string, host: string) => `${name} ${siteLabel(host)}
 
 /**
  * Puts a public Feed in the catalog, or refreshes it: its name and icon, when it was last seen,
- * and how often it's been found. Internal only: what enters is decided on the server (D32).
+ * and how often it's been found. Internal only: what enters is decided on the server (T35).
  */
 export const remember = internalMutation({
   args: {
@@ -196,7 +196,7 @@ export const remember = internalMutation({
 
 /**
  * A Feed fetched again, when it's already in the catalog: refreshes its name, icon and when it was
- * seen. Never adds one, so a typed URL can't enter the catalog this way (D32).
+ * seen. Never adds one, so a typed URL can't enter the catalog this way (T35).
  */
 export const touch = internalMutation({
   args: { url: v.string(), name: v.string(), iconUrl: v.optional(v.string()), now: v.number() },

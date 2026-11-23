@@ -350,7 +350,7 @@ describe('finding a Feed from a website (T21)', () => {
   );
 });
 
-describe('what adding a Feed teaches the catalog (FEE-80, D32)', () => {
+describe('what adding a Feed teaches the catalog (FEE-80, T35)', () => {
   const home = (head: string) => new Response(`<!doctype html><html><head>${head}</head><body><p>Home of the site, with news every day.</p></body></html>`);
   const DECLARES =
     '<meta property="og:site_name" content="Site Example"><link rel="icon" href="/icon.png"><link rel="alternate" type="application/rss+xml" href="/rss.xml">';

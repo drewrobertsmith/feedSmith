@@ -1,7 +1,7 @@
 import { parse } from 'tldts';
 
 /**
- * Finding a Feed by its site's name (FEE-80, D32): which addresses to guess, whether a site's own
+ * Finding a Feed by its site's name (FEE-80, T35): which addresses to guess, whether a site's own
  * name matches what was typed, whether a page is a parked domain, and how results rank. Pure: no
  * fetching happens here.
  */

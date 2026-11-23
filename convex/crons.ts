@@ -11,7 +11,7 @@ crons.hourly('keep the fetch scheduler booked', { minuteUTC: 7 }, internal.refre
 // Articles that aren't Saved go 30 days after publication (P14).
 crons.daily('clean up old Articles', { hourUTC: 9, minuteUTC: 0 }, internal.refresh.cleanup, {});
 
-// Catalog entries not seen for a year are dropped (FEE-80, D32).
+// Catalog entries not seen for a year are dropped (FEE-80, T35).
 crons.daily('forget stale catalog entries', { hourUTC: 9, minuteUTC: 30 }, internal.catalog.forget, {});
 
 export default crons;

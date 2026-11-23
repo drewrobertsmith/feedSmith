@@ -60,7 +60,7 @@ export default defineSchema({
     scheduledId: v.id('_scheduled_functions'),
   }),
   /**
-   * The catalog of known Feeds (FEE-80, D32): public Feeds feedSmith has found before, shared by
+   * The catalog of known Feeds (FEE-80, T35): public Feeds feedSmith has found before, shared by
    * every User's search by name. Only a Feed a site's homepage declares, or one proven at a common
    * address on a guessed site, ever enters it: never a URL someone typed, and never a User id, so
    * nobody's list shows and deleting an Account leaves nothing of it here (Q28).

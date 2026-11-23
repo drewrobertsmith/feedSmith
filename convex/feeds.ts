@@ -42,7 +42,7 @@ function withScheme(typed: string): string {
   return /^[a-z][a-z0-9+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed}`;
 }
 
-/** A site's bare address: no path beyond `/`, no query. What it declares is public (D32). */
+/** A site's bare address: no path beyond `/`, no query. What it declares is public (T35). */
 function isHomepage(url: string): boolean {
   const parsed = new URL(url);
   return parsed.pathname === '/' && parsed.search === '' && parsed.hash === '';
@@ -75,7 +75,7 @@ export const add = action({
     let feedUrl = typed;
     let outcome: FetchOutcome = await fetchFeed(typed);
     let meta: SiteMeta | undefined;
-    /** The homepage that declared the Feed, when it was a homepage: only then does it join the catalog (D32). */
+    /** The homepage that declared the Feed, when it was a homepage: only then does it join the catalog (T35). */
     let declaredBy: string | undefined;
     if (outcome._tag === 'Page') {
       // A web page: its feed links are its feeds, followed one level only (T21).
@@ -105,7 +105,7 @@ export const add = action({
     meta ??= await homepageMeta(outcome.siteUrl);
     const title = meta.name ?? outcome.title;
 
-    // A homepage's declared Feed joins the catalog; any other is only refreshed if already there (D32).
+    // A homepage's declared Feed joins the catalog; any other is only refreshed if already there (T35).
     const now = Date.now();
     if (declaredBy) {
       const host = new URL(declaredBy).hostname.replace(/^www\./, '');
