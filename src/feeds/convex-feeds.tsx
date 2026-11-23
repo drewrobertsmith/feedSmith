@@ -39,7 +39,7 @@ function useSignedInQuery<Query extends FunctionReference<'query'>>(query: Query
 /**
  * The titles of the Articles the lists have shown, by id, so the Reading view can show an Article's headline
  * from its first frame, before the Article itself arrives (FEE-48). Only titles the User already saw; kept in
- * memory for this run of the app, and at most `TITLES_KEPT` of them.
+ * memory for this run of the app, at most `TITLES_KEPT` of them, and forgotten when the User signs out.
  */
 const shownTitles = new Map<string, string>();
 const TITLES_KEPT = 500;
@@ -250,5 +250,10 @@ const convexFeeds: FeedsData = {
 
 /** The app's Feeds and Articles, from Convex. Sits inside `ConvexAuth`, which owns the client. */
 export function ConvexFeeds({ children }: { children: ReactNode }) {
+  // Signing out, or deleting the Account, forgets the titles the lists showed: another account never sees them.
+  const { isAuthenticated } = useConvexAuth();
+  useEffect(() => {
+    if (!isAuthenticated) shownTitles.clear();
+  }, [isAuthenticated]);
   return <FeedsContext value={convexFeeds}>{children}</FeedsContext>;
 }
