@@ -106,6 +106,8 @@ export function SwipeRow({
     });
 
   const rowStyle = useAnimatedStyle(() => ({ transform: [{ translateX: offset.get() }] }));
+  // Only there while the row moves, so it never peeks through a seam between rows at rest.
+  const panelStyle = useAnimatedStyle(() => ({ opacity: offset.get() === 0 ? 0 : 1 }));
   const iconStyle = useAnimatedStyle(() => ({ transform: [{ scale: withSpring(armed.get() ? ARMED_SCALE : 1, ARM) }] }));
 
   const look = ROW_ACTIONS[action];
@@ -114,11 +116,11 @@ export function SwipeRow({
 
   return (
     <View>
-      <View
+      <Animated.View
         testID={`swipe-panel-${action}`}
         accessible={false}
         importantForAccessibility="no-hide-descendants"
-        style={StyleSheet.absoluteFill}
+        style={[StyleSheet.absoluteFill, panelStyle]}
         className={`flex-row items-center justify-end gap-related px-edge ${look.panel}`}
       >
         <AppText variant="action" className={look.ink} accessible={false}>
@@ -127,7 +129,7 @@ export function SwipeRow({
         <Animated.View style={iconStyle}>
           <SymbolView name={look.icon} size={ICON * scale} tintColor={ink} />
         </Animated.View>
-      </View>
+      </Animated.View>
       <GestureDetector gesture={pan}>
         <Animated.View testID={`swipe-row-${id}`} style={rowStyle}>
           {children}

@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -44,9 +44,11 @@ function WorldPreview({ entry, world, theme }: { entry: GalleryEntry; world: Cat
   const spec = { ...world.spec, colorScheme: theme };
   // `world` comes from the catalog, so it's stable while it stays selected.
   useEffect(() => createWorld({ ...world.spec, colorScheme: theme }).dispose, [world, theme]);
+  // One world's Feeds for as long as it's shown: Save, Done and Undo change it, and it keeps the change (FEE-30).
+  const [feeds] = useState(() => worldFeeds(spec));
   return (
     <AuthContext value={worldAuth(spec)}>
-      <FeedsContext value={worldFeeds(spec)}>
+      <FeedsContext value={feeds}>
         <EnvironmentProvider environment={worldEnvironment(spec)}>{entry.render(spec)}</EnvironmentProvider>
       </FeedsContext>
     </AuthContext>
@@ -95,7 +97,8 @@ export function GalleryScreen() {
         ))}
       </View>
       <View className="h-[640px] border-t border-decor">
-        <WorldPreview entry={selected.entry} world={selected.world} theme={theme} />
+        {/* Keyed, so choosing another world or theme starts it fresh. */}
+        <WorldPreview key={`${selected.world.id}-${theme}`} entry={selected.entry} world={selected.world} theme={theme} />
       </View>
     </ScrollView>
   );

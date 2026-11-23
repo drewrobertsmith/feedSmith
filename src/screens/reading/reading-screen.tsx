@@ -66,8 +66,8 @@ const leave = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
 /**
  * Save, or Done once Saved (P11, P13): one quiet pill at the foot of the page, in thumb's reach
- * however far you've read, so Done is there when the Article ends. Its bookmark fills in Gold once
- * Saved (D5). Done means finished, so it goes back to the list, where Undo waits (Q35). The page
+ * however far you've read, so Done is there when the Article ends. Once Saved, its bookmark gains a
+ * tick and turns Gold (D5). Done means finished, so it goes back to the list, where Undo waits (Q35). The page
  * itself never moves (D7).
  */
 function SaveOrDone({ id, saved }: { id: string; saved: boolean }) {
@@ -98,7 +98,7 @@ function SaveOrDone({ id, saved }: { id: string; saved: boolean }) {
         >
           <SymbolView
             testID="save-icon"
-            name={saved ? { ios: 'bookmark.fill', android: 'bookmark' } : { ios: 'bookmark', android: 'bookmark_border' }}
+            name={saved ? { ios: 'bookmark.fill', android: 'bookmark_added' } : { ios: 'bookmark', android: 'bookmark' }}
             size={PILL_ICON * scale}
             tintColor={saved ? theme.accent : theme.text}
             accessible={false}

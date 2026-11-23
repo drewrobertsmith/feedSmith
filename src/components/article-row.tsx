@@ -85,11 +85,11 @@ export function ArticleRow({
           <AppText variant="label" className="text-text-muted">
             {ago}
           </AppText>
-          {/* Yours (D5): Gold, the one accent, and a shape, so it reads without colour too (Q14). */}
+          {/* Yours (D5): Gold, the one accent, and a bookmark with a tick, so it reads without colour too (Q14). */}
           {showMark ? (
             <SymbolView
               testID="row-saved-mark"
-              name={{ ios: 'bookmark.fill', android: 'bookmark' }}
+              name={{ ios: 'bookmark.fill', android: 'bookmark_added' }}
               size={SAVED_MARK * scale}
               tintColor={theme.accent}
               accessible={false}
