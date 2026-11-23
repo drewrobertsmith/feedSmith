@@ -2,9 +2,12 @@ import { Readability } from '@mozilla/readability';
 import { Effect } from 'effect';
 import { parseHTML } from 'linkedom';
 
-import { htmlToBlocks, httpsUrl, type Block, type OmittedKind } from './blocks';
+import { htmlToBlocks, httpsUrl } from './blocks';
 import { FeedHttp } from './http';
 import { MAX_IMAGE_URL } from './parse';
+import type { ExtractOutcome } from './validators';
+
+export type { ExtractOutcome };
 
 /**
  * Less text than this isn't the Article: it's a teaser, a paywall's opening lines, or a page
@@ -13,11 +16,6 @@ import { MAX_IMAGE_URL } from './parse';
 export const MIN_ARTICLE_TEXT = 300;
 /** JSON-LD is walked this deep, and no deeper, in hostile markup. */
 const MAX_JSON_DEPTH = 8;
-
-export type ExtractOutcome =
-  | { _tag: 'Extracted'; blocks: Block[]; omitted: OmittedKind[]; imageUrl?: string }
-  /** The page's own image, when it has one, still serves the fallback. */
-  | { _tag: 'Failed'; imageUrl?: string };
 
 /** The page's own lead image (`og:image`, else `twitter:image`), https only (T18). */
 function pageImage(document: Document, base: string): string | undefined {
@@ -60,14 +58,16 @@ function paywalled(document: Document): boolean {
 export function extractFromPage(html: string, url: string): ExtractOutcome {
   try {
     const { document } = parseHTML(html);
+    // The page's own image, when it has one, serves the Article either way (and the fallback, Q6).
     const imageUrl = pageImage(document, url);
-    const failed: ExtractOutcome = imageUrl ? { _tag: 'Failed', imageUrl } : { _tag: 'Failed' };
+    const image = imageUrl ? { imageUrl } : {};
+    const failed: ExtractOutcome = { _tag: 'Failed', ...image };
     if (paywalled(document)) return failed;
     const found = new Readability(document).parse();
     if (!found?.content || (found.textContent ?? '').trim().length < MIN_ARTICLE_TEXT) return failed;
     const { blocks, omitted } = htmlToBlocks(found.content, url);
     if (!blocks.some((block) => block.type === 'paragraph')) return failed;
-    return imageUrl ? { _tag: 'Extracted', blocks, omitted, imageUrl } : { _tag: 'Extracted', blocks, omitted };
+    return { _tag: 'Extracted', blocks, omitted, ...image };
   } catch {
     return { _tag: 'Failed' };
   }

@@ -2,7 +2,7 @@
 import { convexTest } from 'convex-test';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import { api } from './_generated/api';
+import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import article from './lib/feed/fixtures/page-article.html?raw';
 import index from './lib/feed/fixtures/page-index.html?raw';
@@ -148,12 +148,44 @@ describe('a summary-only Feed reads in full, from its pages (FEE-25, T8)', () =>
     expect(pageFetches()).toHaveLength(items.length);
   });
 
-  test('a Feed removed while its pages are read stops quietly', async () => {
+  test('a Feed removed before its pages are read never has them fetched', async () => {
     const s = await follow([{ guid: 'slow', link: 'https://calmnotes.example/slow' }]);
     pages['https://calmnotes.example/slow'] = article;
     await s.owner.mutation(api.feeds.remove, { id: s.feedId });
     await expect(s.finish()).resolves.not.toThrow();
+    expect(pageFetches()).toEqual([]);
     expect(await s.t.run((ctx) => ctx.db.query('articles').take(5))).toEqual([]);
+  });
+
+  test("new Articles stored while a Feed's pages are being read join that run: every page is fetched once", async () => {
+    const first = { guid: 'one', link: 'https://calmnotes.example/one' };
+    const second = { guid: 'two', link: 'https://calmnotes.example/two' };
+    pages[first.link] = article;
+    pages[second.link] = article;
+    const s = await follow([first]);
+    // The Feed is checked again before its first page is read, and has a new Article.
+    pages[FEED] = rss([second, first]);
+    await s.t.action(internal.refresh.refreshFeed, { feedId: s.feedId });
+    await s.finish();
+    expect(pageFetches().sort()).toEqual([first.link, second.link]);
+    expect(await s.open('two')).not.toHaveProperty('page');
+  });
+
+  test('an Article whose reading never finishes (the server stopped mid-page) falls back, never spins forever', async () => {
+    const s = await follow([{ guid: 'stuck', link: 'https://calmnotes.example/stuck' }]);
+    // Claimed for reading, then nothing: as if the action died before storing what it read.
+    expect(await s.t.mutation(internal.extract.claim, { articleId: await s.idOf('stuck') })).toBe(true);
+    expect(await s.open('stuck')).toMatchObject({ page: 'extracting' });
+    vi.advanceTimersByTime(16 * 60_000);
+    await s.t.finishInProgressScheduledFunctions();
+    expect(await s.open('stuck')).toMatchObject({ page: 'unavailable' });
+  });
+
+  test('a page is claimed once: a second run never reads it again', async () => {
+    const s = await follow([{ guid: 'once', link: 'https://calmnotes.example/once' }]);
+    const articleId = await s.idOf('once');
+    expect(await s.t.mutation(internal.extract.claim, { articleId })).toBe(true);
+    expect(await s.t.mutation(internal.extract.claim, { articleId })).toBe(false);
   });
 
   test("another User still can't open the Article (Q10)", async () => {

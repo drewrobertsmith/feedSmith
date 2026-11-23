@@ -57,8 +57,15 @@ export type AddFeedReason = Infer<typeof vAddFeedReason>;
 /** What a Feed said about its version last time (T19). */
 export const vValidators = { etag: v.optional(v.string()), lastModified: v.optional(v.string()) };
 
-/** Where reading an Article from its page is up to (T8, FEE-25). */
-export const vExtraction = v.union(v.literal('pending'), v.literal('extracted'), v.literal('failed'));
+/**
+ * Where reading an Article from its page is up to (T8, FEE-25): waiting, being read (claimed
+ * by one run), then extracted or failed.
+ */
+export const vExtraction = v.union(v.literal('pending'), v.literal('reading'), v.literal('extracted'), v.literal('failed'));
+
+/** What the Reading view is told about a summary-only Article's page: still being read, or couldn't be (Q6). */
+export const vReadingPage = v.union(v.literal('extracting'), v.literal('unavailable'));
+export type ReadingPage = Infer<typeof vReadingPage>;
 
 /** What reading an Article's page came to: its blocks, or a failure. Either may bring the page's image. */
 export const vExtractOutcome = v.union(
@@ -81,3 +88,5 @@ export const vStoredArticle = v.object({
 });
 
 export type StoredArticle = Infer<typeof vStoredArticle>;
+export type ExtractOutcome = Infer<typeof vExtractOutcome>;
+export type Extraction = Infer<typeof vExtraction>;

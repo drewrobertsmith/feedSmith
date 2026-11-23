@@ -6,16 +6,16 @@ import type { Environment } from '@/environment';
 import type { AddFeedReason, AddFeedView, ArticleView, FeedsData } from '@/feeds/feeds-data';
 import {
   FIXTURE_ARTICLE,
-  FIXTURE_EXTRACTING_ARTICLE,
   FIXTURE_CHIPS,
   FIXTURE_CHOICES,
+  FIXTURE_EXTRACTING_ARTICLE,
   FIXTURE_MANAGE,
   FIXTURE_MANAGE_PINNED,
   FIXTURE_NOW,
   FIXTURE_OMITTED_ARTICLE,
-  FIXTURE_UNEXTRACTED_ARTICLE,
   FIXTURE_READ_ROWS,
   FIXTURE_ROWS,
+  FIXTURE_UNEXTRACTED_ARTICLE,
 } from '@/worlds/fixtures';
 import type { ThemeName } from '@/theme/tokens';
 

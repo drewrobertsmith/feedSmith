@@ -23,6 +23,15 @@ export async function storeNewArticles(
   articles: StoredArticle[],
   now: number,
 ) {
+  // One run reads a Feed's pages at a time: one already going picks up what's stored now (T24).
+  const reading = await Promise.all(
+    (['pending', 'reading'] as const).map((state) =>
+      ctx.db
+        .query('articles')
+        .withIndex('by_feed_extraction', (q) => q.eq('feedId', feedId).eq('extraction', state))
+        .first(),
+    ),
+  );
   const stored = await Promise.all(
     articles.map(async ({ blocks, omitted, ...fields }) => {
       if (fields.publishedAt < now - RETENTION) return false;
@@ -40,7 +49,7 @@ export async function storeNewArticles(
       return fields.extraction === 'pending';
     }),
   );
-  if (stored.some(Boolean)) await ctx.scheduler.runAfter(0, internal.extract.run, { feedId });
+  if (stored.some(Boolean) && !reading.some(Boolean)) await ctx.scheduler.runAfter(0, internal.extractPages.run, { feedId });
 }
 
 /** Marks a Feed working and sets its next check from its pace (T19). */

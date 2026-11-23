@@ -89,7 +89,6 @@ export const FIXTURE_ARTICLE: ReadingArticle = {
   ],
 };
 
-/** An Article whose Feed had a video and a table, which feedSmith doesn't show yet. */
 const CALM_SUBTITLE = 'Why reading slowly is worth it, and how to start.';
 
 /** A summary-only Article whose page is still being read (FEE-25, T8). */
@@ -111,6 +110,7 @@ export const FIXTURE_UNEXTRACTED_ARTICLE: ReadingArticle = {
   page: 'unavailable',
 };
 
+/** An Article whose Feed had a video and a table, which feedSmith doesn't show yet. */
 export const FIXTURE_OMITTED_ARTICLE: ReadingArticle = {
   ...FIXTURE_ARTICLE,
   omitted: ['video', 'table'],

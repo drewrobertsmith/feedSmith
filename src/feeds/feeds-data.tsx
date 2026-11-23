@@ -1,7 +1,7 @@
 import { createContext, use } from 'react';
 
 import type { Block, OmittedKind, Span } from '../../convex/lib/feed/blocks';
-import type { AddFeedReason } from '../../convex/lib/feed/validators';
+import type { AddFeedReason, ReadingPage } from '../../convex/lib/feed/validators';
 
 export type { AddFeedReason, Block, OmittedKind, Span };
 
@@ -37,7 +37,7 @@ export type ReadingArticle = {
    * A summary-only Article (T8): its page is still being read, or couldn't be (Q6). Absent once
    * the text is whole.
    */
-  page?: 'extracting' | 'unavailable';
+  page?: ReadingPage;
 };
 
 export type AllView = { status: 'loading' } | { status: 'ready'; articles: ArticleRow[] };

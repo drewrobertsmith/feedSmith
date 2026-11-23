@@ -12,6 +12,7 @@ import type * as articles from "../articles.js";
 import type * as auth from "../auth.js";
 import type * as crons from "../crons.js";
 import type * as extract from "../extract.js";
+import type * as extractPages from "../extractPages.js";
 import type * as feeds from "../feeds.js";
 import type * as http from "../http.js";
 import type * as lib_appReturn from "../lib/appReturn.js";
@@ -45,6 +46,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   crons: typeof crons;
   extract: typeof extract;
+  extractPages: typeof extractPages;
   feeds: typeof feeds;
   http: typeof http;
   "lib/appReturn": typeof lib_appReturn;
