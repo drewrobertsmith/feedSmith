@@ -3,7 +3,7 @@ import type { Doc, Id } from '../../_generated/dataModel';
 import type { MutationCtx, QueryCtx } from '../../_generated/server';
 import type { Validators } from './http';
 import { backoff, nextCheckIn, PACE_WINDOW } from './pace';
-import { bookFetchTimer } from './timer';
+import { bringFetchForward } from './timer';
 import type { StoredArticle } from './validators';
 
 /** Articles that aren't Saved are kept this long after publication (P14). */
@@ -73,7 +73,7 @@ async function writeSchedule(ctx: MutationCtx, feed: Doc<'feeds'>, schedule: Doc
   if (schedule) await ctx.db.patch(schedule._id, fields);
   else await ctx.db.insert('feedSchedules', { feedId: feed._id, userId: feed.userId, ...fields });
   // A Feed now due sooner than the scheduler's next run brings that run forward (FEE-55).
-  await bookFetchTimer(ctx, 'sooner');
+  await bringFetchForward(ctx, fields.nextFetchAt);
 }
 
 /** Sets whether a Feed works (P15), only when that changes: the screens read the Feed. */

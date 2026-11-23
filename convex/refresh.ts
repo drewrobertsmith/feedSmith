@@ -7,7 +7,7 @@ import { DELETE_BATCH } from './lib/feed/blocks';
 import { deleteArticles } from './lib/deleteArticles';
 import { fetchFeed } from './lib/feed/fetch';
 import { markFailing, markWorking, RETENTION, scheduleOf, storeNewArticles } from './lib/feed/record';
-import { bookFetchTimer } from './lib/feed/timer';
+import { bookNextFetch, ensureFetchBooked } from './lib/feed/timer';
 import { vStoredArticle, vValidators } from './lib/feed/validators';
 
 /** How long a Feed handed to a fetch stays out of the next tick, so a slow fetch isn't doubled. */
@@ -134,7 +134,7 @@ export const scheduleDue = internalMutation({
       }),
     );
     // More were due than one run starts: the soonest is still due, so the next run is now.
-    await bookFetchTimer(ctx, 'exact');
+    await bookNextFetch(ctx);
     return null;
   },
 });
@@ -147,7 +147,7 @@ export const ensureFetchTimer = internalMutation({
   args: {},
   returns: v.null(),
   handler: async (ctx) => {
-    await bookFetchTimer(ctx, 'sooner');
+    await ensureFetchBooked(ctx);
     return null;
   },
 });

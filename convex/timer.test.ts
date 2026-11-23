@@ -84,9 +84,9 @@ describe('the fetch scheduler sleeps until a Feed is due (FEE-55)', () => {
     await runScheduledNow(t);
 
     expect(network).toHaveBeenCalled();
-    const ticks = await pendingTicks(t);
+    // The run booked for `due` is the one this stands in for, so it's left alone; one is booked after it.
+    const ticks = (await pendingTicks(t)).filter((time) => time > due);
     expect(ticks).toHaveLength(1);
-    expect(ticks[0]).toBeGreaterThan(due);
   });
 
   test('a Feed due sooner brings the run forward; there is never more than one', async () => {
@@ -151,4 +151,34 @@ describe('the fetch scheduler sleeps until a Feed is due (FEE-55)', () => {
 
     expect(await pendingTicks(t)).toHaveLength(1);
   });
+});
+
+test("a run never cancels itself: in production a running mutation's own job still reads as pending", async () => {
+  const { t, asA } = await setup();
+  await asA.action(api.feeds.add, { url: 'https://a.example.com/feed' });
+  const [due] = await dueTimes(t);
+  const booked = await t.run(async (ctx) => (await ctx.db.query('fetchTimer').first())!.scheduledId);
+
+  // Its time has come, but its job hasn't started: exactly how the run sees itself in production.
+  vi.setSystemTime(due + 1);
+  await t.mutation(internal.refresh.scheduleDue, {});
+
+  const job = await t.run((ctx) => ctx.db.system.get(booked));
+  expect(job!.state.kind).not.toBe('canceled');
+  // The next run is booked for after the lease, and it is the only one in the future.
+  const future = (await pendingTicks(t)).filter((time) => time > due + 1);
+  expect(future).toHaveLength(1);
+});
+
+test("a schedule written while the run is due doesn't book a second one", async () => {
+  const { t, userId, asA } = await setup();
+  await asA.action(api.feeds.add, { url: 'https://a.example.com/feed' });
+  const [due] = await dueTimes(t);
+  vi.setSystemTime(due + 1);
+
+  // A second Feed's check lands while the booked run is due but hasn't started.
+  const feedId = await t.run((ctx) => ctx.db.insert('feeds', { userId, url: 'https://b.example.com/feed', title: 'B' }));
+  await t.mutation(internal.refresh.recordFailure, { feedId, now: due + 1 });
+
+  expect(await pendingTicks(t)).toHaveLength(1);
 });
