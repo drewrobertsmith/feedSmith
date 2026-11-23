@@ -39,3 +39,19 @@ test.each([
 ])('%s reads as "%s"', (_case, at, expected) => {
   expect(load().publishedAgo(at, NOW)).toBe(expected);
 });
+
+describe('a byline (FEE-41)', () => {
+  test.each([
+    [['Emma Roth'], 'By Emma Roth'],
+    [['Emma Roth', 'Jay Peters'], 'By Emma Roth and Jay Peters'],
+    [['A. One', 'B. Two', 'C. Three'], 'By A. One, B. Two and C. Three'],
+    [['A. One', 'B. Two', 'C. Three', 'D. Four'], 'By A. One, B. Two and 2 others'],
+  ])('%j reads "%s"', (authors, byline) => {
+    expect(load().byline(authors)).toBe(byline);
+  });
+
+  test('nobody credited means no byline', () => {
+    expect(load().byline(undefined)).toBeUndefined();
+    expect(load().byline([])).toBeUndefined();
+  });
+});

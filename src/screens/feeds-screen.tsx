@@ -10,7 +10,7 @@ import { AppText } from '@/components/app-text';
 import { FeedIcon } from '@/components/feed-icon';
 import { useEnvironment } from '@/environment';
 import { useAll, useChips, useRefresh, type ArticleRow } from '@/feeds/feeds-data';
-import { publishedAgo } from '@/feeds/format';
+import { byline, publishedAgo } from '@/feeds/format';
 import { ChipRow } from '@/screens/chip-row';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
@@ -29,7 +29,8 @@ const ESTIMATED_ROW = 112;
 function Row({ article }: { article: ArticleRow }) {
   const { colorScheme, fontScale, now } = useEnvironment();
   const ago = publishedAgo(article.publishedAt, now());
-  const label = `${article.title}, ${article.feedTitle}, ${ago}${article.read ? ', Read' : ''}`;
+  const credit = byline(article.authors);
+  const label = [article.title, credit, article.feedTitle, ago, article.read ? 'Read' : undefined].filter(Boolean).join(', ');
   const thumbnail = THUMBNAIL * fontScale;
 
   return (
@@ -60,6 +61,12 @@ function Row({ article }: { article: ArticleRow }) {
         <AppText variant="reading" className={article.read ? 'text-text-muted' : 'text-text'}>
           {article.title}
         </AppText>
+        {/* Who wrote it, where you decide whether to open it (FEE-41). */}
+        {credit ? (
+          <AppText variant="label" className="text-text-muted" numberOfLines={1}>
+            {credit}
+          </AppText>
+        ) : null}
         {article.subtitle ? (
           <AppText variant="label" className="text-text-muted" numberOfLines={2}>
             {article.subtitle}

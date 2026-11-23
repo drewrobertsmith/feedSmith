@@ -12,11 +12,13 @@ import {
   FIXTURE_LONG_FEED_ARTICLE,
   FIXTURE_MANAGE,
   FIXTURE_MANAGE_PINNED,
+  FIXTURE_NO_AUTHOR_ARTICLE,
   FIXTURE_NO_LEAD_IMAGE_ARTICLE,
   FIXTURE_NOW,
   FIXTURE_OMITTED_ARTICLE,
   FIXTURE_READ_ROWS,
   FIXTURE_ROWS,
+  FIXTURE_SEVERAL_AUTHORS_ARTICLE,
   FIXTURE_UNEXTRACTED_ARTICLE,
 } from '@/worlds/fixtures';
 import type { ThemeName } from '@/theme/tokens';
@@ -56,6 +58,8 @@ export type WorldSpec = {
     | 'full'
     | 'no-lead-image'
     | 'long-feed-name'
+    | 'several-authors'
+    | 'no-author'
     | 'omitted'
     | 'extracting'
     | 'unextracted'
@@ -85,6 +89,8 @@ const READING_FIXTURES = {
   full: FIXTURE_ARTICLE,
   'no-lead-image': FIXTURE_NO_LEAD_IMAGE_ARTICLE,
   'long-feed-name': FIXTURE_LONG_FEED_ARTICLE,
+  'several-authors': FIXTURE_SEVERAL_AUTHORS_ARTICLE,
+  'no-author': FIXTURE_NO_AUTHOR_ARTICLE,
   omitted: FIXTURE_OMITTED_ARTICLE,
   extracting: FIXTURE_EXTRACTING_ARTICLE,
   unextracted: FIXTURE_UNEXTRACTED_ARTICLE,

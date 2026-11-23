@@ -81,6 +81,8 @@ export const READING_WORLDS = [
     label: 'A long Feed name',
     spec: { colorScheme: 'light', section: 'article', article: 'long-feed-name' },
   },
+  { id: 'reading-several-authors', label: 'Four authors', spec: { colorScheme: 'dark', section: 'article', article: 'several-authors' } },
+  { id: 'reading-no-author', label: 'No author', spec: { colorScheme: 'light', section: 'article', article: 'no-author' } },
   { id: 'reading-omitted', label: 'A video and a table left out', spec: { colorScheme: 'dark', section: 'article', article: 'omitted' } },
   { id: 'reading-missing', label: 'Article not available', spec: { colorScheme: 'dark', section: 'article', article: 'missing' } },
   { id: 'reading-extracting', label: 'Bringing in from the page', spec: { colorScheme: 'dark', section: 'article', article: 'extracting' } },

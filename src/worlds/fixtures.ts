@@ -12,7 +12,8 @@ const VERGE_FACE = { feedId: 'f1', feedTitle: VERGE, faviconUrl: 'https://www.th
 
 /**
  * All, as a few Feeds would fill it: newest first, with every kind of row (P12): image and
- * Subtitle, no image, no Subtitle, a long title, a Feed with no favicon, and one Read.
+ * Subtitle, no image, no Subtitle, a long title, a Feed with no favicon, and one Read; one
+ * author, two, and none (FEE-41).
  */
 export const FIXTURE_ROWS: ArticleRow[] = [
   {
@@ -20,6 +21,7 @@ export const FIXTURE_ROWS: ArticleRow[] = [
     title: 'The UN fails to agree on rules regulating ‘killer robots’',
     subtitle: 'Countries agree to ‘start discussing options’ for rules around autonomous weapons.',
     imageUrl: 'https://platform.theverge.com/wp-content/uploads/sites/2/chorus/uploads/chorus_asset/file/13611631/503831564.jpg.jpg',
+    authors: ['Terrence O’Brien'],
     ...VERGE_FACE,
     publishedAt: day(21),
     read: false,
@@ -28,6 +30,7 @@ export const FIXTURE_ROWS: ArticleRow[] = [
     id: 'a2',
     title: 'The FBI and USDA were reportedly hacked',
     subtitle: 'Investigators say the intrusions began months ago and reached systems holding staff records.',
+    authors: ['Emma Roth', 'Jay Peters'],
     ...VERGE_FACE,
     publishedAt: day(20),
     read: true,
@@ -53,6 +56,7 @@ export const FIXTURE_ARTICLE: ReadingArticle = {
   publishedAt: day(21),
   link: 'https://www.theverge.com/tech/1039554/un-regulations-killer-robots',
   subtitle: 'Countries agreed only to start discussing options for autonomous weapons.',
+  authors: ['Terrence O’Brien'],
   // The Feed's lead image is also the first image in its text: the Reading view shows it once.
   imageUrl: 'https://platform.theverge.com/wp-content/uploads/sites/2/chorus/uploads/chorus_asset/file/13611631/503831564.jpg.jpg',
   omitted: [],
@@ -98,6 +102,15 @@ export const FIXTURE_NO_LEAD_IMAGE_ARTICLE: ReadingArticle = {
   imageUrl: undefined,
   blocks: FIXTURE_ARTICLE.blocks.filter((block) => block.type !== 'image'),
 };
+
+/** An Article credited to four people: the byline names two and counts the rest (FEE-41). */
+export const FIXTURE_SEVERAL_AUTHORS_ARTICLE: ReadingArticle = {
+  ...FIXTURE_ARTICLE,
+  authors: ['Terrence O’Brien', 'Emma Roth', 'Jay Peters', 'Sheena Vasani'],
+};
+
+/** An Article its Feed credits to nobody: no byline line at all. */
+export const FIXTURE_NO_AUTHOR_ARTICLE: ReadingArticle = { ...FIXTURE_ARTICLE, authors: undefined };
 
 /** A Feed whose name won't fit on one line, as The Verge's subscriber Feed names itself. */
 export const FIXTURE_LONG_FEED_ARTICLE: ReadingArticle = {

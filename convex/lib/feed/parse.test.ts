@@ -153,3 +153,44 @@ describe('lead images and the site (FEE-27)', () => {
     );
   });
 });
+
+describe("an Article's authors (FEE-41)", () => {
+  const rssItem = (inner: string) =>
+    `<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/"><channel><title>T</title><item><title>A</title><guid>1</guid>${inner}</item></channel></rss>`;
+  const atomEntry = (inner: string) =>
+    `<feed xmlns="http://www.w3.org/2005/Atom"><title>T</title><entry><id>1</id><title>A</title>${inner}</entry></feed>`;
+  const authorsOf = (xml: string) => parse(xml).articles[0].authors;
+
+  test("The Verge's Articles carry their authors from dc:creator", () => {
+    expect(parse(verge).articles.map((a) => a.authors)).toEqual([['Terrence O’Brien'], ['Terrence O’Brien'], ['Sheena Vasani']]);
+  });
+
+  test.each([
+    ['RSS dc:creator, several', rssItem('<dc:creator>Emma Roth</dc:creator><dc:creator>Jay Peters</dc:creator>'), ['Emma Roth', 'Jay Peters']],
+    ['an RSS author given as email (name)', rssItem('<author>emma@example.com (Emma Roth)</author>'), ['Emma Roth']],
+    ['an Atom author', atomEntry('<author><name>John Gruber</name></author>'), ['John Gruber']],
+    ['several Atom authors', atomEntry('<author><name>A. One</name></author><author><name>B. Two</name></author>'), ['A. One', 'B. Two']],
+    ['the same name twice', rssItem('<dc:creator>Emma Roth</dc:creator><author>e@example.com (Emma Roth)</author>'), ['Emma Roth']],
+    ['a name with markup and spacing', rssItem('<dc:creator><![CDATA[  <b>Emma</b>   Roth ]]></dc:creator>'), ['Emma Roth']],
+  ])('reads %s', (_case, xml, authors) => {
+    expect(authorsOf(xml)).toEqual(authors);
+  });
+
+  test.each([
+    ['a bare email', rssItem('<author>emma@example.com</author>')],
+    ['an email inside a name', rssItem('<dc:creator>Emma Roth (emma@example.com)</dc:creator>')],
+    ['an Atom author with only an email', atomEntry('<author><email>emma@example.com</email></author>')],
+  ])('never keeps an email address: %s', (_case, xml) => {
+    expect(JSON.stringify(parse(xml).articles[0])).not.toContain('@');
+  });
+
+  test('an Article with no author has none', () => {
+    expect(authorsOf(rssItem(''))).toBeUndefined();
+  });
+
+  test('authors are capped in number and length', () => {
+    const many = Array.from({ length: 30 }, (_, i) => `<dc:creator>Writer ${i}</dc:creator>`).join('');
+    expect(authorsOf(rssItem(many))).toHaveLength(10);
+    expect(authorsOf(rssItem(`<dc:creator>${'N'.repeat(500)}</dc:creator>`))![0]).toHaveLength(100);
+  });
+});
