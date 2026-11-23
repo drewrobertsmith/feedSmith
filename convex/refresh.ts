@@ -152,14 +152,14 @@ export const ensureFetchTimer = internalMutation({
   },
 });
 
-/** Deletes Articles 30 days after publication (P14), a batch at a time. Saved is exempt once it exists (FEE-30). */
+/** Deletes Articles 30 days after publication (P14), a batch at a time. Saved Articles stay until Done. */
 export const cleanup = internalMutation({
   args: {},
   returns: v.null(),
   handler: async (ctx) => {
     const old = await ctx.db
       .query('articles')
-      .withIndex('by_published', (q) => q.lt('publishedAt', Date.now() - RETENTION))
+      .withIndex('by_saved_published', (q) => q.eq('savedAt', undefined).lt('publishedAt', Date.now() - RETENTION))
       .take(DELETE_BATCH);
     await deleteArticles(ctx, old);
     if (old.length === DELETE_BATCH) await ctx.scheduler.runAfter(0, internal.refresh.cleanup, {});

@@ -370,8 +370,8 @@ export const rename = mutation({
 });
 
 /**
- * Removes one of the signed-in User's Feeds and its Articles (T23). The Feed goes at once;
- * its Articles follow in batches, and All never shows them meanwhile.
+ * Removes one of the signed-in User's Feeds and its Articles, except those Saved (T23). The Feed
+ * goes at once; its other Articles follow in batches, and All never shows them meanwhile.
  */
 export const remove = mutation({
   args: { id: v.string() },
@@ -382,20 +382,29 @@ export const remove = mutation({
     if (!feed) return { ok: false as const, reason: 'not-found' as const };
     const schedule = await scheduleOf(ctx, feed._id);
     if (schedule) await ctx.db.delete(schedule._id);
+    // Saved Articles stay, still named by the Feed (T23). A User Saves a handful, never thousands.
+    const saved = await ctx.db
+      .query('articles')
+      .withIndex('by_feed_saved', (q) => q.eq('feedId', feed._id).gt('savedAt', 0))
+      .collect();
+    await Promise.all(saved.map((article) => ctx.db.patch(article._id, { feedTitle: feed.title })));
     await ctx.db.delete(feed._id);
     await ctx.scheduler.runAfter(0, internal.feeds.removeArticles, { feedId: feed._id });
     return { ok: true as const };
   },
 });
 
-/** Deletes a removed Feed's Articles and their bodies, a batch at a time. Saved ones stay once Saved exists (T23, FEE-30). */
+/**
+ * Deletes a removed Feed's Articles and their bodies, a batch at a time. Saved ones stay in Saved
+ * until Done (T23); `remove` already gave them the Feed's name to keep.
+ */
 export const removeArticles = internalMutation({
   args: { feedId: v.id('feeds') },
   returns: v.null(),
   handler: async (ctx, { feedId }) => {
     const articles = await ctx.db
       .query('articles')
-      .withIndex('by_feed_published', (q) => q.eq('feedId', feedId))
+      .withIndex('by_feed_saved', (q) => q.eq('feedId', feedId).eq('savedAt', undefined))
       .take(DELETE_BATCH);
     await deleteArticles(ctx, articles);
     if (articles.length === DELETE_BATCH) await ctx.scheduler.runAfter(0, internal.feeds.removeArticles, { feedId });

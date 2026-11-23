@@ -1,6 +1,6 @@
 import { v } from 'convex/values';
 
-import type { Id } from './_generated/dataModel';
+import type { Doc, Id } from './_generated/dataModel';
 import { mutation, query, type QueryCtx } from './_generated/server';
 import { requireUserId } from './lib/currentUser';
 import { ownFeed } from './feeds';
@@ -29,6 +29,39 @@ async function feedFaces(ctx: QueryCtx, feedIds: Id<'feeds'>[]) {
   );
 }
 
+/** One Article in a list: All, a Feed's, or Saved. Never a feed URL (Q9). */
+const vRow = v.object({
+  id: v.id('articles'),
+  /** Absent for a Saved Article whose Feed was removed (T23). */
+  feedId: v.optional(v.id('feeds')),
+  title: v.string(),
+  subtitle: v.optional(v.string()),
+  imageUrl: v.optional(v.string()),
+  authors: v.optional(v.array(v.string())),
+  feedTitle: v.string(),
+  faviconUrl: v.optional(v.string()),
+  publishedAt: v.number(),
+  read: v.boolean(),
+  saved: v.boolean(),
+});
+
+/** An Article as a list row, named by its Feed, or by the name it kept when its Feed went (T23). */
+function rowOf(article: Doc<'articles'>, face: FeedFace | undefined) {
+  return {
+    id: article._id,
+    ...(face ? { feedId: article.feedId } : {}),
+    title: article.title,
+    subtitle: article.subtitle,
+    imageUrl: article.imageUrl,
+    authors: article.authors,
+    feedTitle: face?.title ?? article.feedTitle ?? '',
+    faviconUrl: face?.faviconUrl,
+    publishedAt: article.publishedAt,
+    read: article.readAt !== undefined,
+    saved: article.savedAt !== undefined,
+  };
+}
+
 /** A link's id as one of the signed-in User's Articles, or null (Q25). */
 async function ownArticle(ctx: QueryCtx, userId: Id<'users'>, rawId: string) {
   // Convex ids are well under 64 characters; longer strings aren't worth normalising.
@@ -43,20 +76,7 @@ async function ownArticle(ctx: QueryCtx, userId: Id<'users'>, rawId: string) {
  */
 export const all = query({
   args: { feedId: v.optional(v.string()) },
-  returns: v.array(
-    v.object({
-      id: v.id('articles'),
-      feedId: v.id('feeds'),
-      title: v.string(),
-      subtitle: v.optional(v.string()),
-      imageUrl: v.optional(v.string()),
-      authors: v.optional(v.array(v.string())),
-      feedTitle: v.string(),
-      faviconUrl: v.optional(v.string()),
-      publishedAt: v.number(),
-      read: v.boolean(),
-    }),
-  ),
+  returns: v.array(vRow),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     let articles;
@@ -77,21 +97,27 @@ export const all = query({
     }
     const faces = await feedFaces(ctx, articles.map((a) => a.feedId));
     // A removed Feed's Articles are deleted in batches after it; they're never shown meanwhile.
-    return articles.filter((a) => faces.has(a.feedId)).map((a) => {
-      const face = faces.get(a.feedId);
-      return {
-        id: a._id,
-        feedId: a.feedId,
-        title: a.title,
-        subtitle: a.subtitle,
-        imageUrl: a.imageUrl,
-        authors: a.authors,
-        feedTitle: face?.title ?? '',
-        faviconUrl: face?.faviconUrl,
-        publishedAt: a.publishedAt,
-        read: a.readAt !== undefined,
-      };
-    });
+    return articles.filter((a) => faces.has(a.feedId)).map((a) => rowOf(a, faces.get(a.feedId)));
+  },
+});
+
+/**
+ * Saved: the signed-in User's Saved Articles, most recently Saved first (P14), including those
+ * whose Feed was removed, named by the Feed they came from (T23). Saved holds only what you still
+ * mean to read (P8), so it's read whole.
+ */
+export const saved = query({
+  args: {},
+  returns: v.array(vRow),
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
+    const articles = await ctx.db
+      .query('articles')
+      .withIndex('by_user_saved', (q) => q.eq('userId', userId).gt('savedAt', 0))
+      .order('desc')
+      .collect();
+    const faces = await feedFaces(ctx, articles.map((a) => a.feedId));
+    return articles.map((a) => rowOf(a, faces.get(a.feedId)));
   },
 });
 
@@ -105,8 +131,8 @@ export const get = query({
     v.null(),
     v.object({
       title: v.string(),
-      /** Its Feed, so the Reading view's Feed name links to it (FEE-47). */
-      feedId: v.id('feeds'),
+      /** Its Feed, so the Reading view's Feed name links to it (FEE-47); absent once removed (T23). */
+      feedId: v.optional(v.id('feeds')),
       feedTitle: v.string(),
       publishedAt: v.number(),
       link: v.optional(v.string()),
@@ -117,6 +143,7 @@ export const get = query({
       omitted: v.array(vOmittedKind),
       /** Summary only: its page is still being read, or couldn't be (T8, Q6). Absent once the text is whole. */
       page: v.optional(vReadingPage),
+      saved: v.boolean(),
     }),
   ),
   handler: async (ctx, args) => {
@@ -130,8 +157,8 @@ export const get = query({
         .withIndex('by_article', (q) => q.eq('articleId', article._id))
         .unique(),
     ]);
-    // A removed Feed's Articles are on their way out (T23); a link to one opens nothing.
-    if (!feed) return null;
+    // A removed Feed's Articles are on their way out, except those Saved (T23); a link to one opens nothing.
+    if (!feed && article.savedAt === undefined) return null;
     const read = await ctx.db
       .query('pageReads')
       .withIndex('by_article', (q) => q.eq('articleId', article._id))
@@ -139,8 +166,8 @@ export const get = query({
     const page = pageOf(read?.state);
     return {
       title: article.title,
-      feedId: feed._id,
-      feedTitle: feed.title,
+      ...(feed ? { feedId: feed._id } : {}),
+      feedTitle: feed?.title ?? article.feedTitle ?? '',
       publishedAt: article.publishedAt,
       link: article.link,
       subtitle: article.subtitle,
@@ -149,6 +176,7 @@ export const get = query({
       blocks: body?.blocks ?? [],
       omitted: body?.omitted ?? [],
       ...(page ? { page } : {}),
+      saved: article.savedAt !== undefined,
     };
   },
 });
@@ -168,6 +196,61 @@ export const markRead = mutation({
     const userId = await requireUserId(ctx);
     const article = await ownArticle(ctx, userId, args.id);
     if (article && article.readAt === undefined) await ctx.db.patch(article._id, { readAt: Date.now() });
+    return null;
+  },
+});
+
+/** What an Article's Saved and Read state was before a change, for Undo to put back (Q35). */
+const vBefore = v.object({ savedAt: v.optional(v.number()), readAt: v.optional(v.number()) });
+const beforeOf = (article: Doc<'articles'>) => ({ savedAt: article.savedAt, readAt: article.readAt });
+
+/**
+ * Saves one of the User's Articles (Q3): it goes to the top of Saved. One already Saved keeps its
+ * place. Returns what it was before, for Undo; null when the id names none of the User's Articles.
+ */
+export const save = mutation({
+  args: { id: v.string() },
+  returns: v.union(v.null(), vBefore),
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const article = await ownArticle(ctx, userId, args.id);
+    if (!article) return null;
+    if (article.savedAt === undefined) await ctx.db.patch(article._id, { savedAt: Date.now() });
+    return beforeOf(article);
+  },
+});
+
+/**
+ * Marks one of the User's Saved Articles Done (P8): it leaves Saved and stays in its Feed as Read.
+ * Returns what it was before, for Undo; null when the id names none of the User's Articles.
+ */
+export const done = mutation({
+  args: { id: v.string() },
+  returns: v.union(v.null(), vBefore),
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const article = await ownArticle(ctx, userId, args.id);
+    if (!article) return null;
+    await ctx.db.patch(article._id, { savedAt: undefined, readAt: article.readAt ?? Date.now() });
+    return beforeOf(article);
+  },
+});
+
+/**
+ * Undo (Q35): puts an Article's Saved and Read state back as `save` or `done` found it, so it
+ * returns to its old place in Saved. Times never run ahead of now, and anything that isn't a time counts as none.
+ */
+export const restore = mutation({
+  args: { id: v.string(), savedAt: v.optional(v.number()), readAt: v.optional(v.number()) },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const article = await ownArticle(ctx, userId, args.id);
+    if (!article) return null;
+    const now = Date.now();
+    // Only a real moment counts; anything else (NaN, zero, negative) means none.
+    const at = (time: number | undefined) => (time !== undefined && Number.isFinite(time) && time > 0 ? Math.min(time, now) : undefined);
+    await ctx.db.patch(article._id, { savedAt: at(args.savedAt), readAt: at(args.readAt) });
     return null;
   },
 });
