@@ -14,7 +14,8 @@ export function NativeSheet({ open, onClose, children }: { open: boolean; onClos
   const { colorScheme } = useEnvironment();
   return (
     <BottomSheet isPresented={open} onDismiss={onClose} containerColor={themes[colorScheme].surface} contentPadding={0}>
-      <RNHostView matchContents>{children}</RNHostView>
+      {/* Full width from the sheet, height from the content, so rows and the divider reach its edges. */}
+      <RNHostView matchContents={{ vertical: true }}>{children}</RNHostView>
     </BottomSheet>
   );
 }

@@ -6,7 +6,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useAuth } from '@/auth/auth-context';
 import { AppText } from '@/components/app-text';
 import { NativeSheet } from '@/components/native-sheet';
-import { useEnvironment } from '@/environment';
+import { useEnvironment, useSizeScale } from '@/environment';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
 
@@ -30,6 +30,7 @@ function SheetRow({
   busyLabel?: string;
 }) {
   const { colorScheme } = useEnvironment();
+  const box = ICON * useSizeScale();
   const shown = busy && busyLabel ? busyLabel : label;
   return (
     <Pressable
@@ -43,7 +44,13 @@ function SheetRow({
       className={busy ? 'flex-row items-center gap-group px-edge opacity-60' : 'flex-row items-center gap-group px-edge'}
       style={{ minHeight: ROW }}
     >
-      <SymbolView name={icon} size={ICON} tintColor={themes[colorScheme].text} />
+      {/* The icon grows with the text, as its words do, and never shrinks to make room (Q16). */}
+      <SymbolView
+        name={icon}
+        size={ICON}
+        tintColor={themes[colorScheme].text}
+        style={{ width: box, height: box, flexShrink: 0 }}
+      />
       <AppText variant="action" className="shrink text-text" accessible={false}>
         {shown}
       </AppText>
@@ -98,10 +105,10 @@ function AccountSheetContent({ onClose }: { onClose: () => void }) {
  */
 export function AccountButton({ initiallyOpen = false }: { initiallyOpen?: boolean }) {
   const { account } = useAuth();
-  const { fontScale } = useEnvironment();
   const [open, setOpen] = useState(initiallyOpen);
   const close = () => setOpen(false);
-  const size = CIRCLE * fontScale;
+  // Grows with the initial inside it, so large text never outgrows the circle (Q16).
+  const size = CIRCLE * useSizeScale();
 
   return (
     <>
