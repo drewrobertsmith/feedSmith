@@ -89,6 +89,28 @@ export const FIXTURE_ARTICLE: ReadingArticle = {
   ],
 };
 
+const CALM_SUBTITLE = 'Why reading slowly is worth it, and how to start.';
+
+/** A summary-only Article whose page is still being read (FEE-25, T8). */
+export const FIXTURE_EXTRACTING_ARTICLE: ReadingArticle = {
+  title: 'The Art of Slow Reading',
+  feedTitle: 'Calm Notes',
+  publishedAt: day(18),
+  link: 'https://calmnotes.example/2026/slow-reading',
+  subtitle: CALM_SUBTITLE,
+  blocks: [{ type: 'paragraph', spans: [{ text: CALM_SUBTITLE }] }],
+  omitted: [],
+  page: 'extracting',
+};
+
+/** A summary-only Article whose page couldn't be read: the fallback (Q6). */
+export const FIXTURE_UNEXTRACTED_ARTICLE: ReadingArticle = {
+  ...FIXTURE_EXTRACTING_ARTICLE,
+  // A real image, so the gallery shows the fallback as a reader would see it.
+  imageUrl: 'https://platform.theverge.com/wp-content/uploads/sites/2/chorus/uploads/chorus_asset/file/13611631/503831564.jpg.jpg',
+  page: 'unavailable',
+};
+
 /** An Article whose Feed had a video and a table, which feedSmith doesn't show yet. */
 export const FIXTURE_OMITTED_ARTICLE: ReadingArticle = {
   ...FIXTURE_ARTICLE,

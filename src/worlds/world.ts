@@ -8,12 +8,14 @@ import {
   FIXTURE_ARTICLE,
   FIXTURE_CHIPS,
   FIXTURE_CHOICES,
+  FIXTURE_EXTRACTING_ARTICLE,
   FIXTURE_MANAGE,
   FIXTURE_MANAGE_PINNED,
   FIXTURE_NOW,
   FIXTURE_OMITTED_ARTICLE,
   FIXTURE_READ_ROWS,
   FIXTURE_ROWS,
+  FIXTURE_UNEXTRACTED_ARTICLE,
 } from '@/worlds/fixtures';
 import type { ThemeName } from '@/theme/tokens';
 
@@ -48,7 +50,7 @@ export type WorldSpec = {
   /** Manage Feeds' writes don't reach the server, or the server refuses the name. */
   manageWrites?: 'fail' | 'invalid';
   /** The Article the Reading view opens. Defaults to one with every kind of block. */
-  article?: 'full' | 'omitted' | 'missing' | 'loading';
+  article?: 'full' | 'omitted' | 'extracting' | 'unextracted' | 'unextracted-no-image' | 'missing' | 'loading';
 };
 
 /** What a world's fake Feeds were asked to do. */
@@ -66,6 +68,15 @@ const emptyLog = (): FeedsLog => ({ added: [], refreshes: 0, read: [], pins: [],
 
 /** What a world's fake auth was asked to do. */
 export type SignInLog = { starts: number; completions: { code?: string; error?: string }[] };
+
+/** The Article each Reading world shows. */
+const READING_FIXTURES = {
+  full: FIXTURE_ARTICLE,
+  omitted: FIXTURE_OMITTED_ARTICLE,
+  extracting: FIXTURE_EXTRACTING_ARTICLE,
+  unextracted: FIXTURE_UNEXTRACTED_ARTICLE,
+  'unextracted-no-image': { ...FIXTURE_UNEXTRACTED_ARTICLE, imageUrl: undefined },
+} as const;
 
 /** A world's Feeds and Articles: fixture data, and a log of what it's asked. */
 export function worldFeeds(
@@ -89,7 +100,7 @@ export function worldFeeds(
       ? { status: 'loading' }
       : article === 'missing'
         ? { status: 'missing' }
-        : { status: 'ready', article: article === 'omitted' ? FIXTURE_OMITTED_ARTICLE : FIXTURE_ARTICLE };
+        : { status: 'ready', article: READING_FIXTURES[article ?? 'full'] };
 
   return {
     useAll: (feedId) => {

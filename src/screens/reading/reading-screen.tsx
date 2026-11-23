@@ -5,8 +5,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/app-button';
 import { AppText } from '@/components/app-text';
-import { useArticle, useMarkRead } from '@/feeds/feeds-data';
+import { useArticle, useMarkRead, type Block, type ReadingArticle } from '@/feeds/feeds-data';
 import { publishedDate } from '@/feeds/format';
+import { openLink } from '@/feeds/open-link';
 import { ArticleBlocks } from '@/screens/reading/article-blocks';
 import { spacing } from '@/theme/spacing';
 
@@ -20,6 +21,27 @@ export function ArticleMissing() {
         It may have been removed from its Feed.
       </AppText>
       <AppButton label="Back to All" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
+    </View>
+  );
+}
+
+/**
+ * A summary-only Article whose page couldn't be read (Q6): its lead image and Subtitle, and a
+ * plain way to the original, instead of a broken page.
+ */
+function PageUnavailable({ article }: { article: ReadingArticle }) {
+  const { imageUrl, subtitle, link } = article;
+  const blocks: Block[] = [
+    ...(imageUrl ? [{ type: 'image' as const, src: imageUrl }] : []),
+    ...(subtitle ? [{ type: 'paragraph' as const, spans: [{ text: subtitle }] }] : []),
+  ];
+  return (
+    <View className="gap-group">
+      <ArticleBlocks blocks={blocks} />
+      <AppText variant="label" className="text-text-muted">
+        This Article couldn’t be brought in from its page.
+      </AppText>
+      {link ? <AppButton label="Open original" onPress={() => openLink(link)} /> : null}
     </View>
   );
 }
@@ -57,7 +79,19 @@ export function ReadingScreen({ id }: { id: string }) {
           </AppText>
         </View>
       </View>
-      <ArticleBlocks blocks={article.blocks} link={article.link} />
+      {article.page === 'unavailable' ? (
+        <PageUnavailable article={article} />
+      ) : (
+        <View className="gap-group">
+          {article.page === 'extracting' ? (
+            // Announced when it goes: the full text replaces the Subtitle as soon as it's read.
+            <AppText variant="label" className="text-text-muted" accessibilityLiveRegion="polite">
+              Bringing in the full Article from its page…
+            </AppText>
+          ) : null}
+          <ArticleBlocks blocks={article.blocks} link={article.link} />
+        </View>
+      )}
     </ScrollView>
   );
 }

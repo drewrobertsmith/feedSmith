@@ -77,6 +77,23 @@ export const READING_WORLDS = [
   { id: 'reading-light', label: 'Reading, light', spec: { colorScheme: 'light', section: 'article' } },
   { id: 'reading-omitted', label: 'A video and a table left out', spec: { colorScheme: 'dark', section: 'article', article: 'omitted' } },
   { id: 'reading-missing', label: 'Article not available', spec: { colorScheme: 'dark', section: 'article', article: 'missing' } },
+  { id: 'reading-extracting', label: 'Bringing in from the page', spec: { colorScheme: 'dark', section: 'article', article: 'extracting' } },
+  { id: 'reading-unextracted', label: "Page couldn't be read", spec: { colorScheme: 'dark', section: 'article', article: 'unextracted' } },
+  {
+    id: 'reading-unextracted-no-image',
+    label: "Page couldn't be read, no image",
+    spec: { colorScheme: 'dark', section: 'article', article: 'unextracted-no-image' },
+  },
+  {
+    id: 'reading-unextracted-light',
+    label: "Page couldn't be read, light",
+    spec: { colorScheme: 'light', section: 'article', article: 'unextracted' },
+  },
+  {
+    id: 'reading-unextracted-largest-font',
+    label: "Page couldn't be read, largest font",
+    spec: { colorScheme: 'dark', section: 'article', article: 'unextracted', fontScale: 2 },
+  },
   {
     id: 'reading-largest-font',
     label: 'Reading, largest font size',

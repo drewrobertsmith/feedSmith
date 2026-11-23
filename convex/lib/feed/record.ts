@@ -1,3 +1,4 @@
+import { internal } from '../../_generated/api';
 import type { Id } from '../../_generated/dataModel';
 import type { MutationCtx } from '../../_generated/server';
 import type { Validators } from './http';
@@ -12,7 +13,8 @@ const PACE_SAMPLE = 700;
 /**
  * Stores the Articles the Feed doesn't have yet, by guid, skipping any already past retention.
  * Expects each guid once in `articles` (`articlesToStore` guarantees it): the check is against
- * what's already stored, not within the batch.
+ * what's already stored, not within the batch. When any new one is summary only, its Feed's
+ * pages are read next (T8).
  */
 export async function storeNewArticles(
   ctx: MutationCtx,
@@ -21,9 +23,19 @@ export async function storeNewArticles(
   articles: StoredArticle[],
   now: number,
 ) {
-  await Promise.all(
+  // One run reads a Feed's pages at a time: one already going picks up what's stored now (T24).
+  // Checked before storing, on purpose: the Articles about to be stored would otherwise count themselves.
+  const reading = await Promise.all(
+    (['pending', 'reading'] as const).map((state) =>
+      ctx.db
+        .query('articles')
+        .withIndex('by_feed_extraction', (q) => q.eq('feedId', feedId).eq('extraction', state))
+        .first(),
+    ),
+  );
+  const stored = await Promise.all(
     articles.map(async ({ blocks, omitted, ...fields }) => {
-      if (fields.publishedAt < now - RETENTION) return;
+      if (fields.publishedAt < now - RETENTION) return false;
       const existing = await ctx.db
         .query('articles')
         .withIndex('by_feed_guid', (q) => q.eq('feedId', feedId).eq('guid', fields.guid))
@@ -31,12 +43,14 @@ export async function storeNewArticles(
       if (existing) {
         // Stored before lead images were kept: fill it in, and nothing else changes.
         if (!existing.imageUrl && fields.imageUrl) await ctx.db.patch(existing._id, { imageUrl: fields.imageUrl });
-        return;
+        return false;
       }
       const articleId = await ctx.db.insert('articles', { userId, feedId, ...fields });
       await ctx.db.insert('articleBodies', { userId, articleId, blocks, omitted });
+      return fields.extraction === 'pending';
     }),
   );
+  if (stored.some(Boolean) && !reading.some(Boolean)) await ctx.scheduler.runAfter(0, internal.extractPages.run, { feedId });
 }
 
 /** Marks a Feed working and sets its next check from its pace (T19). */
