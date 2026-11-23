@@ -9,6 +9,8 @@ import type { TextStyle } from 'react-native';
 export const typeScale = {
   title: { fontFamily: 'InstrumentSans', fontWeight: '600', fontSize: 24, lineHeight: 30 },
   label: { fontFamily: 'InstrumentSans', fontWeight: '500', fontSize: 13, lineHeight: 18 },
+  /** A row in a menu or sheet that does something: Manage Feeds, Sign out (FEE-35). */
+  action: { fontFamily: 'InstrumentSans', fontWeight: '500', fontSize: 16, lineHeight: 24 },
   reading: { fontFamily: 'Literata', fontWeight: '400', fontSize: 19, lineHeight: 31 },
   /** An Article's headline: the Reading view's one large element. */
   headline: { fontFamily: 'Literata', fontWeight: '600', fontSize: 30, lineHeight: 38 },

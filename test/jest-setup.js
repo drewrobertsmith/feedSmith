@@ -35,3 +35,9 @@ jest.mock('@/components/drag-row', () => {
     ),
   };
 });
+
+// Android's bottom sheet is Jetpack Compose (Expo UI), which has no Jest renderer: its one
+// adapter shows its content while open, as the real sheet does (FEE-35).
+jest.mock('@/components/native-sheet', () => ({
+  NativeSheet: jest.fn(({ open, children }) => (open ? children : null)),
+}));

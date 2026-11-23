@@ -77,3 +77,11 @@ test('the light and dark toggle switches the world’s theme', async () => {
   expect(screen.getByRole('radio', { name: 'Light' })).toBeChecked();
   expect(Uniwind.currentTheme).toBe('light');
 });
+
+test('an Account world with the sheet open shows it at once (FEE-35)', async () => {
+  await renderRouter(routes, { initialUrl: '/gallery?world=account-sheet' });
+
+  expect(await screen.findByRole('heading', { name: 'State gallery' })).toBeOnTheScreen();
+  expect(screen.getByTestId('account-sheet')).toBeOnTheScreen();
+  expect(screen.getByRole('button', { name: 'Sign out' })).toBeOnTheScreen();
+});

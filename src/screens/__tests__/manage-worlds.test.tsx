@@ -1,4 +1,4 @@
-import { act, fireEvent, userEvent } from '@testing-library/react-native';
+import { act, fireEvent, userEvent, within } from '@testing-library/react-native';
 import { renderRouter, screen } from 'expo-router/testing-library';
 import { Alert, ToastAndroid } from 'react-native';
 import { Uniwind } from 'uniwind';
@@ -61,10 +61,12 @@ describe('Manage Feeds worlds', () => {
 });
 
 describe('Manage Feeds', () => {
-  test('opens from the Feeds top bar', async () => {
+  test('opens from the Account sheet (D17)', async () => {
     const user = userEvent.setup();
     await open({ colorScheme: 'dark', feeds: 'some' });
-    await user.press(await screen.findByRole('button', { name: 'Manage Feeds' }));
+    const bar = await screen.findByTestId('top-bar-Feeds');
+    await user.press(within(bar).getByRole('button', { name: /^Account/ }));
+    await user.press(within(screen.getByTestId('account-sheet')).getByRole('button', { name: 'Manage Feeds' }));
     expect(await screen.findByRole('heading', { name: 'Manage Feeds' })).toBeOnTheScreen();
   });
 

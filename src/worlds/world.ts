@@ -1,10 +1,11 @@
 import { Uniwind } from 'uniwind';
 
-import type { Auth } from '@/auth/auth-context';
+import type { Account, Auth } from '@/auth/auth-context';
 import type { SignInView } from '@/auth/sign-in-outcome';
 import type { Environment } from '@/environment';
 import type { AddFeedReason, AddFeedView, ArticleView, FeedsData } from '@/feeds/feeds-data';
 import {
+  FIXTURE_ACCOUNT,
   FIXTURE_ARTICLE,
   FIXTURE_CHIPS,
   FIXTURE_CHOICES,
@@ -37,6 +38,12 @@ export type WorldSpec = {
   section?: 'feeds' | 'saved' | 'add-feed' | 'article' | 'manage';
   /** Where the User is in signing in. Defaults to signed in. */
   auth?: 'signed-in' | 'signed-out' | 'signing-in' | 'not-allowed' | 'failed';
+  /** The signed-in User's Account. `no-name`: Google gave no name, so the email stands in. */
+  account?: 'no-name';
+  /** The Account sheet starts open (the state gallery; tests tap the circle). */
+  accountSheet?: 'open';
+  /** Signing out: `busy` is under way; `no-server` can't reach the server, and signs out anyway. */
+  signOut?: 'busy' | 'no-server';
   /** What All holds. Defaults to no Feeds yet. `read` is every Article already Read. */
   feeds?: 'none' | 'loading' | 'some' | 'read';
   /** Eight followed Feeds, one with a long name, instead of the usual three (FEE-44). */
@@ -85,7 +92,9 @@ export type FeedsLog = {
 const emptyLog = (): FeedsLog => ({ added: [], refreshes: 0, read: [], pins: [], renames: [], removed: [], pinOrders: [] });
 
 /** What a world's fake auth was asked to do. */
-export type SignInLog = { starts: number; completions: { code?: string; error?: string }[] };
+export type SignInLog = { starts: number; completions: { code?: string; error?: string }[]; signOuts: number };
+
+const emptySignInLog = (): SignInLog => ({ starts: 0, completions: [], signOuts: 0 });
 
 /** The Article each Reading world shows. */
 const READING_FIXTURES = {
@@ -216,11 +225,19 @@ const SIGN_IN_VIEWS: Record<NonNullable<WorldSpec['auth']>, SignInView> = {
 };
 
 /** A world's auth, without applying anything: fixed state, and a log of what it's asked. */
-export function worldAuth(spec: WorldSpec, log: SignInLog = { starts: 0, completions: [] }): Auth {
+export function worldAuth(spec: WorldSpec, log: SignInLog = emptySignInLog()): Auth {
   const state = spec.auth ?? 'signed-in';
+  const signedIn = state === 'signed-in';
+  const account: Account = spec.account === 'no-name' ? { email: FIXTURE_ACCOUNT.email, initial: 'A' } : FIXTURE_ACCOUNT;
   return {
-    session: state === 'signed-in' ? 'signed-in' : 'signed-out',
+    session: signedIn ? 'signed-in' : 'signed-out',
+    account: signedIn ? account : null,
     signIn: SIGN_IN_VIEWS[state],
+    signOut: async () => {
+      log.signOuts += 1;
+      // With no server, the real adapter still clears the phone's tokens: the fake resolves as it does.
+    },
+    signingOut: spec.signOut === 'busy',
     startSignIn: () => {
       log.starts += 1;
     },
@@ -240,7 +257,7 @@ const SECTION_URLS = {
 
 export function createWorld(spec: WorldSpec): World {
   Uniwind.setTheme(spec.colorScheme);
-  const signInLog: SignInLog = { starts: 0, completions: [] };
+  const signInLog = emptySignInLog();
   const signedIn = (spec.auth ?? 'signed-in') === 'signed-in';
   const feedsLog: FeedsLog = emptyLog();
 

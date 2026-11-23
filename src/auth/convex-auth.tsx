@@ -1,6 +1,6 @@
 import { useSignInWithGoogle } from '@convex-dev/auth/methods/google/react';
-import { ConvexAuthProvider } from '@convex-dev/auth/react';
-import { ConvexReactClient, useConvexAuth } from 'convex/react';
+import { ConvexAuthProvider, useAuthActions } from '@convex-dev/auth/react';
+import { ConvexReactClient, useConvexAuth, useQuery } from 'convex/react';
 import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
 import { useState, type ReactNode } from 'react';
@@ -26,11 +26,26 @@ const secureStorage = {
 function ConvexAuthBridge({ children }: { children: ReactNode }) {
   const { isLoading, isAuthenticated } = useConvexAuth();
   const { signIn } = useSignInWithGoogle(api.auth);
+  const { signOut } = useAuthActions();
+  const account = useQuery(api.users.viewer, isAuthenticated ? {} : 'skip');
   const [view, setView] = useState<SignInView>({ status: 'idle' });
+  const [signingOut, setSigningOut] = useState(false);
 
   const auth: Auth = {
     session: isLoading ? 'loading' : isAuthenticated ? 'signed-in' : 'signed-out',
+    account: isAuthenticated ? (account ?? null) : null,
     signIn: view,
+    // Convex Auth revokes the session on the server, and clears the tokens from SecureStore
+    // whether or not that call reached it, so the phone always signs out (Q26).
+    signOut: async () => {
+      setSigningOut(true);
+      try {
+        await signOut();
+      } finally {
+        setSigningOut(false);
+      }
+    },
+    signingOut,
     startSignIn: async () => {
       setView({ status: 'busy' });
       const start = await signIn({ redirectTo: SIGN_IN_FORWARDER });

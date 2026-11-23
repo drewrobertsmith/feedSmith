@@ -1,6 +1,5 @@
 import { LegendList } from '@legendapp/list/react-native';
 import { Image } from 'expo-image';
-import { SymbolView } from 'expo-symbols';
 import { router } from 'expo-router';
 import { Pressable, RefreshControl, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,17 +8,17 @@ import { AppButton } from '@/components/app-button';
 import { AppText } from '@/components/app-text';
 import { ChipSwitch, SlideRow } from '@/components/chip-switch';
 import { FeedIcon } from '@/components/feed-icon';
+import { TopBar, TopBarIcon } from '@/components/top-bar';
 import { useEnvironment } from '@/environment';
 import { useAll, useChips, useRefresh, type ArticleRow } from '@/feeds/feeds-data';
 import { byline, publishedAgo } from '@/feeds/format';
 import { useShownRows } from '@/feeds/use-shown-rows';
+import { AccountButton } from '@/screens/account/account-sheet';
 import { ChipRow } from '@/screens/chip-row';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
 
 const addFeed = () => router.push('/add-feed');
-const manageFeeds = () => router.push('/manage-feeds');
-const MANAGE_ICON = 24;
 
 /** A Read row's image fades back with its text (P7); text dims by colour, so contrast holds (Q14). */
 const READ_IMAGE_OPACITY = 0.55;
@@ -104,8 +103,9 @@ function Row({ article, feedNamed }: { article: ArticleRow; feedNamed: boolean }
  * The Feeds section: All, or one Feed's Articles, newest first (Q1, P5, P12), under the chip
  * row (P9). The chosen chip lives in the route (`?feed=`), so it can be restored and linked to;
  * a link's value is untrusted, so anything but one of the User's chips means All (Q25).
+ * `accountOpen` opens the Account sheet at once, for the state gallery.
  */
-export function FeedsScreen({ feed }: { feed?: string }) {
+export function FeedsScreen({ feed, accountOpen }: { feed?: string; accountOpen?: boolean }) {
   const insets = useSafeAreaInsets();
   const chipsView = useChips();
   const chips = chipsView.status === 'ready' ? chipsView.chips : [];
@@ -125,28 +125,12 @@ export function FeedsScreen({ feed }: { feed?: string }) {
 
   const header = (
     <View className="gap-group pb-related" style={{ paddingTop: insets.top + spacing.section }}>
-      <View className="flex-row items-center justify-between px-edge">
-        <AppText variant="title" className="text-text">
-          Feeds
-        </AppText>
-        {chips.length > 0 ? (
-          <View className="flex-row items-center gap-related">
-            {/* Adding a Feed is always here, in the same place (Q31, FEE-44); Manage Feeds moves to the Account sheet with FEE-35 (D17). */}
-            <Pressable role="button" aria-label="Add a Feed" onPress={addFeed} hitSlop={spacing.related} className="p-inside">
-              <SymbolView name={{ ios: 'plus', android: 'add' }} size={MANAGE_ICON} tintColor={theme.text} />
-            </Pressable>
-            <Pressable
-              role="button"
-              aria-label="Manage Feeds"
-              onPress={manageFeeds}
-              hitSlop={spacing.related}
-              className="p-inside"
-            >
-              <SymbolView name={{ ios: 'slider.horizontal.3', android: 'tune' }} size={MANAGE_ICON} tintColor={theme.text} />
-            </Pressable>
-          </View>
-        ) : null}
-      </View>
+      <TopBar
+        title="Feeds"
+        // Adding a Feed is always here, in the same place (Q31, D18); the empty state has its own button.
+        action={chips.length > 0 ? <TopBarIcon label="Add a Feed" icon={{ ios: 'plus', android: 'add' }} onPress={addFeed} /> : undefined}
+        trailing={<AccountButton initiallyOpen={accountOpen} />}
+      />
       {chips.length > 0 ? <ChipRow chips={chips} selected={selectedChip?.id ?? null} onSelect={select} /> : null}
       {selectedChip && empty ? (
         <AppText variant="reading" className="px-edge text-text-muted">

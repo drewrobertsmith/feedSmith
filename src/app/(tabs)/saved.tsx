@@ -1,1 +1,5 @@
-export { SavedScreen as default } from '@/screens/saved-screen';
+import { SavedScreen } from '@/screens/saved-screen';
+
+export default function SavedRoute() {
+  return <SavedScreen />;
+}

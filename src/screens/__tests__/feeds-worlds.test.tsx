@@ -150,14 +150,14 @@ describe('All', () => {
     expect(screen.queryByText('+')).not.toBeOnTheScreen();
   });
 
-  test('the top bar: the Feeds title, then Add a Feed, then Manage Feeds; one way to add (Q31, FEE-44)', async () => {
+  test('the top bar: the Feeds title, then Add a Feed, then the account circle; one way to add (Q31, D17)', async () => {
     await open({ colorScheme: 'dark', feeds: 'some' });
-    await screen.findAllByRole('tab');
-    expect(screen.getByRole('heading', { name: 'Feeds' })).toBeOnTheScreen();
-    const buttons = screen.getAllByRole('button');
-    const add = buttons.indexOf(screen.getByRole('button', { name: 'Add a Feed' }));
-    const manage = buttons.indexOf(screen.getByRole('button', { name: 'Manage Feeds' }));
-    expect([add, manage]).toEqual([0, 1]);
+    const bar = await screen.findByTestId('top-bar-Feeds');
+    expect(within(bar).getByRole('heading', { name: 'Feeds' })).toBeOnTheScreen();
+    expect(within(bar).getAllByRole('button').map((button) => button.props.accessibilityLabel)).toEqual([
+      'Add a Feed',
+      'Account, Ada Lovelace',
+    ]);
     expect(screen.getAllByRole('button', { name: 'Add a Feed' })).toHaveLength(1);
   });
 

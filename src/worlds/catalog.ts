@@ -132,3 +132,37 @@ export const MANAGE_WORLDS = [
 ] as const satisfies readonly CatalogWorld[];
 
 export type ManageWorldId = (typeof MANAGE_WORLDS)[number]['id'];
+
+/** The account circle and the Account sheet (FEE-35, P17, D17). */
+export const ACCOUNT_WORLDS = [
+  { id: 'account-circle-dark', label: 'Account circle, dark', spec: { colorScheme: 'dark', feeds: 'some' } },
+  { id: 'account-circle-light', label: 'Account circle, light', spec: { colorScheme: 'light', section: 'saved' } },
+  { id: 'account-sheet', label: 'Account sheet', spec: { colorScheme: 'dark', feeds: 'some', accountSheet: 'open' } },
+  {
+    id: 'account-signing-out',
+    label: 'Signing out',
+    spec: { colorScheme: 'dark', feeds: 'some', accountSheet: 'open', signOut: 'busy' },
+  },
+  {
+    id: 'account-no-server',
+    label: 'Sign out with no server',
+    spec: { colorScheme: 'dark', section: 'saved', accountSheet: 'open', signOut: 'no-server' },
+  },
+  {
+    id: 'account-no-name',
+    label: 'No name from Google',
+    spec: { colorScheme: 'light', feeds: 'some', accountSheet: 'open', account: 'no-name' },
+  },
+  {
+    id: 'account-largest-font',
+    label: 'Account sheet, largest font size',
+    spec: { colorScheme: 'dark', feeds: 'some', accountSheet: 'open', fontScale: 2 },
+  },
+  {
+    id: 'account-remove-animations',
+    label: 'Account sheet, Remove animations',
+    spec: { colorScheme: 'dark', feeds: 'some', accountSheet: 'open', reduceMotion: true },
+  },
+] as const satisfies readonly CatalogWorld[];
+
+export type AccountWorldId = (typeof ACCOUNT_WORLDS)[number]['id'];
