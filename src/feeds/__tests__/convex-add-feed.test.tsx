@@ -79,3 +79,15 @@ test('an older search’s answer never changes a newer search (Q20)', async () =
   await act(async () => mockFinds[0].reject(new Error('late')));
   expect(result.current.view).toMatchObject({ name: 'daring fireball', phase: 'searching', results: [] });
 });
+
+test('leaving the screen retires a search still running (Q20)', async () => {
+  const { result, unmount } = await renderHook(() => useAddFeed(), { wrapper });
+  await act(async () => {
+    await result.current.add('the verge');
+  });
+  const answered = jest.spyOn(console, 'error');
+  await unmount();
+  await act(async () => mockFinds[0].resolve({ found: [] }));
+  expect(answered).not.toHaveBeenCalled();
+  answered.mockRestore();
+});

@@ -144,9 +144,13 @@ export function hostMatch(typed: string, host: string): boolean {
   return keys(list).includes(label);
 }
 
-/** The same name, on the site whose host is that name: guessing stops here. */
+/**
+ * The same name, on the site whose host is that name (what was typed, or the site's own: "verge"
+ * and theverge.com's "The Verge"): guessing stops here. A look-alike naming itself so on another
+ * host never is.
+ */
 export function isStrong(typed: string, found: { name: string; host: string }): boolean {
-  return nameMatch(typed, found.name) === 3 && hostMatch(typed, found.host);
+  return nameMatch(typed, found.name) === 3 && (hostMatch(typed, found.host) || hostMatch(found.name, found.host));
 }
 
 /** Domain parking and sale services: a page served from one of these is never a site. */
@@ -216,7 +220,8 @@ function visibleText(html: string): string {
   return parts.join(' ').replace(/\s+/g, ' ').trim();
 }
 
-export type Ranked = { name: string; host: string; source: 'declared' | 'common-path'; finds: number };
+/** What ranking reads: a Feed's name and host, and for catalog entries, how it was found and how often. */
+export type Ranked = { name: string; host: string; source?: 'declared' | 'common-path'; finds?: number };
 
 /**
  * Results in order: the strength of the name match, then the site whose host is the name, then
@@ -229,7 +234,7 @@ export function rank<T extends Ranked>(typed: string, found: T[]): T[] {
     key: [
       -nameMatch(typed, entry.name),
       hostMatch(typed, entry.host) ? 0 : 1,
-      -entry.finds,
+      -(entry.finds ?? 0),
       entry.source === 'declared' ? 0 : 1,
       entry.host.endsWith('.com') ? 0 : 1,
       entry.host.length,

@@ -8,7 +8,7 @@ import type { Id } from './_generated/dataModel';
 import { action, internalMutation, internalQuery, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireUserId } from './lib/currentUser';
 import { findFeedLinks, siteMeta, type FeedLink, type SiteMeta } from './lib/feed/discover';
-import { faviconOf, hostOf } from './lib/feed/face';
+import { faviconOf, hostOf, siteHost } from './lib/feed/face';
 import { fetchFeed, type FetchOutcome } from './lib/feed/fetch';
 import { safeUrl } from './lib/feed/http';
 import { markWorking, scheduleOf, storeNewArticles } from './lib/feed/record';
@@ -108,7 +108,7 @@ export const add = action({
     // A homepage's declared Feed joins the catalog; any other is only refreshed if already there (T35).
     const now = Date.now();
     if (declaredBy) {
-      const host = new URL(declaredBy).hostname.replace(/^www\./, '');
+      const host = siteHost(declaredBy);
       await ctx.runMutation(internal.catalog.remember, { url: feedUrl, name: title, host, siteUrl: declaredBy, iconUrl: meta.iconUrl, source: 'declared', now });
     } else {
       await ctx.runMutation(internal.catalog.touch, { url: feedUrl, name: title, iconUrl: meta.iconUrl, now });

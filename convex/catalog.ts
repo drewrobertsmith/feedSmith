@@ -1,10 +1,10 @@
-import { v } from 'convex/values';
+import { v, type Infer } from 'convex/values';
 
 import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import { action, internalAction, internalMutation, internalQuery, query, type QueryCtx } from './_generated/server';
 import { requireUserId } from './lib/currentUser';
-import { faviconOf, hostOf } from './lib/feed/face';
+import { faviconOf, hostOf, siteHost } from './lib/feed/face';
 import { fetchFeed } from './lib/feed/fetch';
 import { candidates, hostMatch, isStrong, nameMatch, rank, searchTerms, siteLabel } from './lib/feed/find';
 import { safeUrl } from './lib/feed/http';
@@ -38,9 +38,7 @@ const vFound = v.union(
   v.object({ kind: v.literal('following'), feedId: v.id('feeds'), title: v.string(), host: v.string(), iconUrl: v.optional(v.string()) }),
   v.object({ kind: v.literal('new'), url: v.string(), title: v.string(), host: v.string(), iconUrl: v.optional(v.string()) }),
 );
-type Found =
-  | { kind: 'following'; feedId: Id<'feeds'>; title: string; host: string; iconUrl?: string }
-  | { kind: 'new'; url: string; title: string; host: string; iconUrl?: string };
+type Found = Infer<typeof vFound>;
 
 /** What a name matches: by the site's own name, or by its host being the name. */
 const matches = (typed: string, name: string, host: string) => nameMatch(typed, name) > 0 || hostMatch(typed, host);
@@ -98,7 +96,7 @@ export const search = query({
 
     const followed: Found[] = rank(
       name,
-      [...following.values()].map((feed) => ({ feed, name: feed.title, host: hostOf(feed).replace(/^www\./, ''), source: 'declared' as const, finds: 0 })),
+      [...following.values()].map((feed) => ({ feed, name: feed.title, host: siteHost(`https://${hostOf(feed)}`) })),
     ).map(({ feed, name: title, host }) => {
       const found: Found = { kind: 'following', feedId: feed._id, title, host };
       const iconUrl = faviconOf(feed);
@@ -117,13 +115,22 @@ export const search = query({
   },
 });
 
-/** Whether the catalog already holds the Feed for this name, on the site of that name: then nothing is guessed. */
-export const hasStrong = internalQuery({
-  args: { name: v.string() },
+/**
+ * Whether feedSmith already knows the Feed for this name, so nothing is guessed: the User follows
+ * one of that name or on the site of that name ("You already follow…", T22), or the catalog holds
+ * it on the site of that name.
+ */
+export const known = internalQuery({
+  args: { userId: v.id('users'), name: v.string() },
   returns: v.boolean(),
-  handler: async (ctx, { name }) => {
+  handler: async (ctx, { userId, name }) => {
     const terms = searchTerms(name);
     if (!terms) return false;
+    const feeds = await ctx.db
+      .query('feeds')
+      .withIndex('by_user_url', (q) => q.eq('userId', userId))
+      .take(FOLLOWED_LIMIT);
+    if (feeds.some((feed) => nameMatch(name, feed.title) === 3 || hostMatch(name, hostOf(feed)))) return true;
     return (await catalogHits(ctx, terms)).some((hit) => isStrong(name, hit));
   },
 });
@@ -132,16 +139,16 @@ export const hasStrong = internalQuery({
  * Finds Feeds for a site's name by guessing its address and proving it (FEE-80, T35): a few sites
  * at a time, under one fetch budget and deadline, stopping once the site of that very name is
  * proven. Each proven Feed joins the catalog at once, so `search` shows it as it's found. Nothing
- * is guessed when the catalog already has a strong match. Returns the proven Feeds' addresses.
+ * is guessed when feedSmith already knows the Feed (`known`). Returns the proven Feeds' addresses.
  */
 export const find = action({
   args: { name: v.string() },
   returns: v.object({ found: v.array(v.string()) }),
   handler: async (ctx, { name }) => {
-    await ctx.runQuery(internal.feeds.viewer, {});
+    const userId = await ctx.runQuery(internal.feeds.viewer, {});
     const hosts = candidates(name);
     if (hosts.length === 0) return { found: [] };
-    if (await ctx.runQuery(internal.catalog.hasStrong, { name })) return { found: [] };
+    if (await ctx.runQuery(internal.catalog.known, { userId, name })) return { found: [] };
 
     const budget = new Budget(MAX_FETCHES, Date.now() + DEADLINE_MS);
     const tried = new Set<string>();
@@ -222,7 +229,7 @@ export const rememberDeclared = internalAction({
   handler: async (ctx, { url, name, siteUrl, iconUrl }) => {
     const outcome = await fetchFeed(url);
     if (outcome._tag !== 'Fetched') return null;
-    const host = new URL(siteUrl).hostname.replace(/^www\./, '');
+    const host = siteHost(siteUrl);
     await ctx.runMutation(internal.catalog.remember, { url, name, host, siteUrl, iconUrl, source: 'declared', now: Date.now() });
     return null;
   },

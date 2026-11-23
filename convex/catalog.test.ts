@@ -197,6 +197,31 @@ describe('what feedSmith already knows', () => {
     expect(fetched()).toEqual([]);
   });
 
+  test('searching again for a shorter name of a found site fetches nothing', async () => {
+    const { a } = await setup();
+    web({ 'https://verge.com/': () => page('Verge Agency', ['https://verge.com/feed']), 'https://verge.com/feed': feed, 'https://theverge.com/': () => page('The Verge', [FEED]), [FEED]: feed });
+    await a.action(api.catalog.find, { name: 'the verge' });
+    network.mockClear();
+    await a.action(api.catalog.find, { name: 'verge' });
+    expect(fetched()).toEqual([]);
+  });
+
+  test('a look-alike naming itself after another site never stops the guessing', async () => {
+    const { t, a } = await setup();
+    await t.mutation(internal.catalog.remember, { ...ENTRY, url: 'https://evil.example.com/feed', host: 'evil.example.com', siteUrl: 'https://evil.example.com' });
+    web({ 'https://theverge.com/': () => page('The Verge', [FEED]), [FEED]: feed });
+    expect((await a.action(api.catalog.find, { name: 'the verge' })).found).toEqual([FEED]);
+    const hosts = (await a.query(api.catalog.search, { name: 'the verge' })).map((found) => found.host);
+    expect(hosts).toEqual(['theverge.com', 'evil.example.com']);
+  });
+
+  test('a name matching a Feed you follow fetches nothing at all', async () => {
+    const { t, a, aId } = await setup();
+    await t.run((ctx) => ctx.db.insert('feeds', { userId: aId, url: SECRET, title: 'The Verge', siteUrl: 'https://www.theverge.com' }));
+    expect(await a.action(api.catalog.find, { name: 'the verge' })).toEqual({ found: [] });
+    expect(fetched()).toEqual([]);
+  });
+
   test('a weak catalog match stays in the list while guessing goes on', async () => {
     const { t, a } = await setup();
     await t.mutation(internal.catalog.remember, { ...ENTRY, url: 'https://vergeagency.com/feed', name: 'Verge Agency', host: 'vergeagency.com', siteUrl: 'https://vergeagency.com' });

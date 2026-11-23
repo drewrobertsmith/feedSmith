@@ -36,10 +36,6 @@ import type { ThemeName } from '@/theme/tokens';
 import { accountInitial } from '../../convex/lib/account';
 import { PINNED } from '../../convex/lib/pinned';
 
-/**
- * One state the app can be in, as plain data (T13). Later tickets extend it with their
- * own axes (signed in or out, network, fixture Feeds…), reached through the real modules.
- */
 /** Searching for a site's name, as a world shows it (FEE-80). */
 type FindWorld = 'find-searching' | 'find-arriving' | 'find-known' | 'find-following' | 'find-nothing' | 'find-failed';
 const found = (results: FoundFeed[], phase: 'searching' | 'done' | 'failed'): AddFeedView => ({ status: 'found', name: 'the verge', results, phase });
@@ -52,6 +48,10 @@ const FIND_VIEWS: Record<FindWorld, AddFeedView> = {
   'find-failed': found([], 'failed'),
 };
 
+/**
+ * One state the app can be in, as plain data (T13). Later tickets extend it with their
+ * own axes (signed in or out, network, fixture Feeds…), reached through the real modules.
+ */
 export type WorldSpec = {
   colorScheme: ThemeName;
   reduceMotion?: boolean;
