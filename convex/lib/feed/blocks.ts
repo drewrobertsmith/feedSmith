@@ -93,13 +93,20 @@ const ITALIC = new Set(['em', 'i', 'cite']);
 /** A base for resolving links when a Feed gives no address of its own; it resolves nothing real. */
 export const NO_BASE = 'https://invalid.invalid/';
 
-/** An `https:` URL resolved against the Article's address, or undefined. */
+/**
+ * Longer than this, a URL is hostile, not an address: it's dropped. A link's address is copied
+ * into each of its spans, so one 2 MB href made the cleaner build gigabytes of JSON (FEE-68).
+ */
+export const MAX_URL = 2048;
+
+/** An `https:` URL resolved against the Article's address, at most `MAX_URL` long, or undefined. */
 export function httpsUrl(value: string | undefined, base: string): string | undefined {
-  if (!value) return undefined;
+  if (!value || value.length > MAX_URL) return undefined;
   try {
     const url = new URL(value.trim(), base);
     // A relative address in a Feed with no address of its own resolves to nothing real.
-    return url.protocol === 'https:' && !url.href.startsWith(NO_BASE) ? url.href : undefined;
+    const ok = url.protocol === 'https:' && !url.href.startsWith(NO_BASE) && url.href.length <= MAX_URL;
+    return ok ? url.href : undefined;
   } catch {
     return undefined;
   }
@@ -287,12 +294,21 @@ function sameStyle(a: Span, b: Span): boolean {
 
 /** Merges neighbouring spans of one style, and trims the run's ends. */
 function tidy(spans: Span[]): Span[] {
+  // Each run's texts are joined once at its end: collapsing the run's text on every merge
+  // rescanned it each time, so 2 MB of like spans took a second (FEE-68).
   const merged: Span[] = [];
+  const runs: string[][] = [];
   for (const span of spans) {
     const last = merged.at(-1);
-    if (last && sameStyle(last, span)) last.text = collapse(last.text + span.text);
-    else merged.push({ ...span });
+    if (last && sameStyle(last, span)) runs[runs.length - 1].push(span.text);
+    else {
+      merged.push({ ...span });
+      runs.push([span.text]);
+    }
   }
+  merged.forEach((span, i) => {
+    if (runs[i].length > 1) span.text = collapse(runs[i].join(''));
+  });
   if (merged.length > MAX_SPANS) {
     const rest = merged.splice(MAX_SPANS - 1);
     merged.push({ text: rest.map((span) => span.text).join('') });

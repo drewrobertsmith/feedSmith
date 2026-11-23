@@ -1,6 +1,8 @@
+import { parseDocument } from 'htmlparser2';
 import { describe, expect, test } from 'vitest';
 
-import { htmlToBlocks, MAX_BLOCKS, MAX_DEPTH, MAX_ENTRIES, MAX_SIZE, MAX_SPANS, NO_BASE } from './blocks';
+import { type Block, htmlToBlocks, httpsUrl, MAX_BLOCKS, MAX_DEPTH, MAX_ENTRIES, MAX_SIZE, MAX_SPANS, MAX_URL, NO_BASE } from './blocks';
+import { MAX_BYTES } from './http';
 
 const BASE = 'https://example.com/posts/1';
 
@@ -70,6 +72,11 @@ describe('hostile HTML never reaches the stored blocks (Q8)', () => {
     expect(omitted).toEqual(['other']);
   });
 
+  test('like spans merged into one keep single spaces where they joined', () => {
+    const { blocks } = htmlToBlocks('<p><span>a </span><span> b</span>\n<span>c</span><br><br>d</p>', BASE);
+    expect(blocks).toEqual([{ type: 'paragraph', spans: [{ text: 'a b c d' }] }]);
+  });
+
   test(`a run of styles keeps at most ${MAX_SPANS} spans per block, losing no text`, () => {
     const html = `<p>${'<b>x</b>y'.repeat(5000)}</p>`;
     const [block] = htmlToBlocks(html, BASE).blocks;
@@ -79,10 +86,54 @@ describe('hostile HTML never reaches the stored blocks (Q8)', () => {
   });
 
   test(`keeps an Article's blocks under ${MAX_SIZE} characters of stored JSON, overhead included`, () => {
-    const html = `<p>${'<b>x</b><i>y</i>'.repeat(200_000)}</p><p>${'b'.repeat(1000)}</p>`;
+    // Each paragraph holds 1,000 characters of text but about 25,000 of JSON, so 20 of them pass
+    // the cap on overhead alone, from 160 KB of HTML (FEE-68).
+    const html = `<p>${'<b>x</b><i>y</i>'.repeat(500)}</p>`.repeat(20);
     const { blocks } = htmlToBlocks(html, BASE);
     expect(JSON.stringify(blocks).length).toBeLessThanOrEqual(MAX_SIZE + 100);
+    expect(blocks.length).toBeLessThan(20);
     expect(blocks.at(-1)).toEqual({ type: 'omitted', kind: 'other' });
+  });
+
+  test(`a page at the ${MAX_BYTES} byte fetch cap costs a few parses, not a second (FEE-68)`, () => {
+    const unit = '<span>x</span>';
+    const count = Math.floor(MAX_BYTES / unit.length) - 1;
+    const html = `<p>${unit.repeat(count)}</p>`;
+    const time = (work: () => unknown) => {
+      const start = performance.now();
+      work();
+      return performance.now() - start;
+    };
+    // Warm the JIT on this very input, so the times below are the work's.
+    parseDocument(html, { decodeEntities: true });
+    htmlToBlocks(unit.repeat(1000), BASE);
+    // Timed against the parser on the same input, so a busy machine slows both alike.
+    const parse = time(() => parseDocument(html, { decodeEntities: true }));
+    let blocks: Block[] = [];
+    const clean = time(() => ({ blocks } = htmlToBlocks(html, BASE)));
+    // Like spans merge into one run, joined once. Rescanning the run on every merge cost 16 parses.
+    expect(clean).toBeLessThan(parse * 5);
+    expect(blocks).toEqual([{ type: 'paragraph', spans: [{ text: 'x'.repeat(count) }] }]);
+  });
+
+  test('a link too long to be real is kept as plain text, never copied into each span', () => {
+    // One huge href repeated in 999 spans once cost hundreds of MB of JSON (FEE-68).
+    const href = `https://a.example/${'p'.repeat(MAX_BYTES - 20_000)}`;
+    const html = `<p><a href="${href}">${'<b>x</b>y'.repeat(999)}</a></p>`;
+    const start = performance.now();
+    const [block] = htmlToBlocks(html, BASE).blocks;
+    expect(performance.now() - start).toBeLessThan(1000);
+    if (block.type !== 'paragraph') throw new Error('expected a paragraph');
+    expect(block.spans.some((span) => span.href)).toBe(false);
+    expect(block.spans.map((span) => span.text).join('')).toBe('xy'.repeat(999));
+  });
+
+  test(`a URL is kept up to ${MAX_URL} characters, and dropped past them`, () => {
+    const url = (length: number) => `https://a.example/${'p'.repeat(length - 'https://a.example/'.length)}`;
+    expect(httpsUrl(url(MAX_URL), BASE)).toBe(url(MAX_URL));
+    expect(httpsUrl(url(MAX_URL + 1), BASE)).toBeUndefined();
+    // Short as written, too long once resolved against the Article's address.
+    expect(httpsUrl('p'.repeat(MAX_URL - 10), BASE)).toBeUndefined();
   });
 
   test(`a list keeps at most ${MAX_ENTRIES} entries, and a quote as many paragraphs`, () => {
