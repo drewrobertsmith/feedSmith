@@ -1,3 +1,4 @@
+import type { Account } from '@/auth/auth-context';
 import type { ArticleRow, FeedChip, ManagedFeed, ReadingArticle } from '@/feeds/feeds-data';
 
 /** Midday UTC, so the date reads the same in every time zone a test runs in. */
@@ -195,3 +196,6 @@ export const FIXTURE_MANAGE_PINNED: ManagedFeed[] = [
   { ...FIXTURE_MANAGE[2], pinned: true },
   { id: 'f3', title: 'Daring Fireball', host: 'daringfireball.net', pinned: false, working: true },
 ];
+
+/** The signed-in User's Account (P17): a made-up person, never the owner's real Google account (Q22). */
+export const FIXTURE_ACCOUNT: Account = { name: 'Ada Lovelace', email: 'ada@example.com', initial: 'A' };

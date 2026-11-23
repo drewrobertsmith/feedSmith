@@ -1,4 +1,5 @@
-import { useAction, useMutation, useQuery } from 'convex/react';
+import { useAction, useConvexAuth, useMutation, useQuery } from 'convex/react';
+import type { FunctionArgs, FunctionReference } from 'convex/server';
 import { useState, type ReactNode } from 'react';
 
 import { api } from '../../convex/_generated/api';
@@ -15,13 +16,23 @@ import {
   type FeedsData,
 } from '@/feeds/feeds-data';
 
+/**
+ * A query that runs only while signed in. Signing out clears the session before the route guard
+ * leaves Feeds, and every User query refuses a signed-out caller (Q10), so a query still
+ * subscribed then would throw; skipped, it just stops (FEE-35).
+ */
+function useSignedInQuery<Query extends FunctionReference<'query'>>(query: Query, args: FunctionArgs<Query>) {
+  const { isAuthenticated } = useConvexAuth();
+  return useQuery(query, ...((isAuthenticated ? [args] : ['skip']) as [FunctionArgs<Query> | 'skip']));
+}
+
 function useAll(feedId: string | null): AllView {
-  const articles = useQuery(api.articles.all, feedId === null ? {} : { feedId });
+  const articles = useSignedInQuery(api.articles.all, feedId === null ? {} : { feedId });
   return articles === undefined ? { status: 'loading' } : { status: 'ready', articles };
 }
 
 function useChips(): ChipsView {
-  const chips = useQuery(api.feeds.chips);
+  const chips = useSignedInQuery(api.feeds.chips, {});
   return chips === undefined ? { status: 'loading' } : { status: 'ready', chips };
 }
 
@@ -35,7 +46,7 @@ function useSetPinned() {
 }
 
 function useArticle(id: string): ArticleView {
-  const article = useQuery(api.articles.get, { id });
+  const article = useSignedInQuery(api.articles.get, { id });
   if (article === undefined) return { status: 'loading' };
   return article === null ? { status: 'missing' } : { status: 'ready', article };
 }
@@ -92,7 +103,7 @@ function useMarkRead() {
 }
 
 function useManage(): ManageView {
-  const feeds = useQuery(api.feeds.manage);
+  const feeds = useSignedInQuery(api.feeds.manage, {});
   return feeds === undefined ? { status: 'loading' } : { status: 'ready', feeds };
 }
 

@@ -6,7 +6,7 @@ import { ManageFeedsScreen } from '@/screens/manage-feeds-screen';
 import { ReadingScreen } from '@/screens/reading/reading-screen';
 import { SavedScreen } from '@/screens/saved-screen';
 import { SignInScreen } from '@/screens/sign-in/sign-in-screen';
-import { ADD_FEED_WORLDS, ALL_WORLDS, MANAGE_WORLDS, READING_WORLDS, SHELL_WORLDS, SIGN_IN_WORLDS } from '@/worlds/catalog';
+import { ACCOUNT_WORLDS, ADD_FEED_WORLDS, ALL_WORLDS, MANAGE_WORLDS, READING_WORLDS, SHELL_WORLDS, SIGN_IN_WORLDS } from '@/worlds/catalog';
 import { FIXTURE_ROWS } from '@/worlds/fixtures';
 import type { CatalogWorld, WorldSpec } from '@/worlds/world';
 
@@ -33,4 +33,12 @@ export const GALLERY: readonly GalleryEntry[] = [
   { screen: 'Add a Feed', worlds: ADD_FEED_WORLDS, render: () => <AddFeedScreen /> },
   { screen: 'Manage Feeds', worlds: MANAGE_WORLDS, render: () => <ManageFeedsScreen /> },
   { screen: 'Reading view', worlds: READING_WORLDS, render: () => <ReadingScreen id={FIXTURE_ROWS[0].id} /> },
+  {
+    screen: 'Account',
+    worlds: ACCOUNT_WORLDS,
+    render: (spec) => {
+      const accountOpen = spec.accountSheet === 'open';
+      return spec.section === 'saved' ? <SavedScreen accountOpen={accountOpen} /> : <FeedsScreen accountOpen={accountOpen} />;
+    },
+  },
 ];
