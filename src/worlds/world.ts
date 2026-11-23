@@ -207,11 +207,11 @@ export function worldFeeds(
         ? FIXTURE_TWO_PINS
         : spec.pins === 'three'
           ? FIXTURE_THREE_PINS
-        : spec.pins === 'quiet'
-          ? FIXTURE_QUIET_PINS
-          : spec.pins === 'none'
-            ? FIXTURE_NO_PINS
-            : FIXTURE_CHIPS;
+          : spec.pins === 'quiet'
+            ? FIXTURE_QUIET_PINS
+            : spec.pins === 'none'
+              ? FIXTURE_NO_PINS
+              : FIXTURE_CHIPS;
   /** The Feeds the Pinned view reads (FEE-59). */
   const pinnedIds = new Set(someChips.filter((chip) => chip.pinned).map((chip) => chip.id));
   const addFeed = spec.addFeed ?? 'idle';

@@ -735,14 +735,22 @@ describe("the Pinned chip's stacked icons (FEE-61)", () => {
     expect(chip).toBeCollapsed();
   });
 
-  test('each circle is ringed in the page colour, and every one after the first overlaps the one before', async () => {
+  test('each circle is a disc ringed in the page colour, and every one after the first overlaps the one before', async () => {
     await open({ colorScheme: 'dark', feeds: 'some', pins: 'three' });
     const chip = await screen.findByRole('tab', { name: /^Pinned:/ });
     const rings = within(chip).getAllByTestId('pinned-stack-ring', { includeHiddenElements: true });
     expect(rings).toHaveLength(3);
     for (const ring of rings) expect(ring).toHaveProp('className', expect.stringContaining('border-background'));
     expect(rings[0].props.className).not.toContain('-ml-');
-    for (const ring of rings.slice(1)) expect(ring.props.className).toContain('-ml-related');
+    for (const ring of rings.slice(1)) expect(ring.props.className).toContain('-ml-inside');
+  });
+
+  test('TalkBack hears the Feeds by name, never the icons (Q15)', async () => {
+    await open({ colorScheme: 'dark', feeds: 'some', pins: 'three' });
+    const chip = await screen.findByRole('tab', { name: 'Pinned: The Verge, Daring Fireball, Calm Notes' });
+    expect(within(chip).getAllByTestId('pinned-stack-ring', { includeHiddenElements: true })).toHaveLength(3);
+    // Hidden from accessibility: the default query, which skips hidden elements, finds none of them.
+    expect(within(chip).queryAllByTestId('pinned-stack-ring')).toHaveLength(0);
   });
 });
 

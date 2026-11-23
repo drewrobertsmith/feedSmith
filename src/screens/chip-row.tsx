@@ -143,8 +143,9 @@ function Chip({
 
 /**
  * The Pinned chip's Feeds at a glance (FEE-61): one circle per Pinned Feed, in Pin order, each its
- * icon or its initial (D14), ringed in the page colour so overlapping circles read as separate, each
- * after the first overlapping the one before, like a shared-avatar stack. Sized with the type like
+ * icon or its initial (D14) on a surface disc, ringed in the page colour so overlapping circles read
+ * as separate, each after the first overlapping the one before by one inside step, like a
+ * shared-avatar stack. Sized with the type like
  * every icon beside text (Q16). TalkBack hears the chip's name, which lists the Feeds, not the icons.
  */
 function PinnedStack({ chips }: { chips: FeedChip[] }) {
@@ -154,7 +155,12 @@ function PinnedStack({ chips }: { chips: FeedChip[] }) {
         <View
           key={chip.id}
           testID="pinned-stack-ring"
-          className={i === 0 ? 'overflow-hidden rounded-full border-2 border-background' : 'overflow-hidden rounded-full border-2 border-background -ml-related'}
+          // A surface backdrop, so a transparent logo still reads as a disc; overlapping by one inside step keeps each glyph whole.
+          className={
+            i === 0
+              ? 'items-center justify-center overflow-hidden rounded-full border-2 border-background bg-surface'
+              : 'items-center justify-center overflow-hidden rounded-full border-2 border-background bg-surface -ml-inside'
+          }
         >
           <FeedIcon key={chip.faviconUrl} url={chip.faviconUrl} title={chip.title} size={ICON} testID={`pinned-stack-${chip.id}`} />
         </View>
