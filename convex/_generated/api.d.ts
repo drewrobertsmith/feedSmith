@@ -35,6 +35,7 @@ import type * as lib_feed_store from "../lib/feed/store.js";
 import type * as lib_feed_validators from "../lib/feed/validators.js";
 import type * as lib_feedName from "../lib/feedName.js";
 import type * as lib_signUp from "../lib/signUp.js";
+import type * as migrations from "../migrations.js";
 import type * as refresh from "../refresh.js";
 import type * as users from "../users.js";
 
@@ -72,6 +73,7 @@ declare const fullApi: ApiFromModules<{
   "lib/feed/validators": typeof lib_feed_validators;
   "lib/feedName": typeof lib_feedName;
   "lib/signUp": typeof lib_signUp;
+  migrations: typeof migrations;
   refresh: typeof refresh;
   users: typeof users;
 }>;

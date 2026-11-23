@@ -11,7 +11,7 @@ import { findFeedLinks, siteMeta, type FeedLink, type SiteMeta } from './lib/fee
 import { faviconOf, hostOf } from './lib/feed/face';
 import { fetchFeed, type FetchOutcome } from './lib/feed/fetch';
 import { safeUrl } from './lib/feed/http';
-import { markWorking, storeNewArticles } from './lib/feed/record';
+import { markWorking, scheduleOf, storeNewArticles } from './lib/feed/record';
 import { vAddFeedReason, vFeedChoice, vStoredArticle, vValidators, type AddFeedReason } from './lib/feed/validators';
 import { inBatches, refreshOne } from './refresh';
 
@@ -140,11 +140,11 @@ export const toRefresh = internalQuery({
   args: { userId: v.id('users'), now: v.number() },
   returns: v.array(v.id('feeds')),
   handler: async (ctx, { userId, now }) => {
-    const feeds = await ctx.db
-      .query('feeds')
-      .withIndex('by_user_url', (q) => q.eq('userId', userId))
+    const schedules = await ctx.db
+      .query('feedSchedules')
+      .withIndex('by_user', (q) => q.eq('userId', userId))
       .take(PULL_LIMIT);
-    return feeds.filter((feed) => (feed.lastFetchedAt ?? 0) <= now - PULL_GAP).map((feed) => feed._id);
+    return schedules.filter((schedule) => (schedule.lastFetchedAt ?? 0) <= now - PULL_GAP).map((schedule) => schedule.feedId);
   },
 });
 
@@ -170,6 +170,8 @@ export const store = internalMutation({
       .withIndex('by_user_url', (q) => q.eq('userId', userId).eq('url', url))
       .first();
     if (existing) return { title: existing.title, feedId: existing._id };
+    // The Account was deleted while this add was fetching: store nothing for it (P18, Q28).
+    if ((await ctx.db.get(userId)) === null) return null;
     const feedId = await ctx.db.insert('feeds', { userId, url, title, siteUrl, iconUrl });
     await storeNewArticles(ctx, userId, feedId, articles, now);
     await markWorking(ctx, feedId, now, { etag, lastModified });
@@ -358,6 +360,8 @@ export const remove = mutation({
     const userId = await requireUserId(ctx);
     const feed = await ownFeed(ctx, userId, args.id);
     if (!feed) return { ok: false as const, reason: 'not-found' as const };
+    const schedule = await scheduleOf(ctx, feed._id);
+    if (schedule) await ctx.db.delete(schedule._id);
     await ctx.db.delete(feed._id);
     await ctx.scheduler.runAfter(0, internal.feeds.removeArticles, { feedId: feed._id });
     return { ok: true as const };

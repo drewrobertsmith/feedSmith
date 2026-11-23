@@ -33,6 +33,7 @@ async function seedUser(t: ReturnType<typeof convexTest>, email: string, googleI
   const userId = await t.run(async (ctx) => {
     const id = await ctx.db.insert('users', { email, name: email.split('@')[0] });
     const feedId = await ctx.db.insert('feeds', { userId: id, url: `https://${email}/feed.xml`, title: 'A Feed' });
+    await ctx.db.insert('feedSchedules', { feedId, userId: id, nextFetchAt: Date.now(), failures: 0 });
     for (const guid of ['one', 'two']) {
       const articleId = await ctx.db.insert('articles', { userId: id, feedId, guid, title: guid, publishedAt: Date.now() });
       await ctx.db.insert('articleBodies', { userId: id, articleId, blocks: [], omitted: [] });
@@ -61,6 +62,7 @@ async function holdings(t: ReturnType<typeof convexTest>, userId: Id<'users'>, g
   return await t.run(async (ctx) => ({
     users: (await ctx.db.get(userId)) === null ? 0 : 1,
     feeds: (await ctx.db.query('feeds').collect()).filter((row) => row.userId === userId).length,
+    feedSchedules: (await ctx.db.query('feedSchedules').collect()).filter((row) => row.userId === userId).length,
     articles: (await ctx.db.query('articles').collect()).filter((row) => row.userId === userId).length,
     articleBodies: (await ctx.db.query('articleBodies').collect()).filter((row) => row.userId === userId).length,
     sessions: (await ctx.runQuery(components.auth.public.listSessions, { userId })).length,
@@ -68,8 +70,8 @@ async function holdings(t: ReturnType<typeof convexTest>, userId: Id<'users'>, g
   }));
 }
 
-const NOTHING = { users: 0, feeds: 0, articles: 0, articleBodies: 0, sessions: 0, googleLink: 0 };
-const EVERYTHING = { users: 1, feeds: 1, articles: 2, articleBodies: 2, sessions: 1, googleLink: 1 };
+const NOTHING = { users: 0, feeds: 0, feedSchedules: 0, articles: 0, articleBodies: 0, sessions: 0, googleLink: 0 };
+const EVERYTHING = { users: 1, feeds: 1, feedSchedules: 1, articles: 2, articleBodies: 2, sessions: 1, googleLink: 1 };
 
 async function setup() {
   const t = convexTest(schema, modules);
@@ -108,7 +110,7 @@ describe('deleteAccount (P18)', () => {
 
     await asA.mutation(api.account.deleteAccount, {});
 
-    expect(await holdings(t, a, 'google-a')).toMatchObject({ users: 0, feeds: 0, sessions: 0, googleLink: 0 });
+    expect(await holdings(t, a, 'google-a')).toMatchObject({ users: 0, feeds: 0, feedSchedules: 0, sessions: 0, googleLink: 0 });
   });
 
   test('deleting an Account that is already gone fails cleanly', async () => {

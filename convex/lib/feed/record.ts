@@ -1,6 +1,6 @@
 import { internal } from '../../_generated/api';
-import type { Id } from '../../_generated/dataModel';
-import type { MutationCtx } from '../../_generated/server';
+import type { Doc, Id } from '../../_generated/dataModel';
+import type { MutationCtx, QueryCtx } from '../../_generated/server';
 import type { Validators } from './http';
 import { backoff, nextCheckIn, PACE_WINDOW } from './pace';
 import type { StoredArticle } from './validators';
@@ -57,26 +57,64 @@ export async function storeNewArticles(
   if (stored.some(Boolean) && !reading.some(Boolean)) await ctx.scheduler.runAfter(0, internal.extractPages.run, { feedId });
 }
 
-/** Marks a Feed working and sets its next check from its pace (T19). */
+/** A Feed's fetch schedule (FEE-54), or null for a Feed stored before schedules existed. */
+export function scheduleOf(ctx: QueryCtx, feedId: Id<'feeds'>) {
+  return ctx.db
+    .query('feedSchedules')
+    .withIndex('by_feed', (q) => q.eq('feedId', feedId))
+    .unique();
+}
+
+type ScheduleFields = Omit<Doc<'feedSchedules'>, '_id' | '_creationTime' | 'feedId' | 'userId'>;
+
+/** Writes a Feed's schedule, creating it the first time. */
+async function writeSchedule(ctx: MutationCtx, feed: Doc<'feeds'>, schedule: Doc<'feedSchedules'> | null, fields: ScheduleFields) {
+  if (schedule) await ctx.db.patch(schedule._id, fields);
+  else await ctx.db.insert('feedSchedules', { feedId: feed._id, userId: feed.userId, ...fields });
+}
+
+/** Sets whether a Feed works (P15), only when that changes: the screens read the Feed. */
+async function setStatus(ctx: MutationCtx, feed: Doc<'feeds'>, status: 'working' | 'failing') {
+  if (feed.status !== status) await ctx.db.patch(feed._id, { status });
+}
+
+/**
+ * Marks a Feed working and sets its next check from its pace (T19). Callers check first that no
+ * newer fetch has finished (`recordFetch`, `recordNotModified`), so an older result never wins.
+ */
 export async function markWorking(ctx: MutationCtx, feedId: Id<'feeds'>, now: number, validators?: Validators) {
+  const feed = await ctx.db.get(feedId);
+  if (!feed) return;
   const recent = await ctx.db
     .query('articles')
     .withIndex('by_feed_published', (q) => q.eq('feedId', feedId).gte('publishedAt', now - PACE_WINDOW))
     .take(PACE_SAMPLE);
-  await ctx.db.patch(feedId, {
-    status: 'working',
+  const schedule = await scheduleOf(ctx, feedId);
+  await writeSchedule(ctx, feed, schedule, {
     failures: 0,
     lastFetchedAt: now,
     nextFetchAt: now + nextCheckIn(recent.map((a) => a.publishedAt), now),
-    ...(validators ? { etag: validators.etag, lastModified: validators.lastModified } : {}),
+    // A 304 brings no new validators: the ones the Feed gave last time still stand.
+    etag: validators ? validators.etag : schedule?.etag,
+    lastModified: validators ? validators.lastModified : schedule?.lastModified,
   });
+  await setStatus(ctx, feed, 'working');
 }
 
 /** Marks a Feed failing and backs its next try off (Q7). Its Articles stay. */
 export async function markFailing(ctx: MutationCtx, feedId: Id<'feeds'>, now: number) {
   const feed = await ctx.db.get(feedId);
-  // Gone, or a newer fetch already finished: an older failure never overwrites it.
-  if (!feed || (feed.lastFetchedAt ?? 0) > now) return;
-  const failures = (feed.failures ?? 0) + 1;
-  await ctx.db.patch(feedId, { status: 'failing', failures, lastFetchedAt: now, nextFetchAt: now + backoff(failures) });
+  if (!feed) return;
+  const schedule = await scheduleOf(ctx, feedId);
+  // A newer fetch already finished: an older failure never overwrites it.
+  if ((schedule?.lastFetchedAt ?? 0) > now) return;
+  const failures = (schedule?.failures ?? 0) + 1;
+  await writeSchedule(ctx, feed, schedule, {
+    failures,
+    lastFetchedAt: now,
+    nextFetchAt: now + backoff(failures),
+    etag: schedule?.etag,
+    lastModified: schedule?.lastModified,
+  });
+  await setStatus(ctx, feed, 'failing');
 }

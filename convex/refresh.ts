@@ -6,7 +6,7 @@ import { internalAction, internalMutation, internalQuery, type ActionCtx } from 
 import { DELETE_BATCH } from './lib/feed/blocks';
 import { deleteArticles } from './lib/deleteArticles';
 import { fetchFeed } from './lib/feed/fetch';
-import { markFailing, markWorking, RETENTION, storeNewArticles } from './lib/feed/record';
+import { markFailing, markWorking, RETENTION, scheduleOf, storeNewArticles } from './lib/feed/record';
 import { vStoredArticle, vValidators } from './lib/feed/validators';
 
 /** How long a Feed handed to a fetch stays out of the next tick, so a slow fetch isn't doubled. */
@@ -59,7 +59,8 @@ export const forRefresh = internalQuery({
     if (!feed) return null;
     // A Feed stored before it knew its site is fetched in full once, so it learns it (FEE-27).
     if (!feed.siteUrl) return { url: feed.url };
-    return { url: feed.url, etag: feed.etag, lastModified: feed.lastModified };
+    const schedule = await scheduleOf(ctx, feedId);
+    return { url: feed.url, etag: schedule?.etag, lastModified: schedule?.lastModified };
   },
 });
 
@@ -75,7 +76,7 @@ export const recordFetch = internalMutation({
   handler: async (ctx, { feedId, now, siteUrl, articles, etag, lastModified }) => {
     const feed = await ctx.db.get(feedId);
     // Gone, or a newer fetch already finished: an older result never overwrites it.
-    if (!feed || (feed.lastFetchedAt ?? 0) > now) return null;
+    if (!feed || ((await scheduleOf(ctx, feedId))?.lastFetchedAt ?? 0) > now) return null;
     if (siteUrl && siteUrl !== feed.siteUrl) await ctx.db.patch(feedId, { siteUrl });
     await storeNewArticles(ctx, feed.userId, feedId, articles, now);
     await markWorking(ctx, feedId, now, { etag, lastModified });
@@ -87,8 +88,8 @@ export const recordNotModified = internalMutation({
   args: { feedId: v.id('feeds'), now: v.number() },
   returns: v.null(),
   handler: async (ctx, { feedId, now }) => {
-    const feed = await ctx.db.get(feedId);
-    if (feed && (feed.lastFetchedAt ?? 0) <= now) await markWorking(ctx, feedId, now);
+    const schedule = await scheduleOf(ctx, feedId);
+    if ((schedule?.lastFetchedAt ?? 0) <= now) await markWorking(ctx, feedId, now);
     return null;
   },
 });
@@ -118,13 +119,14 @@ export const scheduleDue = internalMutation({
   handler: async (ctx) => {
     const now = Date.now();
     const due = await ctx.db
-      .query('feeds')
+      .query('feedSchedules')
       .withIndex('by_next_fetch', (q) => q.lte('nextFetchAt', now))
       .take(PER_TICK);
     await Promise.all(
-      due.map(async (feed) => {
-        await ctx.db.patch(feed._id, { nextFetchAt: now + LEASE });
-        await ctx.scheduler.runAfter(0, internal.refresh.refreshFeed, { feedId: feed._id });
+      due.map(async (schedule) => {
+        // The lease goes on the schedule, never the Feed, so it re-runs nothing on screen (FEE-54).
+        await ctx.db.patch(schedule._id, { nextFetchAt: now + LEASE });
+        await ctx.scheduler.runAfter(0, internal.refresh.refreshFeed, { feedId: schedule.feedId });
       }),
     );
     // More were due than one tick starts: come straight back for the rest.
