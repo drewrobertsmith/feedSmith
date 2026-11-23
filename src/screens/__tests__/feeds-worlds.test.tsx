@@ -16,11 +16,13 @@ import {
   ADD_FEED_WORLDS,
   ALL_WORLDS,
   PINNED_GROUP_WORLDS,
+  PINNED_STACK_WORLDS,
   PINNED_WORLDS,
   READING_WORLDS,
   type AddFeedWorldId,
   type AllWorldId,
   type PinnedGroupWorldId,
+  type PinnedStackWorldId,
   type PinnedWorldId,
   type ReadingWorldId,
 } from '@/worlds/catalog';
@@ -683,6 +685,72 @@ describe('the Pinned group (FEE-60)', () => {
     await act(async () => fireEvent(opened, 'accessibilityAction', { nativeEvent: { actionName: 'collapse' } }));
     expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName('All');
     expect(screen.getByRole('tab', { name: PINNED_CHIP })).toBeCollapsed();
+  });
+});
+
+describe("the Pinned chip's stacked icons (FEE-61)", () => {
+  type Shows = {
+    name: string;
+    /** Each circle in order: an icon, or the initial a Feed without one shows (D14). */
+    circles: ('icon' | 'initial')[];
+    ids: string[];
+    iconSize: number;
+  };
+  const SHOWS: Record<PinnedStackWorldId, Shows> = {
+    'stack-three-dark': {
+      name: 'Pinned: The Verge, Daring Fireball, Calm Notes',
+      circles: ['icon', 'icon', 'initial'],
+      ids: ['f1', 'f3', 'f2'],
+      iconSize: 16,
+    },
+    'stack-three-light': {
+      name: 'Pinned: The Verge, Daring Fireball, Calm Notes',
+      circles: ['icon', 'icon', 'initial'],
+      ids: ['f1', 'f3', 'f2'],
+      iconSize: 16,
+    },
+    'stack-initial': { name: 'Pinned: Daring Fireball, Kottke', circles: ['icon', 'initial'], ids: ['f3', 'f9'], iconSize: 16 },
+    'stack-two': { name: 'Pinned: The Verge, Daring Fireball', circles: ['icon', 'icon'], ids: ['f1', 'f3'], iconSize: 16 },
+    // Icons beside text grow with it (Q16).
+    'stack-largest-font': {
+      name: 'Pinned: The Verge, Daring Fireball, Calm Notes',
+      circles: ['icon', 'icon', 'initial'],
+      ids: ['f1', 'f3', 'f2'],
+      iconSize: 32,
+    },
+  };
+
+  test.each(PINNED_STACK_WORLDS)('$label', async ({ id, spec }) => {
+    const shows = SHOWS[id];
+    await open(spec);
+    const chip = await screen.findByRole('tab', { name: shows.name });
+    const circles = within(chip).getAllByTestId(/^pinned-stack-(?!ring)/, { includeHiddenElements: true });
+    expect(circles.map((circle) => circle.props.testID)).toEqual(
+      shows.ids.map((feedId, i) => (shows.circles[i] === 'icon' ? `pinned-stack-${feedId}` : `pinned-stack-${feedId}-initial`)),
+    );
+    // 16 points, grown with Android's font size and the world's, as every icon beside text is (Q16).
+    const side = shows.iconSize * Dimensions.get('window').fontScale;
+    for (const circle of circles) expect(circle).toHaveStyle({ width: side });
+    // TalkBack hears the Feeds by name, with its role and state, never the icons (Q15).
+    expect(chip).toBeCollapsed();
+  });
+
+  test('each circle is a disc ringed in the page colour, and every one after the first overlaps the one before', async () => {
+    await open({ colorScheme: 'dark', feeds: 'some', pins: 'three' });
+    const chip = await screen.findByRole('tab', { name: /^Pinned:/ });
+    const rings = within(chip).getAllByTestId('pinned-stack-ring', { includeHiddenElements: true });
+    expect(rings).toHaveLength(3);
+    for (const ring of rings) expect(ring).toHaveProp('className', expect.stringContaining('border-background'));
+    expect(rings[0].props.className).not.toContain('-ml-');
+    for (const ring of rings.slice(1)) expect(ring.props.className).toContain('-ml-inside');
+  });
+
+  test('TalkBack hears the Feeds by name, never the icons (Q15)', async () => {
+    await open({ colorScheme: 'dark', feeds: 'some', pins: 'three' });
+    const chip = await screen.findByRole('tab', { name: 'Pinned: The Verge, Daring Fireball, Calm Notes' });
+    expect(within(chip).getAllByTestId('pinned-stack-ring', { includeHiddenElements: true })).toHaveLength(3);
+    // Hidden from accessibility: the default query, which skips hidden elements, finds none of them.
+    expect(within(chip).queryAllByTestId('pinned-stack-ring')).toHaveLength(0);
   });
 });
 

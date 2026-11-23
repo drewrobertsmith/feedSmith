@@ -199,6 +199,13 @@ export const FIXTURE_TWO_PINS: FeedChip[] = [
   { id: 'f2', title: 'Calm Notes', pinned: false },
 ];
 
+/** Three Pinned Feeds, the most there can be (P9); Calm Notes has no icon, so it shows its initial (FEE-61). */
+export const FIXTURE_THREE_PINS: FeedChip[] = [
+  { id: 'f1', title: VERGE, faviconUrl: 'https://www.theverge.com/favicon.ico', pinned: true },
+  { id: 'f3', title: 'Daring Fireball', faviconUrl: 'https://daringfireball.net/favicon.ico', pinned: true },
+  { id: 'f2', title: 'Calm Notes', pinned: true },
+];
+
 /** No Pinned Feeds: no Pinned chip, no group (FEE-60). */
 export const FIXTURE_NO_PINS: FeedChip[] = [
   { id: 'f1', title: VERGE, faviconUrl: 'https://www.theverge.com/favicon.ico', pinned: false },
