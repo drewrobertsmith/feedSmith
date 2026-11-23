@@ -34,10 +34,10 @@ const MAKE_ROOM = LinearTransition.duration(motion.rowMakeRoom.duration)
 /** How wide the fade is where the row runs off-screen (FEE-44). */
 const FADE = spacing.section;
 
-/** One chip: a tab in the row. Chosen, it's Gold on the indicator pill (D5) and springs into place (D7). */
 /** Something a chip offers TalkBack besides choosing it (Q15): Pin, Unpin, Expand, Collapse. */
 type ChipAction = { name: string; label: string; run: () => void };
 
+/** One chip: a tab in the row. Chosen, it's Gold on the indicator pill (D5) and springs into place (D7). */
 function Chip({
   label,
   accessibleName,
@@ -226,7 +226,14 @@ export function ChipRow({
         {/* react-doctor-disable-next-line react-doctor/rn-no-scrollview-mapped-list */}
         {shownChips.map((chip) => (
           // The group's chips grow and fade in from the Pinned chip, and the rest move over (D12); Remove animations makes it instant (Q17).
-          <Reanimated.View key={chip.id} entering={REVEAL} exiting={FOLD} layout={MAKE_ROOM}>
+          // Measured here, on the chip's place in the row, so a chosen chip scrolls into view (D18).
+          <Reanimated.View
+            key={chip.id}
+            entering={REVEAL}
+            exiting={FOLD}
+            layout={MAKE_ROOM}
+            onLayout={(event) => chipAt.current.set(chip.id, event.nativeEvent.layout)}
+          >
             <Chip
               label={chip.title}
               accessibleName={chip.pinned ? `${chip.title}, Pinned` : chip.title}
@@ -235,7 +242,6 @@ export function ChipRow({
               onPress={() => onSelect(chip.id)}
               onLongPress={() => void togglePin(chip)}
               actions={[{ name: 'pin', label: chip.pinned ? 'Unpin' : 'Pin', run: () => void togglePin(chip) }]}
-              onLayout={(event) => chipAt.current.set(chip.id, event.nativeEvent.layout)}
             />
           </Reanimated.View>
         ))}
