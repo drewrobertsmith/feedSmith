@@ -15,10 +15,12 @@ import { themes } from '@/theme/tokens';
 import {
   ADD_FEED_WORLDS,
   ALL_WORLDS,
+  PINNED_GROUP_WORLDS,
   PINNED_WORLDS,
   READING_WORLDS,
   type AddFeedWorldId,
   type AllWorldId,
+  type PinnedGroupWorldId,
   type PinnedWorldId,
   type ReadingWorldId,
 } from '@/worlds/catalog';
@@ -549,6 +551,7 @@ describe('the Pinned view (FEE-59)', () => {
   };
   const PINNED_CHIP = 'Pinned: The Verge, Daring Fireball';
   const TWO_PIN_CHIPS = ['All', PINNED_CHIP, 'The Verge, Pinned', 'Daring Fireball, Pinned', 'Calm Notes'];
+  const FOLDED_CHIPS = ['All', PINNED_CHIP, 'Calm Notes'];
   const ALL_ROWS = FIXTURE_ROWS.map((row) => row.feedTitle);
   // The Verge's Articles, and not Calm Notes': Pinned is narrower than All.
   const PINNED_ROWS = FIXTURE_ROWS.filter((row) => row.feedId === 'f1').map((row) => row.feedTitle);
@@ -561,10 +564,11 @@ describe('the Pinned view (FEE-59)', () => {
       rows: [],
       empty: true,
     },
-    'pinned-all': { chips: TWO_PIN_CHIPS, selected: 'All', rows: ALL_ROWS, empty: false },
+    // All chosen: the group folds into the Pinned chip (FEE-60).
+    'pinned-all': { chips: FOLDED_CHIPS, selected: 'All', rows: ALL_ROWS, empty: false },
     // One Pin makes no Pinned chip, so a link to Pinned lands on All (Q25).
     'pinned-one-pin': { chips: ['All', 'The Verge, Pinned', 'Calm Notes', 'Daring Fireball'], selected: 'All', rows: ALL_ROWS, empty: false },
-    'pinned-hostile-link': { chips: TWO_PIN_CHIPS, selected: 'All', rows: ALL_ROWS, empty: false },
+    'pinned-hostile-link': { chips: FOLDED_CHIPS, selected: 'All', rows: ALL_ROWS, empty: false },
     'pinned-largest-font': { chips: TWO_PIN_CHIPS, selected: PINNED_CHIP, rows: PINNED_ROWS, empty: false },
   };
 
@@ -599,6 +603,7 @@ describe('the Pinned view (FEE-59)', () => {
     // Pinned sits second, right after All.
     await user.press(screen.getByRole('tab', { name: PINNED_CHIP }));
     expect(screen.getByTestId('chip-switch')).toHaveProp('index', 1);
+    // Calm Notes isn't Pinned: choosing it folds the group, and it sits after the Pinned Feeds' places.
     await user.press(screen.getByRole('tab', { name: 'Calm Notes' }));
     expect(screen.getByTestId('chip-switch')).toHaveProp('index', 4);
   });
@@ -608,6 +613,76 @@ describe('the Pinned view (FEE-59)', () => {
     await open({ colorScheme: 'dark', feeds: 'some', pins: 'quiet', feed: 'pinned' });
     await user.press(await screen.findByRole('button', { name: 'Manage Feeds' }));
     expect(screen).toHavePathname('/manage-feeds');
+  });
+});
+
+describe('the Pinned group (FEE-60)', () => {
+  const PINNED_CHIP = 'Pinned: The Verge, Daring Fireball';
+  const OPEN = ['All', PINNED_CHIP, 'The Verge, Pinned', 'Daring Fireball, Pinned', 'Calm Notes'];
+  const FOLDED = ['All', PINNED_CHIP, 'Calm Notes'];
+  type Shows = { chips: string[]; selected: string; expanded: boolean | null };
+  const SHOWS: Record<PinnedGroupWorldId, Shows> = {
+    'group-open': { chips: OPEN, selected: 'The Verge, Pinned', expanded: true },
+    'group-folded-all': { chips: FOLDED, selected: 'All', expanded: false },
+    'group-folded-other': { chips: FOLDED, selected: 'Calm Notes', expanded: false },
+    // With fewer than two Pins there's no group: the row is as it was before Pinned.
+    'group-one-pin': { chips: ['All', 'The Verge, Pinned', 'Calm Notes', 'Daring Fireball'], selected: 'All', expanded: null },
+    'group-no-pins': { chips: ['All', 'The Verge', 'Calm Notes', 'Daring Fireball'], selected: 'All', expanded: null },
+    'group-link': { chips: OPEN, selected: 'Daring Fireball, Pinned', expanded: true },
+    'group-remove-animations': { chips: OPEN, selected: PINNED_CHIP, expanded: true },
+  };
+
+  test.each(PINNED_GROUP_WORLDS)('$label', async ({ id, spec }) => {
+    const shows = SHOWS[id];
+    await open(spec);
+    const tabs = await screen.findAllByRole('tab');
+    expect(tabs.map((tab) => tab.props.accessibilityLabel)).toEqual(shows.chips);
+    expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName(shows.selected);
+    const pinned = screen.queryByRole('tab', { name: PINNED_CHIP });
+    if (shows.expanded === null) expect(pinned).not.toBeOnTheScreen();
+    else if (shows.expanded) expect(pinned).toBeExpanded();
+    else expect(pinned).toBeCollapsed();
+  });
+
+  test('choosing Pinned opens the group; moving among its Feeds keeps it open; All folds it', async () => {
+    const user = userEvent.setup();
+    await open({ colorScheme: 'dark', feeds: 'some', pins: 'two' });
+    const names = () => screen.getAllByRole('tab').map((tab) => tab.props.accessibilityLabel);
+    expect(names()).toEqual(FOLDED);
+    await user.press(await screen.findByRole('tab', { name: PINNED_CHIP }));
+    expect(names()).toEqual(OPEN);
+    await user.press(screen.getByRole('tab', { name: 'Daring Fireball, Pinned' }));
+    expect(names()).toEqual(OPEN);
+    await user.press(screen.getByRole('tab', { name: 'The Verge, Pinned' }));
+    expect(names()).toEqual(OPEN);
+    await user.press(screen.getByRole('tab', { name: 'All' }));
+    expect(names()).toEqual(FOLDED);
+  });
+
+  test('a Pinned Feed chosen: its chip is Gold, and the Pinned chip only shows the group is active (D5)', async () => {
+    await open({ colorScheme: 'dark', feeds: 'some', pins: 'two', feed: 'f1' });
+    const pinned = await screen.findByRole('tab', { name: PINNED_CHIP });
+    expect(pinned).not.toBeSelected();
+    // Full-strength text, not Gold: active, without competing with the chosen Feed.
+    expect(within(pinned).getByText('Pinned', { includeHiddenElements: true })).toHaveProp('className', 'text-text');
+    expect(within(screen.getByRole('tab', { name: 'The Verge, Pinned' })).getByText('The Verge', { includeHiddenElements: true })).toHaveProp(
+      'className',
+      'text-accent',
+    );
+  });
+
+  test('TalkBack can expand and collapse the group without gestures (Q15)', async () => {
+    await open({ colorScheme: 'dark', feeds: 'some', pins: 'two' });
+    const folded = await screen.findByRole('tab', { name: PINNED_CHIP });
+    expect(folded.props.accessibilityActions).toEqual([{ name: 'expand', label: 'Expand' }]);
+    await act(async () => fireEvent(folded, 'accessibilityAction', { nativeEvent: { actionName: 'expand' } }));
+    expect(screen).toHaveSearchParams({ feed: 'pinned' });
+    const opened = screen.getByRole('tab', { name: PINNED_CHIP });
+    expect(opened).toBeExpanded();
+    expect(opened.props.accessibilityActions).toEqual([{ name: 'collapse', label: 'Collapse' }]);
+    await act(async () => fireEvent(opened, 'accessibilityAction', { nativeEvent: { actionName: 'collapse' } }));
+    expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName('All');
+    expect(screen.getByRole('tab', { name: PINNED_CHIP })).toBeCollapsed();
   });
 });
 

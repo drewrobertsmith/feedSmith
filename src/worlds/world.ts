@@ -21,6 +21,7 @@ import {
   FIXTURE_NOW,
   FIXTURE_OMITTED_ARTICLE,
   FIXTURE_READ_ROWS,
+  FIXTURE_NO_PINS,
   FIXTURE_QUIET_PINS,
   FIXTURE_ROWS,
   FIXTURE_SAVED_ROWS,
@@ -77,7 +78,7 @@ export type WorldSpec = {
    * `full`: three Feeds are Pinned already, so another Pin is refused (P9). `two`: The Verge and Calm
    * Notes are Pinned, so the Pinned chip shows (FEE-59). `quiet`: two Pinned Feeds with nothing new.
    */
-  pins?: 'full' | 'two' | 'quiet';
+  pins?: 'full' | 'two' | 'quiet' | 'none';
   /** What Manage Feeds lists. Defaults to `some`: one Pinned Feed, one not working. */
   manage?: 'some' | 'pinned' | 'none' | 'loading';
   /** Manage Feeds' writes don't reach the server, or the server refuses the name. */
@@ -205,7 +206,9 @@ export function worldFeeds(
         ? FIXTURE_TWO_PINS
         : spec.pins === 'quiet'
           ? FIXTURE_QUIET_PINS
-          : FIXTURE_CHIPS;
+          : spec.pins === 'none'
+            ? FIXTURE_NO_PINS
+            : FIXTURE_CHIPS;
   /** The Feeds the Pinned view reads (FEE-59). */
   const pinnedIds = new Set(someChips.filter((chip) => chip.pinned).map((chip) => chip.id));
   const addFeed = spec.addFeed ?? 'idle';
