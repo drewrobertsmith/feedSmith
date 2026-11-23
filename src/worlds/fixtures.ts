@@ -106,7 +106,8 @@ export const FIXTURE_EXTRACTING_ARTICLE: ReadingArticle = {
 /** A summary-only Article whose page couldn't be read: the fallback (Q6). */
 export const FIXTURE_UNEXTRACTED_ARTICLE: ReadingArticle = {
   ...FIXTURE_EXTRACTING_ARTICLE,
-  imageUrl: 'https://calmnotes.example/img/slow-reading.jpg',
+  // A real image, so the gallery shows the fallback as a reader would see it.
+  imageUrl: 'https://platform.theverge.com/wp-content/uploads/sites/2/chorus/uploads/chorus_asset/file/13611631/503831564.jpg.jpg',
   page: 'unavailable',
 };
 
