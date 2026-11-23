@@ -6,5 +6,11 @@
 export function reanimatedReducesMotion(): boolean {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { ReducedMotionManager } = require('react-native-reanimated/lib/module/ReducedMotion');
-  return ReducedMotionManager.jsValue as boolean;
+  if (typeof ReducedMotionManager?.jsValue !== 'boolean') {
+    throw new Error(
+      "test/reduced-motion.ts (FEE-33): Reanimated's ReducedMotionManager.jsValue moved. Find where " +
+        'ReducedMotionConfig now stores its state (react-native-reanimated/src/component/ReducedMotionConfig.tsx).',
+    );
+  }
+  return ReducedMotionManager.jsValue;
 }

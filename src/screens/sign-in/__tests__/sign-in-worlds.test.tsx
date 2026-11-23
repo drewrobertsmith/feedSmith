@@ -59,7 +59,7 @@ test.each(SIGN_IN_WORLDS)('$label', async ({ id, spec }) => {
   else expect(screen.queryByRole('alert')).not.toBeOnTheScreen();
   expect(Uniwind.currentTheme).toBe(shows.theme);
   // Reanimated itself reduces motion exactly when the world's Remove animations is on (Q17).
-    expect(reanimatedReducesMotion()).toBe(shows.reduceMotion);
+  expect(reanimatedReducesMotion()).toBe(shows.reduceMotion);
   // Signed out, the sections stay out of reach.
   expect(screen.queryByRole('heading', { name: 'Feeds' })).not.toBeOnTheScreen();
   world.dispose();

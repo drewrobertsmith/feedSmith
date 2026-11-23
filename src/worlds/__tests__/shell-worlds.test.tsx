@@ -53,7 +53,7 @@ test.each(SHELL_WORLDS)('$label', async ({ id, spec }) => {
   expect(screen.getByText(shows.message)).toBeOnTheScreen();
   expect(Uniwind.currentTheme).toBe(shows.theme);
   // Reanimated itself reduces motion exactly when the world's Remove animations is on (Q17).
-    expect(reanimatedReducesMotion()).toBe(shows.reduceMotion);
+  expect(reanimatedReducesMotion()).toBe(shows.reduceMotion);
 
   world.dispose();
 });

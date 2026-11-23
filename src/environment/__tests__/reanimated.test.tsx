@@ -45,9 +45,19 @@ test('a worklet is an ordinary function in Jest', () => {
 
 test("inside Expo Router's test renderer, Reanimated is the real one", async () => {
   const real = jest.requireActual('react-native-reanimated');
-  const used = require('react-native-reanimated');
-  expect(used.useAnimatedStyle).toBe(real.useAnimatedStyle);
+  expect(useAnimatedStyle).toBe(real.useAnimatedStyle);
   await renderRouter({ index: () => <Fade to={1} /> }, { initialUrl: '/' });
   jest.advanceTimersByTime(300);
   expect(screen.getByTestId('fade')).toHaveAnimatedStyle({ opacity: 1 });
+});
+
+test("Expo Router's testing mocks are the ones test/expo-router-test-mocks.js copied", () => {
+  const { createHash } = jest.requireActual<typeof import('crypto')>('crypto');
+  const { readFileSync } = jest.requireActual<typeof import('fs')>('fs');
+  const upstream = readFileSync(require.resolve('expo-router/build/testing-library/mocks.js'));
+  const hash = createHash('sha256').update(upstream).digest('hex');
+  // expo-router 58.0.32. If this fails, Expo Router changed its testing mocks: carry the change
+  // into test/expo-router-test-mocks.js (still without the Reanimated and Worklets mocks), then
+  // record the new hash here.
+  expect(hash).toBe('84f4eaa07f72f0c403770f6574816fdcb46b83a31751c2ed3aaa43f4fb4063c1');
 });

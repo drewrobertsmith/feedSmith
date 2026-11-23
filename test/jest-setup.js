@@ -5,7 +5,6 @@ require('react-native-reanimated').setUpTests();
 // Expo Router's testing library would swap them back for mocks: its mocks file, without those two.
 jest.mock('expo-router/build/testing-library/mocks', () => require('./expo-router-test-mocks'));
 
-
 // The chip switch (FEE-42) is a plain wrapper in tests that shows which chip's rows are shown.
 // Reanimated itself runs for real now (FEE-33); this double stays because the Feeds tests read
 // its `index`, and can move to the real slide with `toHaveAnimatedStyle` when they're next reworked.
