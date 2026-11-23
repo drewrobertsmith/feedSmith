@@ -1,7 +1,6 @@
-import { createContext, use, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
-  Pressable,
   View,
   type LayoutChangeEvent,
   type ScrollViewInstance,
@@ -9,13 +8,13 @@ import {
 import Reanimated, { Easing, Keyframe, LayoutAnimationConfig, LinearTransition, ReduceMotion } from 'react-native-reanimated';
 
 import { AppText } from '@/components/app-text';
+import { DepthPressable, useControlFace } from '@/components/depth-pressable';
 import { FeedIcon } from '@/components/feed-icon';
 import { useEnvironment } from '@/environment';
 import type { FeedChip } from '@/feeds/feeds-data';
 import { usePin } from '@/feeds/use-pin';
 import { PINNED } from '../../convex/lib/pinned';
 import { chipLabel, fadeRanges, hasPinnedView, revealOffset, transparent } from '@/screens/chip-row-layout';
-import { depth, depthStyle } from '@/theme/depth';
 import { motion } from '@/theme/motion';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
@@ -53,9 +52,6 @@ const FADE = spacing.section;
 /** Something a chip offers TalkBack besides choosing it (Q15): Pin, Unpin, Expand, Collapse. */
 type ChipAction = { name: string; label: string; run: () => void };
 
-/** The face colour of the chip something sits on, so what's drawn on it can ring itself in that colour. */
-const ChipFace = createContext<string | undefined>(undefined);
-
 /** One chip: a tab in the row. Chosen, it's raised with a Gold label (D5, D27) and springs into place (D7). */
 function Chip({
   label,
@@ -82,9 +78,7 @@ function Chip({
   actions?: ChipAction[];
   onLayout?: (event: LayoutChangeEvent) => void;
 }) {
-  const { reduceMotion, colorScheme } = useEnvironment();
-  const [pressed, setPressed] = useState(false);
-  const level = pressed ? 'pressed' : selected ? 'raised' : 'soft';
+  const { reduceMotion } = useEnvironment();
   const [scale] = useState(() => new Animated.Value(1));
   const wasSelected = useRef(selected);
 
@@ -107,15 +101,14 @@ function Chip({
 
   return (
     <Animated.View style={{ transform: [{ scale }] }} onLayout={onLayout}>
-      <Pressable
+      <DepthPressable
+        level={selected ? 'raised' : 'soft'}
         role="tab"
         aria-label={accessibleName}
         aria-selected={selected}
         aria-expanded={expanded}
         onPress={onPress}
         onLongPress={onLongPress}
-        onPressIn={() => setPressed(true)}
-        onPressOut={() => setPressed(false)}
         // Long-press for touch, a named action for TalkBack: every action reachable without the gesture (Q15).
         accessibilityActions={actions?.map(({ name, label: actionLabel }) => ({ name, label: actionLabel }))}
         onAccessibilityAction={(event) => {
@@ -126,9 +119,8 @@ function Chip({
         // the Articles (FEE-44); the label is what identifies a chip, at 4.5:1 on every face (Q14, D26).
         // Active (a Pinned Feed chosen): full-strength text, so the group reads as the one you're in.
         className="flex-row items-center gap-inside rounded-full px-group py-related"
-        style={depthStyle(colorScheme, level)}
       >
-        <ChipFace value={depth[colorScheme][level].face}>{icon}</ChipFace>
+        {icon}
         <AppText
           variant="label"
           className={selected ? 'text-accent' : active ? 'text-text' : 'text-text-muted'}
@@ -137,7 +129,7 @@ function Chip({
         >
           {chipLabel(label)}
         </AppText>
-      </Pressable>
+      </DepthPressable>
     </Animated.View>
   );
 }
@@ -151,7 +143,7 @@ function Chip({
  */
 function PinnedStack({ chips }: { chips: FeedChip[] }) {
   // Ringed in the chip's own face, so on it each icon reads as a separate disc (D25, FEE-74).
-  const ring = use(ChipFace);
+  const ring = useControlFace();
   return (
     <View className="flex-row items-center" importantForAccessibility="no-hide-descendants">
       {chips.map((chip, i) => (

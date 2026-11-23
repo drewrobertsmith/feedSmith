@@ -20,8 +20,6 @@ export const palette = {
   paper: '#F9F5EC',
   /** Lighter still: the face of a raised control on cream. */
   paperRaised: '#FDFBF6',
-  /** Light that falls on a face; in dark mode the light is cream. */
-  white: '#FFFFFF',
   /** What a shadow is made of on Midnight. */
   black: '#000000',
   slate: '#4A5468',

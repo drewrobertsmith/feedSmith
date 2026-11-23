@@ -1,3 +1,5 @@
+import { faceOf } from '../../../test/depth';
+import { depthStyle } from '@/theme/depth';
 import { act, userEvent, within } from '@testing-library/react-native';
 import { renderRouter, screen } from 'expo-router/testing-library';
 import { Alert } from 'react-native';
@@ -126,6 +128,13 @@ describe.each(ACCOUNT_WORLDS)('$label', ({ id, spec }) => {
     // Reanimated itself reduces motion exactly when the world's Remove animations is on (Q17).
     expect(reanimatedReducesMotion()).toBe(shows.reduceMotion);
 
+    world.dispose();
+  });
+
+  test('the circle is soft, like the chips beside it (FEE-75, D27)', async () => {
+    const world = createWorld(spec);
+    await renderWorld(world);
+    expect(faceOf(await circle(shows))).toMatchObject(depthStyle(shows.theme, 'soft'));
     world.dispose();
   });
 

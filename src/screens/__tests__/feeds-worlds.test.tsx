@@ -1,3 +1,4 @@
+import { faceOf } from '../../../test/depth';
 import { act, fireEvent, userEvent, waitFor, within } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
 import { screen } from 'expo-router/testing-library';
@@ -195,8 +196,8 @@ describe('All', () => {
     await screen.findAllByRole('tab');
     const all = screen.getByRole('tab', { name: 'All' });
     const calm = screen.getByRole('tab', { name: 'Calm Notes' });
-    expect(all).toHaveStyle(depthStyle(colorScheme, 'raised'));
-    expect(calm).toHaveStyle(depthStyle(colorScheme, 'soft'));
+    expect(faceOf(all)).toMatchObject(depthStyle(colorScheme, 'raised'));
+    expect(faceOf(calm)).toMatchObject(depthStyle(colorScheme, 'soft'));
     for (const chip of [all, calm]) expect(chip).not.toHaveStyle({ borderWidth: expect.any(Number) });
     // Still quieter than the chosen one: muted text, with Gold only on the chosen label (D5).
     expect(within(calm).getByText('Calm Notes')).toHaveProp('className', expect.stringContaining('text-text-muted'));
@@ -207,9 +208,9 @@ describe('All', () => {
     await open({ colorScheme, feeds: 'some' });
     const calm = (await screen.findAllByRole('tab', { name: 'Calm Notes' }))[0];
     await fireEvent(calm, 'pressIn');
-    expect(screen.getByRole('tab', { name: 'Calm Notes' })).toHaveStyle(depthStyle(colorScheme, 'pressed'));
+    expect(faceOf(screen.getByRole('tab', { name: 'Calm Notes' }))).toMatchObject(depthStyle(colorScheme, 'pressed'));
     await fireEvent(calm, 'pressOut');
-    expect(screen.getByRole('tab', { name: 'Calm Notes' })).toHaveStyle(depthStyle(colorScheme, 'soft'));
+    expect(faceOf(screen.getByRole('tab', { name: 'Calm Notes' }))).toMatchObject(depthStyle(colorScheme, 'soft'));
   });
 
   test("tapping a Feed's chip shows only its Articles; tapping All shows everything again", async () => {
@@ -683,8 +684,8 @@ describe('the Pinned group (FEE-60)', () => {
     expect(pinned).not.toBeSelected();
     // Full-strength text on a soft face, not Gold and not raised: active, without competing with the chosen Feed (D27).
     expect(within(pinned).getByText('Pinned', { includeHiddenElements: true })).toHaveProp('className', 'text-text');
-    expect(pinned).toHaveStyle(depthStyle('dark', 'soft'));
-    expect(screen.getByRole('tab', { name: 'The Verge, Pinned' })).toHaveStyle(depthStyle('dark', 'raised'));
+    expect(faceOf(pinned)).toMatchObject(depthStyle('dark', 'soft'));
+    expect(faceOf(screen.getByRole('tab', { name: 'The Verge, Pinned' }))).toMatchObject(depthStyle('dark', 'raised'));
     expect(within(screen.getByRole('tab', { name: 'The Verge, Pinned' })).getByText('The Verge', { includeHiddenElements: true })).toHaveProp(
       'className',
       'text-accent',
@@ -1129,4 +1130,30 @@ test('Manage this Feed opens Manage Feeds from a Feed with nothing new (FEE-47, 
   await open({ colorScheme: 'dark', feeds: 'some', feed: 'f3' });
   await user.press(await screen.findByRole('button', { name: 'Manage this Feed' }));
   expect(await screen.findByRole('heading', { name: 'Manage Feeds' })).toBeOnTheScreen();
+});
+
+describe('buttons have depth, not outlines (FEE-75, D27)', () => {
+  test.each(['dark', 'light'] as const)('in %s, the Reading view\'s Save is soft above the page and sinks when pressed', async (colorScheme) => {
+    await open({ colorScheme, section: 'article' });
+    const save = await screen.findByRole('button', { name: 'Save' });
+    expect(faceOf(save)).toMatchObject(depthStyle(colorScheme, 'soft'));
+    expect(save).not.toHaveStyle({ borderWidth: expect.any(Number) });
+    await fireEvent(save, 'pressIn');
+    expect(faceOf(screen.getByRole('button', { name: 'Save' }))).toMatchObject(depthStyle(colorScheme, 'pressed'));
+  });
+
+  test('Done, on a Saved Article, is soft too', async () => {
+    await open({ colorScheme: 'dark', section: 'article', articleSaved: true });
+    expect(faceOf(await screen.findByRole('button', { name: 'Done' }))).toMatchObject(depthStyle('dark', 'soft'));
+  });
+
+  test.each([
+    ['Add a Feed', { colorScheme: 'dark', feeds: 'none' }],
+    ['Open original', { colorScheme: 'light', section: 'article', article: 'unextracted' }],
+    // The way to the original at the end of an Article that was read in full.
+    ['Open original', { colorScheme: 'dark', section: 'article' }],
+  ] as const)('%s is soft', async (name, spec) => {
+    await open(spec);
+    expect(faceOf(await screen.findByRole('button', { name }))).toMatchObject(depthStyle(spec.colorScheme, 'soft'));
+  });
 });

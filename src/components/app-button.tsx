@@ -1,10 +1,9 @@
-import { Pressable } from 'react-native';
-
 import { AppText } from '@/components/app-text';
+import { DepthPressable } from '@/components/depth-pressable';
 
 /**
- * A quiet, filled button for a screen's main action. Surface-coloured, not Gold: Gold marks
- * only what's active or yours (D5).
+ * A quiet button for a screen's main action: a soft object (D27), not Gold, since Gold marks only
+ * what's active or yours (D5). Its label identifies it, at 4.5:1 on its face (Q14, D26).
  */
 export function AppButton({
   label,
@@ -19,23 +18,20 @@ export function AppButton({
 }) {
   const off = disabled || busy;
   return (
-    <Pressable
+    <DepthPressable
+      level="soft"
       role="button"
       aria-label={label}
       aria-disabled={off}
       aria-busy={busy}
       disabled={off}
       onPress={onPress}
-      // The border is the boundary (Q14: 3:1); the surface fill alone is too faint on cream.
-      className={
-        off
-          ? 'self-start rounded-full border border-text-muted bg-surface px-group py-related opacity-60'
-          : 'self-start rounded-full border border-text-muted bg-surface px-group py-related'
-      }
+      frameClassName="self-start"
+      className={off ? 'rounded-full px-group py-related opacity-60' : 'rounded-full px-group py-related'}
     >
       <AppText variant="label" className="text-text">
         {label}
       </AppText>
-    </Pressable>
+    </DepthPressable>
   );
 }
