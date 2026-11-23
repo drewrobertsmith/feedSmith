@@ -255,9 +255,9 @@ describe('All', () => {
   });
 
   test.each([
-    ['a tiny icon (a placeholder, or blurry at row size)', 16, true],
-    ['a real icon', 32, false],
-  ])("%s: the Feed's initial shows instead: %s", async (_case, width, initial) => {
+    ["a tiny icon (a placeholder, or blurry at row size) gives way to the Feed's initial", 16, true],
+    ['a real icon stays', 32, false],
+  ])('%s (D14)', async (_case, width, initial) => {
     await open({ colorScheme: 'dark', feeds: 'some' });
     await screen.findAllByRole('link');
     const [icon] = screen.getAllByTestId('row-favicon');
