@@ -1,4 +1,5 @@
-import { act, fireEvent, userEvent, within } from '@testing-library/react-native';
+import { act, fireEvent, userEvent, waitFor, within } from '@testing-library/react-native';
+import * as Haptics from 'expo-haptics';
 import { renderRouter, screen } from 'expo-router/testing-library';
 import { Animated, ScrollView, ToastAndroid } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
@@ -16,6 +17,7 @@ import SignInRoute from '@/app/sign-in';
 import { publishedAgo, publishedDate } from '@/feeds/format';
 import { AppRoot } from '@/navigation/app-root';
 import { spacing } from '@/theme/spacing';
+import { themes } from '@/theme/tokens';
 import {
   ADD_FEED_WORLDS,
   ALL_WORLDS,
@@ -35,6 +37,10 @@ import {
 import { createWorld, type World, type WorldSpec } from '@/worlds/world';
 
 jest.mock('expo-web-browser', () => ({ openBrowserAsync: jest.fn() }));
+jest.mock('expo-haptics', () => ({
+  ...jest.requireActual('expo-haptics'),
+  performAndroidHapticsAsync: jest.fn(() => Promise.resolve()),
+}));
 
 function renderWorld(world: World, initialUrl: string = world.initialUrl) {
   return renderRouter(
@@ -332,10 +338,10 @@ describe('All', () => {
     const [first, second] = FIXTURE_ROWS;
     expect(rows[0]).toHaveAccessibleName(`${first.title}, By Terrence O’Brien, The Verge, ${publishedAgo(first.publishedAt, FIXTURE_NOW)}`);
     expect(rows[1]).toHaveAccessibleName(
-      `${second.title}, By Emma Roth and Jay Peters, The Verge, ${publishedAgo(second.publishedAt, FIXTURE_NOW)}, Read`,
+      `${second.title}, By Emma Roth and Jay Peters, The Verge, ${publishedAgo(second.publishedAt, FIXTURE_NOW)}, Saved, Read`,
     );
     const [, , third] = FIXTURE_ROWS;
-    expect(rows[2]).toHaveAccessibleName(`${third.title}, The Verge, ${publishedAgo(third.publishedAt, FIXTURE_NOW)}`);
+    expect(rows[2]).toHaveAccessibleName(`${third.title}, The Verge, ${publishedAgo(third.publishedAt, FIXTURE_NOW)}, Saved`);
   });
 
   test("a row credits its authors under the title, above the Subtitle; a row with none has no byline (FEE-41)", async () => {
@@ -441,6 +447,58 @@ describe('All', () => {
     await open({ colorScheme: 'dark', feeds });
     await user.press(await screen.findByRole('button', { name: 'Add a Feed' }));
     expect(await screen.findByRole('heading', { name: 'Add a Feed' })).toBeOnTheScreen();
+  });
+
+  describe('Save and Done from a row (FEE-30)', () => {
+    const row = (title: string) => screen.findByRole('link', { name: new RegExp(`^${title.slice(0, 20)}`) });
+
+    test('a Saved Article is marked in Gold, to the eye and to TalkBack (D5)', async () => {
+      await open({ colorScheme: 'dark', feeds: 'some' });
+      await screen.findByRole('heading', { name: 'Feeds' });
+      const saved = FIXTURE_ROWS.filter((r) => r.saved);
+      expect(screen.getAllByTestId('row-saved-mark')).toHaveLength(saved.length);
+      expect(screen.getAllByRole('link', { name: /, Saved(, Read)?$/ })).toHaveLength(saved.length);
+      for (const mark of screen.getAllByTestId('row-saved-mark')) expect(mark.props.tintColor).toBe(themes.dark.accent);
+    });
+
+    test('a row offers Save to TalkBack, or Done once Saved (Q15)', async () => {
+      await open({ colorScheme: 'dark', feeds: 'some' });
+      expect((await row(FIXTURE_ROWS[0].title)).props.accessibilityActions).toEqual([{ name: 'save', label: 'Save' }]);
+      expect((await row(FIXTURE_ROWS[2].title)).props.accessibilityActions).toEqual([{ name: 'done', label: 'Done' }]);
+    });
+
+    test('Save marks it at once, with a haptic, says so, and Undo takes it back (Q3, Q35)', async () => {
+      const w = await open({ colorScheme: 'dark', feeds: 'some' });
+      const [first] = FIXTURE_ROWS;
+      await act(async () => fireEvent(await row(first.title), 'accessibilityAction', { nativeEvent: { actionName: 'save' } }));
+
+      expect(w.feedsLog.saves).toEqual([first.id]);
+      expect(Haptics.performAndroidHapticsAsync).toHaveBeenCalledWith(Haptics.AndroidHaptics.Confirm);
+      expect(await row(first.title)).toHaveAccessibleName(/, Saved$/);
+      const toast = await screen.findByTestId('undo-toast');
+      expect(within(toast).getByText('Saved.')).toBeOnTheScreen();
+
+      await userEvent.press(within(toast).getByRole('button', { name: 'Undo' }));
+      await waitFor(() => expect(w.feedsLog.restores).toEqual([{ id: first.id, before: {} }]));
+      expect(await row(first.title)).not.toHaveAccessibleName(/Saved/);
+    });
+
+    test('Done on a Saved row takes it out of Saved and leaves it Read (P8)', async () => {
+      const w = await open({ colorScheme: 'dark', feeds: 'some' });
+      const saved = FIXTURE_ROWS[2];
+      await act(async () => fireEvent(await row(saved.title), 'accessibilityAction', { nativeEvent: { actionName: 'done' } }));
+      expect(w.feedsLog.dones).toEqual([saved.id]);
+      expect(await row(saved.title)).toHaveAccessibleName(/, Read$/);
+      expect(await row(saved.title)).not.toHaveAccessibleName(/Saved/);
+      expect(within(await screen.findByTestId('undo-toast')).getByText('Marked Done.')).toBeOnTheScreen();
+    });
+
+    test("a Save that doesn't reach the server offers no Undo to do", async () => {
+      const w = await open({ colorScheme: 'dark', feeds: 'some', savedWrites: 'fail' });
+      await act(async () => fireEvent(await row(FIXTURE_ROWS[0].title), 'accessibilityAction', { nativeEvent: { actionName: 'save' } }));
+      await userEvent.press(within(await screen.findByTestId('undo-toast')).getByRole('button', { name: 'Undo' }));
+      expect(w.feedsLog.restores).toEqual([]);
+    });
   });
 });
 

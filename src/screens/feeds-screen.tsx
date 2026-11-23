@@ -1,17 +1,18 @@
 import { LegendList } from '@legendapp/list/react-native';
-import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { Pressable, RefreshControl, View } from 'react-native';
+import { RefreshControl, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/app-button';
 import { AppText } from '@/components/app-text';
 import { ChipSwitch, SlideRow } from '@/components/chip-switch';
-import { FeedIcon } from '@/components/feed-icon';
+import { ArticleRow } from '@/components/article-row';
 import { TopBar, TopBarIcon } from '@/components/top-bar';
+import { UndoToastHost } from '@/components/undo-toast';
 import { useEnvironment, useMinuteClock } from '@/environment';
-import { useAll, useChips, useLastUpdated, useRefresh, type ArticleRow } from '@/feeds/feeds-data';
-import { byline, publishedAgo } from '@/feeds/format';
+import { useAll, useChips, useLastUpdated, useRefresh } from '@/feeds/feeds-data';
+import { publishedAgo } from '@/feeds/format';
+import { useSaveAndDone } from '@/feeds/use-save-and-done';
 import { useShownRows } from '@/feeds/use-shown-rows';
 import { AccountButton } from '@/screens/account/account-sheet';
 import { ChipRow } from '@/screens/chip-row';
@@ -33,84 +34,8 @@ function useUpdatedLine(refreshing: boolean): string | undefined {
   return `Updated ${publishedAgo(lastUpdated.at, now)}`;
 }
 
-/** A Read row's image fades back with its text (P7); text dims by colour, so contrast holds (Q14). */
-const READ_IMAGE_OPACITY = 0.55;
-const THUMBNAIL = 72;
-const FAVICON = 16;
 /** A row's usual height, for the list's first layout before rows measure themselves. */
 const ESTIMATED_ROW = 112;
-
-/**
- * One Article in the list (P12). Its parts each have one voice (Q29): muted sans meta, the title
- * in Literata, a full-strength sans byline, the Subtitle in small muted Literata. With one Feed
- * chosen, its chip already names it, so `feedNamed` is off and the row leaves the name out.
- */
-function Row({ article, feedNamed }: { article: ArticleRow; feedNamed: boolean }) {
-  const { colorScheme, fontScale, now } = useEnvironment();
-  const ago = publishedAgo(article.publishedAt, now());
-  const credit = byline(article.authors);
-  const label = [article.title, credit, feedNamed ? article.feedTitle : undefined, ago, article.read ? 'Read' : undefined]
-    .filter(Boolean)
-    .join(', ');
-  const thumbnail = THUMBNAIL * fontScale;
-
-  return (
-    <Pressable
-      role="link"
-      aria-label={label}
-      onPress={() => router.push(`/article/${article.id}`)}
-      android_ripple={{ color: themes[colorScheme].surface }}
-      className="flex-row gap-group px-edge py-group"
-    >
-      <View className="flex-1 gap-inside">
-        <View className="flex-row items-center gap-related">
-          {/* Keyed by favicon, so a failed load never carries over to another Feed's row. */}
-          <FeedIcon
-            key={article.faviconUrl ?? article.feedTitle}
-            url={article.faviconUrl}
-            title={article.feedTitle}
-            size={FAVICON}
-            testID="row-favicon"
-          />
-          {feedNamed ? (
-            <AppText testID="row-feed-name" variant="label" className="shrink text-text-muted" numberOfLines={1}>
-              {article.feedTitle}
-            </AppText>
-          ) : null}
-          <AppText variant="label" className="text-text-muted">
-            {ago}
-          </AppText>
-        </View>
-        <AppText variant="reading" className={article.read ? 'text-text-muted' : 'text-text'}>
-          {article.title}
-        </AppText>
-        {/* Who wrote it, where you decide whether to open it (FEE-41). */}
-        {credit ? (
-          <AppText variant="label" className={article.read ? 'text-text-muted' : 'text-text'} numberOfLines={1}>
-            {credit}
-          </AppText>
-        ) : null}
-        {article.subtitle ? (
-          <AppText variant="summary" className="text-text-muted" numberOfLines={2}>
-            {article.subtitle}
-          </AppText>
-        ) : null}
-      </View>
-      {article.imageUrl ? (
-        <View className="overflow-hidden rounded-lg bg-surface" style={{ width: thumbnail, height: thumbnail }}>
-          <Image
-            testID="row-image"
-            source={{ uri: article.imageUrl }}
-            accessible={false}
-            contentFit="cover"
-            recyclingKey={article.id}
-            style={{ width: thumbnail, height: thumbnail, opacity: article.read ? READ_IMAGE_OPACITY : 1 }}
-          />
-        </View>
-      ) : null}
-    </Pressable>
-  );
-}
 
 /**
  * The Feeds section: All, or one Feed's Articles, newest first (Q1, P5, P12), under the chip
@@ -132,6 +57,7 @@ export function FeedsScreen({ feed, accountOpen }: { feed?: string; accountOpen?
   const updated = useUpdatedLine(refreshing);
   const { colorScheme } = useEnvironment();
   const theme = themes[colorScheme];
+  const saveOrDone = useSaveAndDone();
   const noFeeds = chipsView.status === 'ready' && chips.length === 0;
   const empty = all.status === 'ready' && all.articles.length === 0;
 
@@ -174,6 +100,7 @@ export function FeedsScreen({ feed, accountOpen }: { feed?: string; accountOpen?
   }
 
   return (
+    <View className="flex-1 bg-background">
     <ChipSwitch index={shown.index}>
       <LegendList
         testID="all-list"
@@ -181,7 +108,7 @@ export function FeedsScreen({ feed, accountOpen }: { feed?: string; accountOpen?
         keyExtractor={(article) => article.id}
         renderItem={({ item }) => (
           <SlideRow>
-            <Row article={item} feedNamed={shown.index === 0} />
+            <ArticleRow article={item} feedNamed={shown.index === 0} savedMark onAction={(action) => saveOrDone(item.id, action)} />
           </SlideRow>
         )}
         estimatedItemSize={ESTIMATED_ROW}
@@ -201,5 +128,7 @@ export function FeedsScreen({ feed, accountOpen }: { feed?: string; accountOpen?
         contentContainerStyle={{ paddingBottom: insets.bottom + spacing.section }}
       />
     </ChipSwitch>
+    <UndoToastHost />
+    </View>
   );
 }

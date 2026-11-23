@@ -61,7 +61,10 @@ export type WorldSpec = {
   addFeed?: 'idle' | 'busy' | 'choose' | 'already' | AddFeedReason;
   /** Whether a pull-down refresh is under way. */
   refreshing?: boolean;
-  /** What Saved holds. Defaults to `some`: two Articles from All and one whose Feed was removed (T23). */
+  /**
+   * What Saved holds. With Feeds, defaults to `some`: two Articles from All and one whose Feed was
+   * removed (T23); without, to `none`.
+   */
   saved?: 'some' | 'none' | 'loading';
   /** Save, Done and Undo don't reach the server. */
   savedWrites?: 'fail';
@@ -119,11 +122,8 @@ const emptyLog = (): FeedsLog => ({
  * A world's Saved and Read state, which Save, Done and Undo change as the real ones do, so a
  * screen shows the change at once (Q3). Saved ids are kept most recently Saved first.
  */
-function savedStore(initial: ArticleRow[]) {
-  let state = {
-    saved: initial.filter((row) => row.saved).map((row) => row.id),
-    read: new Set(initial.filter((row) => row.read).map((row) => row.id)),
-  };
+function savedStore(saved: string[], read: string[]) {
+  let state = { saved, read: new Set(read) };
   const listeners = new Set<() => void>();
   const set = (next: typeof state) => {
     state = next;
@@ -197,9 +197,11 @@ export function worldFeeds(
           ? { status: 'choose', choices: FIXTURE_CHOICES }
           : { status: 'error', reason: addFeed };
   const universe = [...FIXTURE_ROWS, ...FIXTURE_SAVED_ROWS.filter((row) => !FIXTURE_ROWS.some((r) => r.id === row.id))];
-  const savedSpec = spec.saved ?? 'some';
+  // Saved has Articles when the world has Feeds, unless it says otherwise.
+  const savedSpec = spec.saved ?? (feeds === 'some' || feeds === 'read' ? 'some' : 'none');
   const store = savedStore(
-    universe.map((row) => ({ ...row, saved: savedSpec === 'some' && row.saved, read: feeds === 'read' || row.read })),
+    savedSpec === 'some' ? FIXTURE_SAVED_ROWS.map((row) => row.id) : [],
+    universe.filter((row) => feeds === 'read' || row.read).map((row) => row.id),
   );
   const useStore = () => useSyncExternalStore(store.subscribe, store.get);
   // Each view is built once per state, as a query's result stays the same object until it changes.
