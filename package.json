@@ -40,6 +40,8 @@
     "react-native-web": "~0.21.4",
     "react-native-worklets": "0.14.0",
     "tailwindcss": "4.3.5",
+    "tldts": "7.4.19",
+    "tldts-core": "7.4.19",
     "uniwind": "1.13.2"
   },
   "devDependencies": {
