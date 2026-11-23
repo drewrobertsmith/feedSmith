@@ -6,10 +6,16 @@ import { AppText } from '@/components/app-text';
 import { useEnvironment } from '@/environment';
 
 /**
+ * An icon this small or smaller isn't used (D14): it's a placeholder (some sites serve a blank
+ * 16 px favicon) or would be blurry at row size. Real site icons are 32 px or more.
+ */
+const TINY_ICON = 16;
+
+/**
  * A Feed's icon at `size` (scaled with the font size), clipped round: expo-image doesn't take
- * Uniwind's rounding classes. When there's no icon, or it won't load, the Feed's initial
- * shows instead, or nothing (`fallback="none"`). Key it by `url` so a failure never carries
- * over to another Feed.
+ * Uniwind's rounding classes. When there's no icon, it won't load, or it's tiny, the Feed's
+ * initial shows instead, or nothing (`fallback="none"`). Key it by `url` so a failure never
+ * carries over to another Feed.
  */
 export function FeedIcon({
   url,
@@ -25,17 +31,20 @@ export function FeedIcon({
   testID?: string;
 }) {
   const { fontScale } = useEnvironment();
-  const [failed, setFailed] = useState(false);
+  const [unusable, setUnusable] = useState(false);
   const side = size * fontScale;
 
-  if (url && !failed) {
+  if (url && !unusable) {
     return (
       <View className="overflow-hidden rounded-sm" style={{ width: side, height: side }}>
         <Image
           testID={testID}
           source={{ uri: url }}
           recyclingKey={url}
-          onError={() => setFailed(true)}
+          onLoad={(event) => {
+            if (Math.max(event.source.width, event.source.height) <= TINY_ICON) setUnusable(true);
+          }}
+          onError={() => setUnusable(true)}
           accessible={false}
           style={{ width: side, height: side }}
         />
