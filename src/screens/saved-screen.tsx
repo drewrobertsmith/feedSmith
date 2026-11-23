@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/app-button';
 import { AppText } from '@/components/app-text';
+import { SharedTitleScreen } from '@/components/shared-title';
 import { ArticleRow } from '@/components/article-row';
 import { rowAction } from '@/components/row-action';
 import { SwipeRow } from '@/components/swipe-row';
@@ -50,25 +51,28 @@ export function SavedScreen({ accountOpen }: { accountOpen?: boolean }) {
   );
 
   return (
-    <View className="flex-1 bg-background">
-      <LegendList
-        testID="saved-list"
-        data={saved.status === 'ready' ? saved.articles : []}
-        keyExtractor={(article) => article.id}
-        renderItem={({ item }) => (
-          // Done takes it out of Saved, so it slides away first.
-          <SwipeRow id={item.id} action={rowAction(item)} leaves onCommit={() => saveOrDone(item.id, rowAction(item), { haptic: false })}>
-            <ArticleRow article={item} feedNamed savedMark={false} onAction={(action) => saveOrDone(item.id, action)} />
-          </SwipeRow>
-        )}
-        estimatedItemSize={ESTIMATED_ROW}
-        // Rows hold small state (a favicon that failed): a reused row must start fresh.
-        recycleItems={false}
-        ListHeaderComponent={header}
-        className="flex-1 bg-background"
-        contentContainerStyle={{ paddingBottom: insets.bottom + spacing.section }}
-      />
-      <UndoToastHost />
-    </View>
+    // Only the screen in front carries titles (FEE-48).
+    <SharedTitleScreen>
+      <View className="flex-1 bg-background">
+        <LegendList
+          testID="saved-list"
+          data={saved.status === 'ready' ? saved.articles : []}
+          keyExtractor={(article) => article.id}
+          renderItem={({ item }) => (
+            // Done takes it out of Saved, so it slides away first.
+            <SwipeRow id={item.id} action={rowAction(item)} leaves onCommit={() => saveOrDone(item.id, rowAction(item), { haptic: false })}>
+              <ArticleRow article={item} feedNamed savedMark={false} onAction={(action) => saveOrDone(item.id, action)} />
+            </SwipeRow>
+          )}
+          estimatedItemSize={ESTIMATED_ROW}
+          // Rows hold small state (a favicon that failed): a reused row must start fresh.
+          recycleItems={false}
+          ListHeaderComponent={header}
+          className="flex-1 bg-background"
+          contentContainerStyle={{ paddingBottom: insets.bottom + spacing.section }}
+        />
+        <UndoToastHost />
+      </View>
+    </SharedTitleScreen>
   );
 }

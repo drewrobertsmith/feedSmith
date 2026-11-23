@@ -28,4 +28,10 @@ export const motion = {
    * up. One curve, the fast-start, gentle-settle one; no scale, no bounce. About 260 ms each way.
    */
   groupReveal: { distance: 8, delay: 60, duration: 200, exit: 90, easing: [0.16, 1, 0.3, 1] },
+  /**
+   * Opening an Article (FEE-48): the row's title box travels into the headline's place in `duration`, on
+   * Material's emphasized curve, while the row's words are gone by `fadeOutEnd` of the way and the headline's
+   * fade in over `fadeIn` as it lands. Short enough to stay inside the 300 ms tap-to-text budget.
+   */
+  articleOpen: { duration: 300, easing: [0.2, 0, 0, 1], fadeOutEnd: 0.4, fadeIn: 150 },
 } as const;

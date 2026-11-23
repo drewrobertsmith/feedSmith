@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppButton } from '@/components/app-button';
 import { AppText } from '@/components/app-text';
 import { DepthPressable } from '@/components/depth-pressable';
+import { SharedTitle, SharedTitleScreen } from '@/components/shared-title';
 import { UndoToastHost } from '@/components/undo-toast';
 import { useEnvironment, useSizeScale } from '@/environment';
 import { useArticle, useMarkRead, type Block, type ReadingArticle } from '@/feeds/feeds-data';
@@ -114,14 +115,17 @@ const textOf = (block: Block | undefined) =>
     : undefined;
 
 /** The Article's headline, Subtitle and meta: the deck is left out where the text already says it. */
-function ArticleHeader({ article }: { article: ReadingArticle }) {
+function ArticleHeader({ id, article }: { id: string; article: ReadingArticle }) {
   const { title, subtitle, authors, feedId, feedTitle, publishedAt, page, blocks } = article;
   const credit = byline(authors);
   // A summary-only Article's text is its Subtitle; a Feed's text often opens with it too.
   const deck = subtitle && !page && textOf(blocks[0]) !== subtitle.trim() ? subtitle : undefined;
   return (
     <View className="gap-related">
-      <AppText variant="headline">{title}</AppText>
+      {/* Where the row's title lands when the Article opens (FEE-48). */}
+      <SharedTitle articleId={id}>
+        <AppText variant="headline">{title}</AppText>
+      </SharedTitle>
       {deck ? (
         <AppText variant="deck" className="text-text-muted">
           {deck}
@@ -197,50 +201,53 @@ export function ReadingScreen({ id }: { id: string }) {
   const lead = article.imageUrl && article.blocks[0]?.type !== 'image' ? article.imageUrl : undefined;
 
   return (
-    <View className="flex-1 bg-background">
-      <ScrollView
-        className="flex-1"
-        contentContainerClassName="items-center px-edge"
-        contentContainerStyle={{
-          paddingTop: insets.top + spacing.section,
-          paddingBottom: insets.bottom + spacing.section + SAVE_AND_DONE_ROOM,
-        }}
-      >
-        <View className="w-full gap-section" style={{ maxWidth: MEASURE * scale }}>
-          <ArticleHeader article={article} />
-          {article.page === 'unavailable' ? (
-            <PageUnavailable article={article} />
-          ) : (
-            <>
-              {lead ? (
-                <View testID="lead-image">
-                  <ArticleBlocks blocks={[{ type: 'image', src: lead }]} />
-                </View>
-              ) : null}
-              <View className="gap-group">
-                {article.page === 'extracting' ? (
-                  // Announced when it goes: the full text replaces the Subtitle as soon as it's read.
-                  <AppText variant="label" className="text-text-muted" accessibilityLiveRegion="polite">
-                    Bringing in the full Article from its page…
-                  </AppText>
+    // Only the screen in front carries titles (FEE-48).
+    <SharedTitleScreen>
+      <View className="flex-1 bg-background">
+        <ScrollView
+          className="flex-1"
+          contentContainerClassName="items-center px-edge"
+          contentContainerStyle={{
+            paddingTop: insets.top + spacing.section,
+            paddingBottom: insets.bottom + spacing.section + SAVE_AND_DONE_ROOM,
+          }}
+        >
+          <View className="w-full gap-section" style={{ maxWidth: MEASURE * scale }}>
+            <ArticleHeader id={id} article={article} />
+            {article.page === 'unavailable' ? (
+              <PageUnavailable article={article} />
+            ) : (
+              <>
+                {lead ? (
+                  <View testID="lead-image">
+                    <ArticleBlocks blocks={[{ type: 'image', src: lead }]} />
+                  </View>
                 ) : null}
-                <ArticleBlocks blocks={article.blocks} link={article.link} />
-              </View>
-              {article.link ? <ArticleEnd link={article.link} /> : null}
-            </>
-          )}
-        </View>
-      </ScrollView>
-      <SaveOrDone id={id} saved={article.saved} />
-      {/* The Undo note sits above Save and Done, never over them. */}
-      <UndoToastHost bottom={insets.bottom + spacing.group + PILL_HEIGHT * scale} />
-      {/* Edge-to-edge (Q18): the text scrolls behind the status bar, and this still strip keeps its icons legible. */}
-      <View
-        testID="status-bar-backing"
-        pointerEvents="none"
-        className="absolute left-0 right-0 top-0 bg-background"
-        style={{ height: insets.top }}
-      />
-    </View>
+                <View className="gap-group">
+                  {article.page === 'extracting' ? (
+                    // Announced when it goes: the full text replaces the Subtitle as soon as it's read.
+                    <AppText variant="label" className="text-text-muted" accessibilityLiveRegion="polite">
+                      Bringing in the full Article from its page…
+                    </AppText>
+                  ) : null}
+                  <ArticleBlocks blocks={article.blocks} link={article.link} />
+                </View>
+                {article.link ? <ArticleEnd link={article.link} /> : null}
+              </>
+            )}
+          </View>
+        </ScrollView>
+        <SaveOrDone id={id} saved={article.saved} />
+        {/* The Undo note sits above Save and Done, never over them. */}
+        <UndoToastHost bottom={insets.bottom + spacing.group + PILL_HEIGHT * scale} />
+        {/* Edge-to-edge (Q18): the text scrolls behind the status bar, and this still strip keeps its icons legible. */}
+        <View
+          testID="status-bar-backing"
+          pointerEvents="none"
+          className="absolute left-0 right-0 top-0 bg-background"
+          style={{ height: insets.top }}
+        />
+      </View>
+    </SharedTitleScreen>
   );
 }

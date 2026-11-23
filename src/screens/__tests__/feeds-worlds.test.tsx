@@ -1157,3 +1157,34 @@ describe('buttons have depth, not outlines (FEE-75, D27)', () => {
     expect(faceOf(await screen.findByRole('button', { name }))).toMatchObject(depthStyle(spec.colorScheme, 'soft'));
   });
 });
+
+// FEE-48: opening an Article carries the row's title into the Reading view's headline, as one shared element
+// (Reanimated's shared element transitions, a container transform in Material's terms, D29).
+describe('the title carries from the row into the headline (FEE-48)', () => {
+  /** The shared-element tag on the view around `element`, if any. */
+  const tagOf = (element: { props: { sharedTransitionTag?: string }; parent: unknown }) => {
+    for (let node = element as typeof element | null; node; node = node.parent as typeof element | null) {
+      if (node.props.sharedTransitionTag) return node.props.sharedTransitionTag;
+    }
+    return undefined;
+  };
+  const [first] = FIXTURE_ROWS;
+
+  test('the row\'s title and the opened Article\'s headline share one tag', async () => {
+    await open({ colorScheme: 'dark', feeds: 'some' });
+    const rowTitle = await screen.findByText(first.title);
+    expect(tagOf(rowTitle)).toBe(`article-title-${first.id}`);
+  });
+
+  test('the Reading view\'s headline carries the same tag', async () => {
+    await open({ colorScheme: 'dark', section: 'article' });
+    const headline = await screen.findByRole('heading', { name: FIXTURE_ARTICLE.title });
+    // The gallery and tests open the first fixture row's Article.
+    expect(tagOf(headline)).toBe(`article-title-${first.id}`);
+  });
+
+  test('with Remove animations on, nothing is tagged, so opening is a plain cut (Q17)', async () => {
+    await open({ colorScheme: 'dark', feeds: 'some', reduceMotion: true });
+    expect(tagOf(await screen.findByText(first.title))).toBeUndefined();
+  });
+});
