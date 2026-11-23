@@ -19,6 +19,7 @@ import { useSaveAndDone } from '@/feeds/use-save-and-done';
 import { useShownRows } from '@/feeds/use-shown-rows';
 import { AccountButton } from '@/screens/account/account-sheet';
 import { ChipRow } from '@/screens/chip-row';
+import { hasPinnedView } from '@/screens/chip-row-layout';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
 
@@ -51,7 +52,7 @@ export function FeedsScreen({ feed, accountOpen }: { feed?: string; accountOpen?
   const chipsView = useChips();
   const chips = chipsView.status === 'ready' ? chipsView.chips : [];
   // With two or more Pinned Feeds, Pinned is a view of its own (FEE-59); with fewer, a link to it means All.
-  const pinnedView = chips.filter((chip) => chip.pinned).length >= 2;
+  const pinnedView = hasPinnedView(chips);
   const selectedChip = chips.find((chip) => chip.id === feed) ?? null;
   const selection = feed === PINNED && pinnedView ? PINNED : (selectedChip?.id ?? null);
   const all = useAll(selection);
@@ -60,6 +61,9 @@ export function FeedsScreen({ feed, accountOpen }: { feed?: string; accountOpen?
   const chipIndex = order.indexOf(selection ?? '');
   // What the list shows: the last ready rows while a newly chosen Feed's load (FEE-42).
   const shown = useShownRows(all, chipIndex);
+  // All and Pinned mix Feeds, so their rows name theirs; one Feed's chip already names it (P20).
+  const shownSelection = order[shown.index];
+  const rowsNameFeeds = shownSelection === '' || shownSelection === PINNED;
   const { refreshing, refresh } = useRefresh();
   const updated = useUpdatedLine(refreshing);
   const { colorScheme } = useEnvironment();
@@ -131,7 +135,7 @@ export function FeedsScreen({ feed, accountOpen }: { feed?: string; accountOpen?
               leaves={false}
               onCommit={() => saveOrDone(item.id, rowAction(item), { haptic: false })}
             >
-              <ArticleRow article={item} feedNamed={order[shown.index] === '' || order[shown.index] === PINNED} savedMark onAction={(action) => saveOrDone(item.id, action)} />
+              <ArticleRow article={item} feedNamed={rowsNameFeeds} savedMark onAction={(action) => saveOrDone(item.id, action)} />
             </SwipeRow>
           </SlideRow>
         )}

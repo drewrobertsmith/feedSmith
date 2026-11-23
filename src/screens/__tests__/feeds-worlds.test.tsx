@@ -547,12 +547,14 @@ describe('the Pinned view (FEE-59)', () => {
     rows: string[];
     empty: boolean;
   };
-  const PINNED_CHIP = 'Pinned: The Verge, Calm Notes';
-  const TWO_PIN_CHIPS = ['All', PINNED_CHIP, 'The Verge, Pinned', 'Calm Notes, Pinned', 'Daring Fireball'];
+  const PINNED_CHIP = 'Pinned: The Verge, Daring Fireball';
+  const TWO_PIN_CHIPS = ['All', PINNED_CHIP, 'The Verge, Pinned', 'Daring Fireball, Pinned', 'Calm Notes'];
   const ALL_ROWS = FIXTURE_ROWS.map((row) => row.feedTitle);
+  // The Verge's Articles, and not Calm Notes': Pinned is narrower than All.
+  const PINNED_ROWS = FIXTURE_ROWS.filter((row) => row.feedId === 'f1').map((row) => row.feedTitle);
   const SHOWS: Record<PinnedWorldId, Shows> = {
-    'pinned-dark': { chips: TWO_PIN_CHIPS, selected: PINNED_CHIP, rows: ALL_ROWS, empty: false },
-    'pinned-light': { chips: TWO_PIN_CHIPS, selected: PINNED_CHIP, rows: ALL_ROWS, empty: false },
+    'pinned-dark': { chips: TWO_PIN_CHIPS, selected: PINNED_CHIP, rows: PINNED_ROWS, empty: false },
+    'pinned-light': { chips: TWO_PIN_CHIPS, selected: PINNED_CHIP, rows: PINNED_ROWS, empty: false },
     'pinned-empty': {
       chips: ['All', 'Pinned: Daring Fireball, Kottke', 'Daring Fireball, Pinned', 'Kottke, Pinned', 'The Verge', 'Calm Notes'],
       selected: 'Pinned: Daring Fireball, Kottke',
@@ -563,7 +565,7 @@ describe('the Pinned view (FEE-59)', () => {
     // One Pin makes no Pinned chip, so a link to Pinned lands on All (Q25).
     'pinned-one-pin': { chips: ['All', 'The Verge, Pinned', 'Calm Notes', 'Daring Fireball'], selected: 'All', rows: ALL_ROWS, empty: false },
     'pinned-hostile-link': { chips: TWO_PIN_CHIPS, selected: 'All', rows: ALL_ROWS, empty: false },
-    'pinned-largest-font': { chips: TWO_PIN_CHIPS, selected: PINNED_CHIP, rows: ALL_ROWS, empty: false },
+    'pinned-largest-font': { chips: TWO_PIN_CHIPS, selected: PINNED_CHIP, rows: PINNED_ROWS, empty: false },
   };
 
   test.each(PINNED_WORLDS)('$label', async ({ id, spec }) => {
@@ -597,7 +599,7 @@ describe('the Pinned view (FEE-59)', () => {
     // Pinned sits second, right after All.
     await user.press(screen.getByRole('tab', { name: PINNED_CHIP }));
     expect(screen.getByTestId('chip-switch')).toHaveProp('index', 1);
-    await user.press(screen.getByRole('tab', { name: 'Daring Fireball' }));
+    await user.press(screen.getByRole('tab', { name: 'Calm Notes' }));
     expect(screen.getByTestId('chip-switch')).toHaveProp('index', 4);
   });
 

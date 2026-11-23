@@ -14,7 +14,7 @@ import { useEnvironment } from '@/environment';
 import type { FeedChip } from '@/feeds/feeds-data';
 import { usePin } from '@/feeds/use-pin';
 import { PINNED } from '../../convex/lib/pinned';
-import { chipLabel, fadeRanges, revealOffset, transparent } from '@/screens/chip-row-layout';
+import { chipLabel, fadeRanges, hasPinnedView, revealOffset, transparent } from '@/screens/chip-row-layout';
 import { motion } from '@/theme/motion';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
@@ -177,7 +177,7 @@ export function ChipRow({
           onLayout={(event) => chipAt.current.set('', event.nativeEvent.layout)}
         />
         {/* Two or more Pinned Feeds read together, right after All (FEE-59). It names them for TalkBack. */}
-        {pinned.length >= 2 ? (
+        {hasPinnedView(chips) ? (
           <Chip
             label="Pinned"
             accessibleName={`Pinned: ${pinned.map((chip) => chip.title).join(', ')}`}

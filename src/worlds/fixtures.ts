@@ -190,14 +190,13 @@ export const FIXTURE_CHOICES = [
 ];
 
 /**
- * The chip row (P9): one Pinned Feed, then the rest by their newest Article. Calm Notes has no
- * icon; Daring Fireball has no Articles in the last 30 days.
+ * Two Pinned Feeds, so the Pinned chip shows (FEE-59): The Verge and Daring Fireball. Pinned then
+ * lists The Verge's Articles and not Calm Notes', so it differs from All.
  */
-/** Two Pinned Feeds, so the Pinned chip shows (FEE-59). */
 export const FIXTURE_TWO_PINS: FeedChip[] = [
   { id: 'f1', title: VERGE, faviconUrl: 'https://www.theverge.com/favicon.ico', pinned: true },
-  { id: 'f2', title: 'Calm Notes', pinned: true },
-  { id: 'f3', title: 'Daring Fireball', faviconUrl: 'https://daringfireball.net/favicon.ico', pinned: false },
+  { id: 'f3', title: 'Daring Fireball', faviconUrl: 'https://daringfireball.net/favicon.ico', pinned: true },
+  { id: 'f2', title: 'Calm Notes', pinned: false },
 ];
 
 /** Two Pinned Feeds with nothing in the last 30 days: Pinned is empty (FEE-59). */
@@ -208,6 +207,10 @@ export const FIXTURE_QUIET_PINS: FeedChip[] = [
   { id: 'f2', title: 'Calm Notes', pinned: false },
 ];
 
+/**
+ * The chip row (P9): one Pinned Feed, then the rest by their newest Article. Calm Notes has no
+ * icon; Daring Fireball has no Articles in the last 30 days.
+ */
 export const FIXTURE_CHIPS: FeedChip[] = [
   { id: 'f1', title: VERGE, faviconUrl: 'https://www.theverge.com/favicon.ico', pinned: true },
   { id: 'f2', title: 'Calm Notes', pinned: false },
