@@ -4,6 +4,7 @@ import { SymbolView } from 'expo-symbols';
 import { Pressable, View, type AccessibilityActionEvent } from 'react-native';
 
 import { AppText } from '@/components/app-text';
+import { SharedTitle } from '@/components/shared-title';
 import { FeedIcon } from '@/components/feed-icon';
 import { ROW_ACTIONS, rowAction, type RowActionName } from '@/components/row-action';
 import { useEnvironment, useSizeScale } from '@/environment';
@@ -96,9 +97,12 @@ export function ArticleRow({
             />
           ) : null}
         </View>
-        <AppText variant="reading" className={article.read ? 'text-text-muted' : 'text-text'}>
-          {article.title}
-        </AppText>
+        {/* Its own view, so opening the Article can carry it into the headline (FEE-48). */}
+        <SharedTitle articleId={article.id}>
+          <AppText variant="reading" className={article.read ? 'text-text-muted' : 'text-text'}>
+            {article.title}
+          </AppText>
+        </SharedTitle>
         {/* Who wrote it, where you decide whether to open it (FEE-41). */}
         {credit ? (
           <AppText variant="label" className={article.read ? 'text-text-muted' : 'text-text'} numberOfLines={1}>

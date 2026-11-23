@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/app-button';
 import { AppText } from '@/components/app-text';
+import { SharedTitleScreen } from '@/components/shared-title';
 import { ChipSwitch, SlideRow } from '@/components/chip-switch';
 import { ArticleRow } from '@/components/article-row';
 import { rowAction } from '@/components/row-action';
@@ -120,43 +121,46 @@ export function FeedsScreen({ feed, accountOpen }: { feed?: string; accountOpen?
   }
 
   return (
-    <View className="flex-1 bg-background">
-    <ChipSwitch index={shown.index}>
-      <LegendList
-        testID="all-list"
-        data={shown.articles}
-        keyExtractor={(article) => article.id}
-        renderItem={({ item }) => (
-          <SlideRow>
-            {/* Save, or Done once Saved: either way the row stays in Feeds, so it springs back. */}
-            <SwipeRow
-              id={item.id}
-              action={rowAction(item)}
-              leaves={false}
-              onCommit={() => saveOrDone(item.id, rowAction(item), { haptic: false })}
-            >
-              <ArticleRow article={item} feedNamed={rowsNameFeeds} savedMark onAction={(action) => saveOrDone(item.id, action)} />
-            </SwipeRow>
-          </SlideRow>
-        )}
-        estimatedItemSize={ESTIMATED_ROW}
-        // Rows hold small state (a favicon that failed): a reused row must start fresh.
-        recycleItems={false}
-        ListHeaderComponent={header}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={refresh}
-            progressViewOffset={insets.top}
-            colors={[theme.accent]}
-            progressBackgroundColor={theme.surface}
-          />
-        }
-        className="flex-1 bg-background"
-        contentContainerStyle={{ paddingBottom: insets.bottom + spacing.section }}
-      />
-    </ChipSwitch>
-    <UndoToastHost />
-    </View>
+    // Only the screen in front carries titles (FEE-48).
+    <SharedTitleScreen>
+      <View className="flex-1 bg-background">
+      <ChipSwitch index={shown.index}>
+        <LegendList
+          testID="all-list"
+          data={shown.articles}
+          keyExtractor={(article) => article.id}
+          renderItem={({ item }) => (
+            <SlideRow>
+              {/* Save, or Done once Saved: either way the row stays in Feeds, so it springs back. */}
+              <SwipeRow
+                id={item.id}
+                action={rowAction(item)}
+                leaves={false}
+                onCommit={() => saveOrDone(item.id, rowAction(item), { haptic: false })}
+              >
+                <ArticleRow article={item} feedNamed={rowsNameFeeds} savedMark onAction={(action) => saveOrDone(item.id, action)} />
+              </SwipeRow>
+            </SlideRow>
+          )}
+          estimatedItemSize={ESTIMATED_ROW}
+          // Rows hold small state (a favicon that failed): a reused row must start fresh.
+          recycleItems={false}
+          ListHeaderComponent={header}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={refresh}
+              progressViewOffset={insets.top}
+              colors={[theme.accent]}
+              progressBackgroundColor={theme.surface}
+            />
+          }
+          className="flex-1 bg-background"
+          contentContainerStyle={{ paddingBottom: insets.bottom + spacing.section }}
+        />
+      </ChipSwitch>
+      <UndoToastHost />
+      </View>
+    </SharedTitleScreen>
   );
 }

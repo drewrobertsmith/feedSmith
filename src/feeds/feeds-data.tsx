@@ -87,7 +87,11 @@ export type ManageActions = {
 export type PinOutcome = 'ok' | 'pins-full' | 'not-found';
 /** Pinning or unpinning, and for an Unpin, where the Feed was among the Pins (from 0), for Undo (Q35). */
 export type PinResult = { outcome: PinOutcome; place?: number };
-export type ArticleView = { status: 'loading' } | { status: 'missing' } | { status: 'ready'; article: ReadingArticle };
+/**
+ * The Article the Reading view opens. While it loads, `title` is the one a list already showed for it, when
+ * there was one, so the headline is there from the first frame for the row's title to travel into (FEE-48).
+ */
+export type ArticleView = { status: 'loading'; title?: string } | { status: 'missing' } | { status: 'ready'; article: ReadingArticle };
 /**
  * What adding a Feed came to: added; already followed at that URL (by its name), which takes
  * the User back to it; or stay, with the view saying why (an error, or feeds to choose from).
