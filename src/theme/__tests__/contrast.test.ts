@@ -89,6 +89,12 @@ describe.each(['dark', 'light'] as const)('depth in %s', (scheme) => {
     expect(raised.shadow.y).toBeGreaterThan(soft.shadow.y);
   });
 
+  // A face is a step off the page, so a control reads as an object even before its shadow does (D27).
+  // It needn't reach 3:1 against it: the label identifies the control (D26).
+  test.each(DEPTH_LEVELS)('the %s face is never the page colour', (level) => {
+    expect(contrastRatio(depth[scheme][level].face, theme.background)).toBeGreaterThan(1.03);
+  });
+
   test('pressed sinks: no shadow and no sheen', () => {
     expect(depth[scheme].pressed.shadow.alpha).toBe(0);
     expect(depth[scheme].pressed.sheen).toBe(0);

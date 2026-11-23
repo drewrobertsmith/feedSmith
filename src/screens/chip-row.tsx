@@ -2,7 +2,6 @@ import { createContext, use, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Pressable,
-  StyleSheet,
   View,
   type LayoutChangeEvent,
   type ScrollViewInstance,
@@ -16,7 +15,7 @@ import type { FeedChip } from '@/feeds/feeds-data';
 import { usePin } from '@/feeds/use-pin';
 import { PINNED } from '../../convex/lib/pinned';
 import { chipLabel, fadeRanges, hasPinnedView, revealOffset, transparent } from '@/screens/chip-row-layout';
-import { depthStyle } from '@/theme/depth';
+import { depth, depthStyle } from '@/theme/depth';
 import { motion } from '@/theme/motion';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
@@ -85,7 +84,7 @@ function Chip({
 }) {
   const { reduceMotion, colorScheme } = useEnvironment();
   const [pressed, setPressed] = useState(false);
-  const face = depthStyle(colorScheme, pressed ? 'pressed' : selected ? 'raised' : 'soft');
+  const level = pressed ? 'pressed' : selected ? 'raised' : 'soft';
   const [scale] = useState(() => new Animated.Value(1));
   const wasSelected = useRef(selected);
 
@@ -127,9 +126,9 @@ function Chip({
         // the Articles (FEE-44); the label is what identifies a chip, at 4.5:1 on every face (Q14, D26).
         // Active (a Pinned Feed chosen): full-strength text, so the group reads as the one you're in.
         className="flex-row items-center gap-inside rounded-full px-group py-related"
-        style={face}
+        style={depthStyle(colorScheme, level)}
       >
-        <ChipFace value={face.backgroundColor as string}>{icon}</ChipFace>
+        <ChipFace value={depth[colorScheme][level].face}>{icon}</ChipFace>
         <AppText
           variant="label"
           className={selected ? 'text-accent' : active ? 'text-text' : 'text-text-muted'}

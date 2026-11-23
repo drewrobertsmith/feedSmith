@@ -26,7 +26,9 @@ test.each(sourceFiles(SRC).filter((f) => !f.startsWith(join(SRC, 'theme'))).map(
   '%s makes no shadow or elevation of its own',
   (file) => {
     const text = readFileSync(join(SRC, file), 'utf8');
-    expect(text).not.toMatch(/\b(boxShadow|shadowColor|shadowOpacity|shadowRadius|shadowOffset|textShadow\w*|elevation)\s*:/);
-    expect(text).not.toMatch(/\bshadow-(2xs|xs|sm|md|lg|xl|2xl|inner)\b/);
+    // As a style key, a JSX prop or an assignment.
+    expect(text).not.toMatch(/\b(boxShadow|shadowColor|shadowOpacity|shadowRadius|shadowOffset|textShadow\w*|elevation)\s*[:=]/);
+    // As a Tailwind class: shadow, shadow-md, shadow-[…], drop-shadow…, inside a className.
+    expect(text).not.toMatch(/className=[{'"`][^\n]*\b(drop-)?shadow(\b(?!-)|-\[|-(2xs|xs|sm|md|lg|xl|2xl|inner)\b)/);
   },
 );

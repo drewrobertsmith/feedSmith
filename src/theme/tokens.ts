@@ -1,6 +1,7 @@
 /**
  * feedSmith's colour tokens (D2–D5). The single source for every colour in the app:
- * `src/global.css` mirrors these as Uniwind themes, and a test keeps the two in step.
+ * `src/global.css` mirrors the themes' roles as Uniwind themes, and a test keeps the two in step.
+ * Palette colours used only through the theme's own modules (the depth faces, D27) aren't mirrored.
  */
 export const palette = {
   midnight: '#1D2532',

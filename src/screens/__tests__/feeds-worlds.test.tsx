@@ -203,13 +203,13 @@ describe('All', () => {
     expect(within(all).getByText('All')).toHaveProp('className', expect.stringContaining('text-accent'));
   });
 
-  test('a chip under the finger sinks to the pressed level, and rises again when let go', async () => {
-    await open({ colorScheme: 'dark', feeds: 'some' });
+  test.each(['dark', 'light'] as const)('in %s, a chip under the finger sinks to the pressed level, and rises again when let go', async (colorScheme) => {
+    await open({ colorScheme, feeds: 'some' });
     const calm = (await screen.findAllByRole('tab', { name: 'Calm Notes' }))[0];
     await fireEvent(calm, 'pressIn');
-    expect(screen.getByRole('tab', { name: 'Calm Notes' })).toHaveStyle(depthStyle('dark', 'pressed'));
+    expect(screen.getByRole('tab', { name: 'Calm Notes' })).toHaveStyle(depthStyle(colorScheme, 'pressed'));
     await fireEvent(calm, 'pressOut');
-    expect(screen.getByRole('tab', { name: 'Calm Notes' })).toHaveStyle(depthStyle('dark', 'soft'));
+    expect(screen.getByRole('tab', { name: 'Calm Notes' })).toHaveStyle(depthStyle(colorScheme, 'soft'));
   });
 
   test("tapping a Feed's chip shows only its Articles; tapping All shows everything again", async () => {
@@ -681,8 +681,10 @@ describe('the Pinned group (FEE-60)', () => {
     await open({ colorScheme: 'dark', feeds: 'some', pins: 'two', feed: 'f1' });
     const pinned = await screen.findByRole('tab', { name: PINNED_CHIP });
     expect(pinned).not.toBeSelected();
-    // Full-strength text, not Gold: active, without competing with the chosen Feed.
+    // Full-strength text on a soft face, not Gold and not raised: active, without competing with the chosen Feed (D27).
     expect(within(pinned).getByText('Pinned', { includeHiddenElements: true })).toHaveProp('className', 'text-text');
+    expect(pinned).toHaveStyle(depthStyle('dark', 'soft'));
+    expect(screen.getByRole('tab', { name: 'The Verge, Pinned' })).toHaveStyle(depthStyle('dark', 'raised'));
     expect(within(screen.getByRole('tab', { name: 'The Verge, Pinned' })).getByText('The Verge', { includeHiddenElements: true })).toHaveProp(
       'className',
       'text-accent',
