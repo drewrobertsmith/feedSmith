@@ -65,3 +65,10 @@ describe('extracting an Article from its page (FEE-25, T8)', () => {
     expect(extractFromPage(page, URL)).not.toHaveProperty('imageUrl');
   });
 });
+
+test('a page nested 50,000 deep is read in well under a second, never at the parser\'s quadratic cost (FEE-57)', () => {
+  const page = `<html><body>${'<div>'.repeat(50_000)}deep${'</div>'.repeat(50_000)}</body></html>`;
+  const start = performance.now();
+  expect(() => extractFromPage(page, URL)).not.toThrow();
+  expect(performance.now() - start).toBeLessThan(500);
+});

@@ -93,10 +93,21 @@ describe('hostile HTML never reaches the stored blocks (Q8)', () => {
     expect(quote[0].type === 'quote' && quote[0].paragraphs.length).toBe(MAX_ENTRIES);
   });
 
-  test(`markup nested deeper than ${MAX_DEPTH} levels doesn't overflow the stack`, () => {
+  test(`markup nested 50,000 deep never overflows the stack, and is cleaned in a blink (FEE-57)`, () => {
     const deep = (tag: string) => `${`<${tag}>`.repeat(50_000)}deep${`</${tag}>`.repeat(50_000)}`;
-    expect(() => htmlToBlocks(deep('div'), BASE)).not.toThrow();
-    expect(() => htmlToBlocks(`<p>${deep('span')}</p>`, BASE)).not.toThrow();
+    for (const html of [deep('div'), `<p>${deep('span')}</p>`]) {
+      const start = performance.now();
+      expect(() => htmlToBlocks(html, BASE)).not.toThrow();
+      // The parser's cost grows with the square of the depth; bounded first, it never gets the chance.
+      expect(performance.now() - start).toBeLessThan(250);
+    }
+  });
+
+  test('what comes before hostile nesting is kept, and the rest is noted as left out (FEE-57)', () => {
+    const { blocks, omitted } = htmlToBlocks(`<p>Kept.</p>${'<div>'.repeat(50_000)}lost`, BASE);
+    expect(blocks[0]).toEqual({ type: 'paragraph', spans: [{ text: 'Kept.' }] });
+    expect(JSON.stringify(blocks)).not.toContain('lost');
+    expect(omitted).toContain('other');
   });
 
   test.each(['constructor', 'toString', 'hasOwnProperty'])('a <%s> tag is just a container', (tag) => {

@@ -4,6 +4,7 @@ import { DomUtils, parseDocument } from 'htmlparser2';
 
 import { httpsUrl, NO_BASE } from './blocks';
 import { NotAFeed } from './errors';
+import { boundNesting } from './nesting';
 
 /** A fetch keeps a Feed's newest Articles, up to this many (T18). */
 export const MAX_ARTICLES = 100;
@@ -79,7 +80,7 @@ function text(el: Element | null | undefined): string {
 
 /** HTML (escaped inside the XML) read as plain text. */
 function plain(html: string): string {
-  return squash(DomUtils.textContent(parseDocument(html, { decodeEntities: true })));
+  return squash(DomUtils.textContent(parseDocument(boundNesting(html), { decodeEntities: true })));
 }
 
 function child(el: Element, name: string): Element | undefined {
@@ -192,7 +193,8 @@ function atomArticle(entry: Element, base: string, now: number): ParsedArticle |
  * entities are never expanded, and every field is capped. `now` dates undated Articles.
  */
 export const parseFeed = Effect.fnUntraced(function* (xml: string, now: number) {
-  const document = parseDocument(xml, { xmlMode: true, decodeEntities: true });
+  // Hostile nesting is cut before parsing, which costs the square of the depth (FEE-57, Q8).
+  const document = parseDocument(boundNesting(xml, { xml: true }), { xmlMode: true, decodeEntities: true });
   const root = document.children.find(isTag);
   const name = root?.name.toLowerCase();
 
