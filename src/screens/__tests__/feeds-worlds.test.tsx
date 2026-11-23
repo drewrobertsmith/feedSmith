@@ -1,6 +1,6 @@
 import { act, fireEvent, userEvent, waitFor, within } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
-import { renderRouter, screen } from 'expo-router/testing-library';
+import { screen } from 'expo-router/testing-library';
 import { Animated, Dimensions, ScrollView, ToastAndroid } from 'react-native';
 import { State, type LegacyPanGesture } from 'react-native-gesture-handler';
 import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
@@ -9,17 +9,7 @@ import type { getAnimatedStyle as GetAnimatedStyle } from 'react-native-reanimat
 import * as WebBrowser from 'expo-web-browser';
 import { Uniwind } from 'uniwind';
 
-import TabsLayout from '@/app/(tabs)/_layout';
-import FeedsRoute from '@/app/(tabs)/index';
-import SavedRoute from '@/app/(tabs)/saved';
-import AddFeedRoute from '@/app/add-feed';
-import ArticleRoute from '@/app/article/[id]';
-import AuthReturnRoute from '@/app/auth';
-import GalleryRoute from '@/app/gallery';
-import ManageFeedsRoute from '@/app/manage-feeds';
-import SignInRoute from '@/app/sign-in';
 import { publishedAgo, publishedDate } from '@/feeds/format';
-import { AppRoot } from '@/navigation/app-root';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
 import {
@@ -39,6 +29,7 @@ import {
   FIXTURE_UNEXTRACTED_ARTICLE,
 } from '@/worlds/fixtures';
 import { createWorld, type World, type WorldSpec } from '@/worlds/world';
+import { layOutList, renderWorld } from '../../../test/world-router';
 
 jest.mock('expo-web-browser', () => ({ openBrowserAsync: jest.fn() }));
 // Reanimated's real one, as its native typings describe it (T31).
@@ -48,45 +39,11 @@ jest.mock('expo-haptics', () => ({
   performAndroidHapticsAsync: jest.fn(() => Promise.resolve()),
 }));
 
-function renderWorld(world: World, initialUrl: string = world.initialUrl) {
-  return renderRouter(
-    {
-      _layout: () => <AppRoot environment={world.environment} auth={world.auth} feeds={world.feeds} />,
-      '(tabs)/_layout': TabsLayout,
-      '(tabs)/index': FeedsRoute,
-      '(tabs)/saved': SavedRoute,
-      'add-feed': AddFeedRoute,
-      'article/[id]': ArticleRoute,
-      'manage-feeds': ManageFeedsRoute,
-      'sign-in': SignInRoute,
-      auth: AuthReturnRoute,
-      gallery: GalleryRoute,
-    },
-    { initialUrl },
-  );
-}
-
-/**
- * Legend List shows its rows once its scroll view and each row report a size, as they do at
- * once on a phone; Jest has no layout, so the test reports them.
- */
-async function layOutAll() {
-  const list = screen.queryByTestId('all-list');
-  if (!list) return;
-  const layout = (height: number) => ({ nativeEvent: { layout: { x: 0, y: 0, width: 412, height } } });
-  await act(async () => fireEvent(list, 'layout', layout(915)));
-  for (const row of screen.queryAllByRole('link')) {
-    let node = row.parent;
-    while (node && !node.props.onLayout) node = node.parent;
-    if (node) await act(async () => fireEvent(node!, 'layout', layout(112)));
-  }
-}
-
 let world: World | undefined;
 const open = async (spec: WorldSpec, initialUrl?: string) => {
   world = createWorld(spec);
   await renderWorld(world, initialUrl);
-  await layOutAll();
+  await layOutList('all-list');
   return world;
 };
 afterEach(() => {
@@ -237,11 +194,11 @@ describe('All', () => {
     const user = userEvent.setup();
     await open({ colorScheme: 'dark', feeds: 'some' });
     await user.press(await screen.findByRole('tab', { name: 'Calm Notes' }));
-    await layOutAll();
+    await layOutList('all-list');
     expect(screen.getByRole('tab', { name: 'Calm Notes' })).toBeSelected();
     expect(screen.getAllByRole('link')).toHaveLength(1);
     await user.press(screen.getByRole('tab', { name: 'All' }));
-    await layOutAll();
+    await layOutList('all-list');
     expect(screen.getAllByRole('link')).toHaveLength(FIXTURE_ROWS.length);
   });
 
@@ -490,6 +447,17 @@ describe('All', () => {
       expect(screen.getByTestId('undo-toast')).toBeOnTheScreen();
       // The panel behind it said Save, in Gold.
       expect(screen.getAllByTestId('swipe-panel-save', { includeHiddenElements: true }).length).toBeGreaterThan(0);
+    });
+
+    test('a Saved row swiped marks it Done, and stays in Feeds as Read (P21)', async () => {
+      const w = await open({ colorScheme: 'dark', feeds: 'some' });
+      const saved = FIXTURE_ROWS[2];
+      await screen.findByRole('heading', { name: 'Feeds' });
+      expect(screen.getAllByTestId('swipe-panel-done', { includeHiddenElements: true }).length).toBeGreaterThan(0);
+      await swipe(saved.id, -0.6 * width());
+      await act(async () => jest.advanceTimersByTime(1000));
+      expect(w.feedsLog.dones).toEqual([saved.id]);
+      expect(screen.getByRole('link', { name: new RegExp(`^${saved.title.slice(0, 20)}.*, Read$`) })).not.toHaveAccessibleName(/Saved/);
     });
 
     test.each([

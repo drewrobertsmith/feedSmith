@@ -11,7 +11,7 @@ export function confirmHaptic() {
   void performAndroidHapticsAsync(AndroidHaptics.Confirm).catch(() => undefined);
 }
 
-/** A swipe crossed the point where letting go commits it, or came back from it. */
+/** A swipe crossed into the point where letting go commits it: once, as it crosses. */
 export function thresholdHaptic() {
   void performAndroidHapticsAsync(AndroidHaptics.Segment_Tick).catch(() => undefined);
 }

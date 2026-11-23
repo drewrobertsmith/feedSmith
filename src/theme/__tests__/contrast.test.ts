@@ -61,3 +61,12 @@ test.each(['dark', 'light'] as const)('the destructive colour reads at 4.5:1 on 
     expect(contrastRatio(theme.destructive, theme[surface])).toBeGreaterThanOrEqual(4.5);
   }
 });
+
+// FEE-30: swiping to Save reveals a Gold panel whose label and icon are the page's background
+// colour; the Saved mark and the Reading view's filled bookmark are Gold on the background.
+test.each(['dark', 'light'] as const)('Save on Gold reads at 4.5:1, and the Gold mark reaches 3:1, in %s (Q14)', (scheme) => {
+  const theme = themes[scheme];
+  // The label on the Gold panel; at 4.5:1 the Gold mark on the background clears its 3:1 too.
+  expect(contrastRatio(theme.background, theme.accent)).toBeGreaterThanOrEqual(4.5);
+  expect(contrastRatio(theme.accent, theme.surface)).toBeGreaterThanOrEqual(3);
+});

@@ -191,3 +191,42 @@ describe('swiping a row left (FEE-30)', () => {
     expect(screen.getAllByTestId('swipe-panel-done', { includeHiddenElements: true }).length).toBe(FIXTURE_SAVED_ROWS.length);
   });
 });
+
+test("the Undo note's timer, and a swiped row's, go with the screen (Q20)", async () => {
+  jest.useFakeTimers();
+  try {
+    await open({ colorScheme: 'dark', section: 'saved', feeds: 'some', savedWrites: 'fail' });
+    await screen.findByRole('heading', { name: 'Saved' });
+    await act(async () => jest.advanceTimersByTime(300));
+    // The timers this change starts: the note's four seconds, and a slid-away row's wait to come back.
+    const ours = new Set<ReturnType<typeof setTimeout>>();
+    const set = jest.spyOn(globalThis, 'setTimeout');
+    const cleared = jest.spyOn(globalThis, 'clearTimeout');
+    const [first] = FIXTURE_SAVED_ROWS;
+    const row = screen.getByRole('link', { name: new RegExp(`^${first.title.slice(0, 20)}`) });
+    await act(async () => fireEvent(row, 'accessibilityAction', { nativeEvent: { actionName: 'done' } }));
+    await act(async () =>
+      fireGestureHandler<LegacyPanGesture>(getByGestureTestId(`swipe-${FIXTURE_SAVED_ROWS[1].id}`), [
+        { state: State.BEGAN, translationX: 0 },
+        { state: State.ACTIVE, translationX: -20 },
+        { translationX: -0.6 * Dimensions.get('window').width },
+        { state: State.END, translationX: -0.6 * Dimensions.get('window').width, velocityX: 0 },
+      ]),
+    );
+    // The row has slid away and is waiting to come back; the note is counting down.
+    await act(async () => jest.advanceTimersByTime(300));
+    expect(screen.getByTestId('undo-toast')).toBeOnTheScreen();
+    set.mock.calls.forEach(([, delay], i) => {
+      if (delay === 4000 || delay === 600) ours.add(set.mock.results[i].value);
+    });
+    // Two notes (the swipe's replaced the first) and the row's wait.
+    expect(ours.size).toBeGreaterThanOrEqual(2);
+    await act(async () => screen.unmount());
+    const clearedIds = new Set(cleared.mock.calls.map(([id]) => id));
+    expect([...ours].filter((id) => !clearedIds.has(id))).toEqual([]);
+    set.mockRestore();
+    cleared.mockRestore();
+  } finally {
+    jest.useRealTimers();
+  }
+});

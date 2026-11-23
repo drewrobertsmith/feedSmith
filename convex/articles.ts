@@ -200,6 +200,15 @@ export const markRead = mutation({
   },
 });
 
+/**
+ * Whether an Article can be (or go back to being) Saved: its Feed is still there, or it already
+ * kept the Feed's name when the Feed was removed (T23). An Article of a Feed being removed is on its
+ * way out, and Saved would have nothing to call it.
+ */
+async function canBeSaved(ctx: QueryCtx, article: Doc<'articles'>) {
+  return article.savedAt !== undefined || article.feedTitle !== undefined || (await ctx.db.get(article.feedId)) !== null;
+}
+
 /** What an Article's Saved and Read state was before a change, for Undo to put back (Q35). */
 const vBefore = v.object({ savedAt: v.optional(v.number()), readAt: v.optional(v.number()) });
 const beforeOf = (article: Doc<'articles'>) => ({ savedAt: article.savedAt, readAt: article.readAt });
@@ -214,7 +223,7 @@ export const save = mutation({
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     const article = await ownArticle(ctx, userId, args.id);
-    if (!article) return null;
+    if (!article || !(await canBeSaved(ctx, article))) return null;
     if (article.savedAt === undefined) await ctx.db.patch(article._id, { savedAt: Date.now() });
     return beforeOf(article);
   },
@@ -250,7 +259,10 @@ export const restore = mutation({
     const now = Date.now();
     // Only a real moment counts; anything else (NaN, zero, negative) means none.
     const at = (time: number | undefined) => (time !== undefined && Number.isFinite(time) && time > 0 ? Math.min(time, now) : undefined);
-    await ctx.db.patch(article._id, { savedAt: at(args.savedAt), readAt: at(args.readAt) });
+    const savedAt = at(args.savedAt);
+    // Back into Saved only if Saved can still name it; its Read state goes back either way.
+    const saveable = savedAt === undefined || (await canBeSaved(ctx, article));
+    await ctx.db.patch(article._id, { savedAt: saveable ? savedAt : undefined, readAt: at(args.readAt) });
     return null;
   },
 });

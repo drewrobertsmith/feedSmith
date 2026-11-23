@@ -5,6 +5,7 @@ import { Pressable, View, type AccessibilityActionEvent } from 'react-native';
 
 import { AppText } from '@/components/app-text';
 import { FeedIcon } from '@/components/feed-icon';
+import { ROW_ACTIONS, rowAction, type RowActionName } from '@/components/row-action';
 import { useEnvironment, useSizeScale } from '@/environment';
 import type { ArticleRow as Row } from '@/feeds/feeds-data';
 import { byline, publishedAgo } from '@/feeds/format';
@@ -16,12 +17,6 @@ const THUMBNAIL = 72;
 const FAVICON = 16;
 const SAVED_MARK = 16;
 
-/** A row's one action besides opening it: Save, or Done once Saved (P11). */
-export type RowAction = { name: 'save' | 'done'; label: 'Save' | 'Done' };
-
-/** What a row offers: Save, or Done once it's Saved. */
-export const rowAction = (article: Row): RowAction =>
-  article.saved ? { name: 'done', label: 'Done' } : { name: 'save', label: 'Save' };
 
 /**
  * One Article in a list (P12): Feeds and Saved share it. Its parts each have one voice (Q29):
@@ -39,7 +34,7 @@ export function ArticleRow({
   article: Row;
   feedNamed: boolean;
   savedMark: boolean;
-  onAction: (action: RowAction['name']) => void;
+  onAction: (action: RowActionName) => void;
 }) {
   const { colorScheme, fontScale, now } = useEnvironment();
   const scale = useSizeScale();
@@ -64,9 +59,9 @@ export function ArticleRow({
     <Pressable
       role="link"
       aria-label={label}
-      accessibilityActions={[action]}
+      accessibilityActions={[{ name: action, label: ROW_ACTIONS[action].label }]}
       onAccessibilityAction={(event: AccessibilityActionEvent) => {
-        if (event.nativeEvent.actionName === action.name) onAction(action.name);
+        if (event.nativeEvent.actionName === action) onAction(action);
       }}
       onPress={() => router.push(`/article/${article.id}`)}
       android_ripple={{ color: theme.surface }}

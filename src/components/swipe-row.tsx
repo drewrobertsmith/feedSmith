@@ -6,7 +6,7 @@ import Animated, { Easing, ReduceMotion, useAnimatedStyle, useSharedValue, withS
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { AppText } from '@/components/app-text';
-import type { RowAction } from '@/components/article-row';
+import { ROW_ACTIONS, type RowActionName } from '@/components/row-action';
 import { commits, dragOffset, pastCommitPoint } from '@/components/swipe-physics';
 import { useEnvironment, useSizeScale } from '@/environment';
 import { thresholdHaptic } from '@/environment/haptics';
@@ -45,7 +45,7 @@ export function SwipeRow({
   children,
 }: {
   id: string;
-  action: RowAction;
+  action: RowActionName;
   leaves: boolean;
   onCommit: () => void;
   children: ReactNode;
@@ -108,28 +108,24 @@ export function SwipeRow({
   const rowStyle = useAnimatedStyle(() => ({ transform: [{ translateX: offset.get() }] }));
   const iconStyle = useAnimatedStyle(() => ({ transform: [{ scale: withSpring(armed.get() ? ARMED_SCALE : 1, ARM) }] }));
 
-  const save = action.name === 'save';
+  const look = ROW_ACTIONS[action];
   // On Gold, the page's own background colour reads clearly (Q14); on the surface, the text colour.
-  const ink = save ? theme.background : theme.text;
+  const ink = action === 'save' ? theme.background : theme.text;
 
   return (
     <View>
       <View
-        testID={`swipe-panel-${action.name}`}
+        testID={`swipe-panel-${action}`}
         accessible={false}
         importantForAccessibility="no-hide-descendants"
         style={StyleSheet.absoluteFill}
-        className={`flex-row items-center justify-end gap-related px-edge ${save ? 'bg-accent' : 'bg-surface'}`}
+        className={`flex-row items-center justify-end gap-related px-edge ${look.panel}`}
       >
-        <AppText variant="action" className={save ? 'text-background' : 'text-text'} accessible={false}>
-          {action.label}
+        <AppText variant="action" className={look.ink} accessible={false}>
+          {look.label}
         </AppText>
         <Animated.View style={iconStyle}>
-          <SymbolView
-            name={save ? { ios: 'bookmark.fill', android: 'bookmark' } : { ios: 'checkmark', android: 'check' }}
-            size={ICON * scale}
-            tintColor={ink}
-          />
+          <SymbolView name={look.icon} size={ICON * scale} tintColor={ink} />
         </Animated.View>
       </View>
       <GestureDetector gesture={pan}>

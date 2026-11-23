@@ -6,7 +6,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppButton } from '@/components/app-button';
 import { AppText } from '@/components/app-text';
 import { ChipSwitch, SlideRow } from '@/components/chip-switch';
-import { ArticleRow, rowAction } from '@/components/article-row';
+import { ArticleRow } from '@/components/article-row';
+import { rowAction } from '@/components/row-action';
 import { SwipeRow } from '@/components/swipe-row';
 import { TopBar, TopBarIcon } from '@/components/top-bar';
 import { UndoToastHost } from '@/components/undo-toast';
@@ -114,7 +115,7 @@ export function FeedsScreen({ feed, accountOpen }: { feed?: string; accountOpen?
               id={item.id}
               action={rowAction(item)}
               leaves={false}
-              onCommit={() => saveOrDone(item.id, rowAction(item).name, { haptic: false })}
+              onCommit={() => saveOrDone(item.id, rowAction(item), { haptic: false })}
             >
               <ArticleRow article={item} feedNamed={shown.index === 0} savedMark onAction={(action) => saveOrDone(item.id, action)} />
             </SwipeRow>

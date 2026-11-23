@@ -5,7 +5,7 @@ import { DELETE_BATCH } from './lib/feed/blocks';
 import { deleteArticles } from './lib/deleteArticles';
 import { MAX_FEED_NAME } from './lib/feedName';
 import type { Id } from './_generated/dataModel';
-import { action, internalMutation, internalQuery, mutation, query, type QueryCtx } from './_generated/server';
+import { action, internalMutation, internalQuery, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireUserId } from './lib/currentUser';
 import { findFeedLinks, siteMeta, type FeedLink, type SiteMeta } from './lib/feed/discover';
 import { faviconOf, hostOf } from './lib/feed/face';
@@ -382,15 +382,35 @@ export const remove = mutation({
     if (!feed) return { ok: false as const, reason: 'not-found' as const };
     const schedule = await scheduleOf(ctx, feed._id);
     if (schedule) await ctx.db.delete(schedule._id);
-    // Saved Articles stay, still named by the Feed (T23). A User Saves a handful, never thousands.
-    const saved = await ctx.db
-      .query('articles')
-      .withIndex('by_feed_saved', (q) => q.eq('feedId', feed._id).gt('savedAt', 0))
-      .collect();
-    await Promise.all(saved.map((article) => ctx.db.patch(article._id, { feedTitle: feed.title })));
+    // Saved Articles stay, still named by the Feed (T23): the first page now, any more after.
+    const named = await nameSavedPage(ctx, feed._id, feed.title, null);
+    if (!named.isDone) {
+      await ctx.scheduler.runAfter(0, internal.feeds.nameSaved, { feedId: feed._id, feedTitle: feed.title, cursor: named.continueCursor });
+    }
     await ctx.db.delete(feed._id);
     await ctx.scheduler.runAfter(0, internal.feeds.removeArticles, { feedId: feed._id });
     return { ok: true as const };
+  },
+});
+
+/** Gives one page of a removed Feed's Saved Articles the Feed's name to keep (T23). */
+async function nameSavedPage(ctx: MutationCtx, feedId: Id<'feeds'>, feedTitle: string, cursor: string | null) {
+  const page = await ctx.db
+    .query('articles')
+    .withIndex('by_feed_saved', (q) => q.eq('feedId', feedId).gt('savedAt', 0))
+    .paginate({ numItems: DELETE_BATCH, cursor });
+  await Promise.all(page.page.map((article) => ctx.db.patch(article._id, { feedTitle })));
+  return page;
+}
+
+/** Names the rest of a removed Feed's Saved Articles, a page at a time, so no removal is too big for one transaction. */
+export const nameSaved = internalMutation({
+  args: { feedId: v.id('feeds'), feedTitle: v.string(), cursor: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { feedId, feedTitle, cursor }) => {
+    const named = await nameSavedPage(ctx, feedId, feedTitle, cursor);
+    if (!named.isDone) await ctx.scheduler.runAfter(0, internal.feeds.nameSaved, { feedId, feedTitle, cursor: named.continueCursor });
+    return null;
   },
 });
 

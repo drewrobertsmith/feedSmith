@@ -230,6 +230,36 @@ describe('what you Saved is never lost (P14, T23)', () => {
     expect(await asA.query(api.articles.all, {})).toEqual([]);
   });
 
+  test("an Article of a Feed being removed can't be Saved or put back into Saved: it would have no name", async () => {
+    const { t, asA, verge, one, two } = await setup();
+    await asA.mutation(api.articles.save, { id: two });
+    const before = await asA.mutation(api.articles.done, { id: two });
+    // The Feed goes; its Articles are deleted in batches after, so a stale screen can still reach them.
+    await asA.mutation(api.feeds.remove, { id: verge });
+
+    expect(await asA.mutation(api.articles.save, { id: one })).toBeNull();
+    await asA.mutation(api.articles.restore, { id: two, ...before! });
+    expect(await asA.query(api.articles.saved, {})).toEqual([]);
+
+    await runScheduledNow(t);
+    expect(await t.run((ctx) => ctx.db.get(one))).toBeNull();
+    expect(await t.run((ctx) => ctx.db.get(two))).toBeNull();
+  });
+
+  test("removing a Feed names every one of its Saved Articles, however many, a batch at a time", async () => {
+    const { t, a, asA, verge } = await setup();
+    await t.run(async (ctx) => {
+      for (let i = 0; i < 250; i += 1) {
+        await ctx.db.insert('articles', { userId: a, feedId: verge, guid: `k${i}`, title: 'k', publishedAt: START, savedAt: START - i });
+      }
+    });
+    await asA.mutation(api.feeds.remove, { id: verge });
+    await runScheduledNow(t);
+    const saved = await asA.query(api.articles.saved, {});
+    expect(saved).toHaveLength(250);
+    expect(saved.every((row) => row.feedTitle === 'The Verge')).toBe(true);
+  });
+
   test("once Done, a removed Feed's Saved Article is gone from view, and the cleanup deletes it", async () => {
     const { t, asA, verge, one } = await setup();
     await asA.mutation(api.articles.save, { id: one });

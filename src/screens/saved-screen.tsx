@@ -5,7 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/app-button';
 import { AppText } from '@/components/app-text';
-import { ArticleRow, rowAction } from '@/components/article-row';
+import { ArticleRow } from '@/components/article-row';
+import { rowAction } from '@/components/row-action';
 import { SwipeRow } from '@/components/swipe-row';
 import { TopBar } from '@/components/top-bar';
 import { UndoToastHost } from '@/components/undo-toast';
@@ -56,7 +57,7 @@ export function SavedScreen({ accountOpen }: { accountOpen?: boolean }) {
         keyExtractor={(article) => article.id}
         renderItem={({ item }) => (
           // Done takes it out of Saved, so it slides away first.
-          <SwipeRow id={item.id} action={rowAction(item)} leaves onCommit={() => saveOrDone(item.id, rowAction(item).name, { haptic: false })}>
+          <SwipeRow id={item.id} action={rowAction(item)} leaves onCommit={() => saveOrDone(item.id, rowAction(item), { haptic: false })}>
             <ArticleRow article={item} feedNamed savedMark={false} onAction={(action) => saveOrDone(item.id, action)} />
           </SwipeRow>
         )}
