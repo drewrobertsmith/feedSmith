@@ -1,6 +1,6 @@
 # Quality bar
 
-What this app must never get wrong. `/expo-dev-loop:feature` plans, reviews and verifies every change against the items that apply to it; `/expo-dev-loop:pre-release` walks all of them. Built and revised with `/expo-dev-loop:quality-bar`.
+What this app must never get wrong. `/expo-dev-loop:feature` plans, reviews and verifies every change against the items that apply to it; `/expo-dev-loop:pre-release` walks all of them. Built and revised with `/expo-dev-loop:quality-bar`. UI items Q29–Q34 come from `docs/design-references/todoist.md`, the worked reference for structure and behaviour (D16).
 
 **The app:** feedSmith is read by its one owner on an Android phone (a Pixel 10 on Android 17), one-handed, often in the evening or in transit. Sessions are studied reading, from a few minutes to half an hour.
 
@@ -36,6 +36,12 @@ What this app must never get wrong. `/expo-dev-loop:feature` plans, reviews and 
 | Q26 | Session tokens are stored only in SecureStore, never in plain storage, files, logs or crash reports, and sessions expire: one-minute access tokens, and signing in again after 30 days. | A stolen token is a stolen Account. | trust boundary, release | Test that the auth adapter's storage is SecureStore; a grep that no token reaches `AsyncStorage`, a log line or a crash report; review of `convex/auth.ts`'s session lifetimes. |
 | Q27 | An element whose look its owner's guidelines set (D10: Google's sign-in button) follows those guidelines exactly and keeps its spec in one named file under `src/theme`. Those files are the only exceptions to Q19 and Q24, and their text still meets Q14's contrast. | Brand rules must not become a back door for off-token colours, type or spacing. | UI | The Q19 and Q24 tests name their exempt files; a contrast test for each such element in both themes. |
 | Q28 | Deleting an Account leaves nothing of it: the User, their sessions and Google sign-in link, and every row in every table that holds User data are removed, and no other User's data is touched (P18). The one exception is Sentry (T16): crash reports, logs and replays aren't deleted with the Account; they expire with Sentry's retention, or the owner deletes them by hand on request. | Deletion is the privacy promise; a table added later and forgotten would quietly break it. | data, trust boundary | A `convex-test` case that creates User A and User B with data in every User table, deletes A, and checks nothing of A remains and B is untouched. Every ticket that adds a User table extends that case. |
+| Q29 | Every part of a list row has a distinct voice (face, weight or colour) and one job, in a fixed order; no two adjacent lines of a row read the same. In an Article row: muted meta, a full-strength byline, the Subtitle in muted Literata. | A row is scanned in a glance; parts that sound alike blur together (seen in FEE-41's byline). Todoist's rows are the model (`docs/design-references/todoist.md` §8). | UI | Screen test of each part's style in the row; the design self-check in Verify on every world's capture. |
+| Q30 | Colour beyond the neutrals marks a meaning stated once in the decision log, and keeps it everywhere: Gold means active or yours (D5); no colour is decorative. | Colour that means something can be read without words; colour that doesn't is noise (reference §6). | UI | The Q19 tokens test, with each accent token's meaning listed beside it; review of every new colour use. |
+| Q31 | Every top-level screen (Feeds, Saved) has the same top bar: a large left-aligned title, at most two icons on the right, its add action in the same place. Deeper screens have a back arrow and a title. The Reading view is exempt: it's a page, not a list. | You learn the app once (reference §1). | UI | Screen test of each section's header; device check in Verify. |
+| Q32 | Actions on a screen live in a menu, grouped by kind, with destructive ones last behind a divider. Quick or passing tasks (rename, detail, options, confirm) are bottom sheets over the current screen; places you stay are full screens. Removing anything asks first. | One rule for every surface keeps you oriented, and nothing is lost by a slip (reference §2). | UI | Review against the reference; a screen test that every remove asks first (as Manage Feeds' does). |
+| Q33 | A settings or options row shows its current value; a toggle's subtitle describes its current effect; a choice between looks or layouts is shown as pictures. | You can read the state without opening anything (reference §3–4). Applies once feedSmith has settings or options. | UI | Screen test on each settings or options screen. |
+| Q34 | Reordering always uses one drag handle, on the right, with TalkBack Move up and Move down actions (D13). No screen is ever blank: an empty or zero state offers something useful, a way to add or what you recently viewed or searched. | Predictability: one gesture with one look, and never a dead end (reference §5, §7). | UI | Screen tests of each reorderable list's handle and TalkBack actions; the gallery's empty worlds walked in Verify. |
 
 ## Budgets
 
@@ -48,7 +54,7 @@ What this app must never get wrong. `/expo-dev-loop:feature` plans, reviews and 
 
 ## Release blockers
 
-Q1, Q2, Q3, Q4, Q8, Q9, Q10, Q11, Q12, Q14, Q15, Q22, Q23, Q26, Q28. Any other failure, including a missed budget, becomes a ticket.
+Q1, Q2, Q3, Q4, Q8, Q9, Q10, Q11, Q12, Q14, Q15, Q22, Q23, Q26, Q28, Q29, and Q32's "removing anything asks first". Any other failure, including a missed budget, becomes a ticket.
 
 ## Deferred
 
