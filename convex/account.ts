@@ -5,6 +5,7 @@ import { internalMutation, mutation } from './_generated/server';
 import { AUTH_ERRORS } from './lib/authErrors';
 import { requireUserId } from './lib/currentUser';
 import { DELETE_BATCH } from './lib/feed/blocks';
+import { deleteArticles as deleteArticleRows } from './lib/deleteArticles';
 
 /**
  * Deletes the signed-in User's Account for good (P18): the User, their Feeds, every session and
@@ -52,16 +53,7 @@ export const deleteArticles = internalMutation({
       .query('articles')
       .withIndex('by_user_published', (q) => q.eq('userId', userId))
       .take(DELETE_BATCH);
-    await Promise.all(
-      articles.map(async (article) => {
-        const bodies = await ctx.db
-          .query('articleBodies')
-          .withIndex('by_article', (q) => q.eq('articleId', article._id))
-          .take(10);
-        await Promise.all(bodies.map((body) => ctx.db.delete(body._id)));
-        await ctx.db.delete(article._id);
-      }),
-    );
+    await deleteArticleRows(ctx, articles);
     if (articles.length === DELETE_BATCH) await ctx.scheduler.runAfter(0, internal.account.deleteArticles, { userId });
     return null;
   },

@@ -35,7 +35,8 @@ function SheetRow({
   const { colorScheme } = useEnvironment();
   const box = ICON * useSizeScale();
   const shown = busy && busyLabel ? busyLabel : label;
-  const colour = tone === 'destructive' ? themes[colorScheme].destructive : themes[colorScheme].text;
+  const destructive = tone === 'destructive';
+  const colour = destructive ? themes[colorScheme].destructive : themes[colorScheme].text;
   return (
     <Pressable
       role="button"
@@ -55,7 +56,7 @@ function SheetRow({
         tintColor={colour}
         style={{ width: box, height: box, flexShrink: 0 }}
       />
-      <AppText variant="action" className={tone === 'destructive' ? 'shrink text-destructive' : 'shrink text-text'} accessible={false}>
+      <AppText variant="action" className={destructive ? 'shrink text-destructive' : 'shrink text-text'} accessible={false}>
         {shown}
       </AppText>
     </Pressable>

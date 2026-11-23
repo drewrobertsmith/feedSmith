@@ -2,6 +2,7 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+    // Convex Auth's convex-test helpers ship as .ts source that imports .ts paths (FEE-36, T25).
     "allowImportingTsExtensions": true,
     "paths": {
       "@/*": [
