@@ -223,28 +223,35 @@ describe('All', () => {
   });
 
   describe('Pinning by long-press (P9)', () => {
-    let toast: jest.SpyInstance;
-    beforeEach(() => {
-      toast = jest.spyOn(ToastAndroid, 'show').mockImplementation(() => {});
-    });
-    afterEach(() => toast.mockRestore());
-
-    test('long-pressing a Feed Pins it; long-pressing a Pinned Feed unpins it', async () => {
+    test('long-pressing a Feed Pins it, says so, and Undo unpins it (Q35)', async () => {
       const user = userEvent.setup();
       const w = await open({ colorScheme: 'dark', feeds: 'some' });
       await user.longPress(await screen.findByRole('tab', { name: 'Calm Notes' }));
       expect(w.feedsLog.pins).toEqual([{ id: 'f2', pinned: true }]);
-      expect(toast).toHaveBeenLastCalledWith('Pinned Calm Notes.', ToastAndroid.SHORT);
-      await user.longPress(screen.getByRole('tab', { name: 'The Verge, Pinned' }));
-      expect(w.feedsLog.pins).toEqual([{ id: 'f2', pinned: true }, { id: 'f1', pinned: false }]);
-      expect(toast).toHaveBeenLastCalledWith('Unpinned The Verge.', ToastAndroid.SHORT);
+      const toast = await screen.findByTestId('undo-toast');
+      expect(within(toast).getByText('Pinned Calm Notes.')).toBeOnTheScreen();
+      await user.press(within(toast).getByRole('button', { name: 'Undo' }));
+      await waitFor(() => expect(w.feedsLog.pins).toEqual([{ id: 'f2', pinned: true }, { id: 'f2', pinned: false }]));
     });
 
-    test('a fourth Pin is refused, saying why', async () => {
+    test('long-pressing a Pinned Feed unpins it, and Undo puts it back in its place (Q35)', async () => {
+      const user = userEvent.setup();
+      const w = await open({ colorScheme: 'dark', feeds: 'some' });
+      await user.longPress(await screen.findByRole('tab', { name: 'The Verge, Pinned' }));
+      expect(w.feedsLog.pins).toEqual([{ id: 'f1', pinned: false }]);
+      const toast = await screen.findByTestId('undo-toast');
+      expect(within(toast).getByText('Unpinned The Verge.')).toBeOnTheScreen();
+      await user.press(within(toast).getByRole('button', { name: 'Undo' }));
+      await waitFor(() => expect(w.feedsLog.restoredPins).toEqual([{ id: 'f1', place: 0 }]));
+    });
+
+    test('a fourth Pin is refused, saying why, with nothing to Undo', async () => {
       const user = userEvent.setup();
       await open({ colorScheme: 'dark', feeds: 'some', pins: 'full' });
       await user.longPress(await screen.findByRole('tab', { name: 'Calm Notes' }));
-      expect(toast).toHaveBeenLastCalledWith('You can Pin up to 3 Feeds. Unpin one first.', ToastAndroid.SHORT);
+      const toast = await screen.findByTestId('undo-toast');
+      expect(within(toast).getByText('You can Pin up to 3 Feeds. Unpin one first.')).toBeOnTheScreen();
+      expect(within(toast).queryByRole('button', { name: 'Undo' })).not.toBeOnTheScreen();
     });
 
     test('TalkBack can Pin and unpin without a long-press (Q15)', async () => {

@@ -3,7 +3,6 @@ import {
   Animated,
   Pressable,
   StyleSheet,
-  ToastAndroid,
   View,
   type LayoutChangeEvent,
   type ScrollViewInstance,
@@ -12,7 +11,8 @@ import {
 import { AppText } from '@/components/app-text';
 import { FeedIcon } from '@/components/feed-icon';
 import { useEnvironment } from '@/environment';
-import { useSetPinned, type FeedChip } from '@/feeds/feeds-data';
+import type { FeedChip } from '@/feeds/feeds-data';
+import { usePin } from '@/feeds/use-pin';
 import { chipLabel, fadeRanges, revealOffset, transparent } from '@/screens/chip-row-layout';
 import { motion } from '@/theme/motion';
 import { spacing } from '@/theme/spacing';
@@ -112,7 +112,7 @@ export function ChipRow({
   selected: string | null;
   onSelect: (feedId: string | null) => void;
 }) {
-  const setPinned = useSetPinned();
+  const pin = usePin();
   const { colorScheme, reduceMotion } = useEnvironment();
   const background = themes[colorScheme].background;
   const scroller = useRef<ScrollViewInstance>(null);
@@ -142,16 +142,7 @@ export function ChipRow({
     scrollX.current = Math.min(to, Math.max(0, row.content - row.width));
   }, [selected, reduceMotion, row.width, row.content]);
 
-  const togglePin = async (chip: FeedChip) => {
-    const outcome = await setPinned(chip.id, !chip.pinned);
-    const notes: Record<typeof outcome, string | null> = {
-      ok: `${chip.pinned ? 'Unpinned' : 'Pinned'} ${chip.title}.`,
-      'pins-full': 'You can Pin up to 3 Feeds. Unpin one first.',
-      'not-found': null,
-    };
-    const note = notes[outcome];
-    if (note) ToastAndroid.show(note, ToastAndroid.SHORT);
-  };
+  const togglePin = (chip: FeedChip) => void pin(chip);
 
   return (
     <View>

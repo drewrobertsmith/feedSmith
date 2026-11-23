@@ -1,6 +1,6 @@
-import { act, fireEvent, userEvent, within } from '@testing-library/react-native';
+import { act, fireEvent, userEvent, waitFor, within } from '@testing-library/react-native';
 import { renderRouter, screen } from 'expo-router/testing-library';
-import { Alert, ToastAndroid } from 'react-native';
+import { Alert } from 'react-native';
 import { Uniwind } from 'uniwind';
 
 import TabsLayout from '@/app/(tabs)/_layout';
@@ -112,21 +112,30 @@ describe('Manage Feeds', () => {
     alert.mockRestore();
   });
 
-  test('Pin and Unpin; a fourth Pin is refused, saying why', async () => {
-    const toast = jest.spyOn(ToastAndroid, 'show').mockImplementation(() => {});
+  test('Pin and Unpin act at once, each with Undo (Q35)', async () => {
     const user = userEvent.setup();
     const w = await open({ colorScheme: 'dark', section: 'manage' });
     await user.press(await screen.findByRole('button', { name: 'Pin Calm Notes' }));
+    expect(within(await screen.findByTestId('undo-toast')).getByText('Pinned Calm Notes.')).toBeOnTheScreen();
     await user.press(screen.getByRole('button', { name: 'Unpin The Verge' }));
     expect(w.feedsLog.pins).toEqual([
       { id: 'f2', pinned: true },
       { id: 'f1', pinned: false },
     ]);
-    world!.dispose();
+    // One note at a time: the Unpin's replaces the Pin's, and its Undo puts The Verge back.
+    const toast = await screen.findByTestId('undo-toast');
+    expect(within(toast).getByText('Unpinned The Verge.')).toBeOnTheScreen();
+    await user.press(within(toast).getByRole('button', { name: 'Undo' }));
+    await waitFor(() => expect(w.feedsLog.restoredPins).toEqual([{ id: 'f1', place: 0 }]));
+  });
+
+  test('a fourth Pin is refused, saying why, with nothing to Undo', async () => {
+    const user = userEvent.setup();
     await open({ colorScheme: 'dark', section: 'manage', manage: 'pinned', pins: 'full' });
     await user.press(await screen.findByRole('button', { name: 'Pin Daring Fireball' }));
-    expect(toast).toHaveBeenLastCalledWith('You can Pin up to 3 Feeds. Unpin one first.', ToastAndroid.SHORT);
-    toast.mockRestore();
+    const toast = await screen.findByTestId('undo-toast');
+    expect(within(toast).getByText('You can Pin up to 3 Feeds. Unpin one first.')).toBeOnTheScreen();
+    expect(within(toast).queryByRole('button', { name: 'Undo' })).not.toBeOnTheScreen();
   });
 
   test('TalkBack orders the Pinned Feeds from their handles: Move up and Move down (Q15)', async () => {
@@ -163,15 +172,13 @@ describe('Manage Feeds', () => {
 
   test("a remove that doesn't reach the server says so (Q5)", async () => {
     const alert = jest.spyOn(Alert, 'alert');
-    const toast = jest.spyOn(ToastAndroid, 'show').mockImplementation(() => {});
     const user = userEvent.setup();
     await open({ colorScheme: 'dark', section: 'manage', manageWrites: 'fail' });
     await user.press(await screen.findByRole('button', { name: 'Remove Calm Notes' }));
     const remove = alert.mock.calls[0][2]!.find((b) => b.text === 'Remove')!;
     await act(async () => remove.onPress!());
-    expect(toast).toHaveBeenLastCalledWith("Couldn't remove Calm Notes. Try again.", ToastAndroid.SHORT);
+    expect(within(await screen.findByTestId('undo-toast')).getByText("Couldn't remove Calm Notes. Try again.")).toBeOnTheScreen();
     alert.mockRestore();
-    toast.mockRestore();
   });
 
   test('a name past the limit is refused, saying the limit', async () => {

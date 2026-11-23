@@ -275,11 +275,14 @@ export const chips = query({
   },
 });
 
-/** Pins or unpins one of the signed-in User's Feeds (P9). A fourth Pin is refused. */
+/**
+ * Pins or unpins one of the signed-in User's Feeds (P9). A fourth Pin is refused. Unpinning says
+ * where the Feed was among the Pins (`place`, from 0), so Undo can put it back there (Q35).
+ */
 export const setPinned = mutation({
   args: { id: v.string(), pinned: v.boolean() },
   returns: v.union(
-    v.object({ ok: v.literal(true) }),
+    v.object({ ok: v.literal(true), place: v.optional(v.number()) }),
     v.object({ ok: v.literal(false), reason: v.union(v.literal('pins-full'), v.literal('not-found')) }),
   ),
   handler: async (ctx, args) => {
@@ -287,8 +290,10 @@ export const setPinned = mutation({
     const feed = await ownFeed(ctx, userId, args.id);
     if (!feed) return { ok: false as const, reason: 'not-found' as const };
     if (!args.pinned) {
-      if (feed.pinOrder !== undefined) await ctx.db.patch(feed._id, { pinOrder: undefined });
-      return { ok: true as const };
+      if (feed.pinOrder === undefined) return { ok: true as const };
+      const place = (await pinnedFeeds(ctx, userId)).findIndex((f) => f._id === feed._id);
+      await ctx.db.patch(feed._id, { pinOrder: undefined });
+      return { ok: true as const, place };
     }
     if (feed.pinOrder !== undefined) return { ok: true as const };
     const pins = (await pinnedFeeds(ctx, userId)).map((f) => f.pinOrder ?? 0);
@@ -298,6 +303,31 @@ export const setPinned = mutation({
   },
 });
 
+
+/**
+ * Undo for Unpin (Q35): Pins a Feed again at `place` among the Pins (from 0), as near as the Pins
+ * now allow, and renumbers them in that order. A place that's no place puts it last; a Feed already
+ * Pinned stays put; a fourth Pin is still refused (P9).
+ */
+export const restorePin = mutation({
+  args: { id: v.string(), place: v.number() },
+  returns: v.union(
+    v.object({ ok: v.literal(true) }),
+    v.object({ ok: v.literal(false), reason: v.union(v.literal('pins-full'), v.literal('not-found')) }),
+  ),
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const feed = await ownFeed(ctx, userId, args.id);
+    if (!feed) return { ok: false as const, reason: 'not-found' as const };
+    if (feed.pinOrder !== undefined) return { ok: true as const };
+    const pinned = await pinnedFeeds(ctx, userId);
+    if (pinned.length >= MAX_PINS) return { ok: false as const, reason: 'pins-full' as const };
+    const place = Number.isInteger(args.place) && args.place >= 0 ? Math.min(args.place, pinned.length) : pinned.length;
+    const order = pinned.map((f) => f._id).toSpliced(place, 0, feed._id);
+    await Promise.all(order.map((id, i) => ctx.db.patch(id, { pinOrder: i + 1 })));
+    return { ok: true as const };
+  },
+});
 
 /**
  * Manage Feeds (D13): every one of the signed-in User's Feeds, Pinned first in their order,

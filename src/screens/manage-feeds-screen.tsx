@@ -1,13 +1,15 @@
 import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, TextInput, ToastAndroid, View } from 'react-native';
+import { Alert, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/app-text';
 import { DragList, DragRow } from '@/components/drag-row';
 import { FeedIcon } from '@/components/feed-icon';
+import { UndoToastHost, useUndo } from '@/components/undo-toast';
 import { useEnvironment } from '@/environment';
-import { useManage, useManageActions, useSetPinned, type ManagedFeed } from '@/feeds/feeds-data';
+import { useManage, useManageActions, type ManagedFeed } from '@/feeds/feeds-data';
+import { usePin } from '@/feeds/use-pin';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
 import { typeScale } from '@/theme/type';
@@ -81,14 +83,12 @@ function RenameField({ feed, onDone }: { feed: ManagedFeed; onDone: () => void }
 }
 
 function FeedRow({ feed }: { feed: ManagedFeed }) {
-  const setPinned = useSetPinned();
+  const pin = usePin();
+  const note = useUndo();
   const { remove } = useManageActions();
   const [renaming, setRenaming] = useState(false);
 
-  const togglePin = async () => {
-    const outcome = await setPinned(feed.id, !feed.pinned);
-    if (outcome === 'pins-full') ToastAndroid.show('You can Pin up to 3 Feeds. Unpin one first.', ToastAndroid.SHORT);
-  };
+  const togglePin = () => void pin(feed);
   const confirmRemove = () =>
     Alert.alert(`Remove ${feed.title}?`, 'Its Articles go too. Articles you’ve Saved stay in Saved.', [
       { text: 'Cancel', style: 'cancel' },
@@ -99,7 +99,8 @@ function FeedRow({ feed }: { feed: ManagedFeed }) {
       },
     ]);
   const removeFeed = async () => {
-    if ((await remove(feed.id)) === 'failed') ToastAndroid.show(`Couldn't remove ${feed.title}. Try again.`, ToastAndroid.SHORT);
+    // Nothing to undo: it didn't happen (Q5).
+    if ((await remove(feed.id)) === 'failed') note(`Couldn't remove ${feed.title}. Try again.`);
   };
 
   return (
@@ -156,66 +157,70 @@ export function ManageFeedsScreen() {
   };
 
   return (
-    <ScrollView
-      className="flex-1 bg-background"
-      contentContainerClassName="gap-section px-edge"
-      contentContainerStyle={{
-        paddingTop: insets.top + spacing.section,
-        paddingBottom: insets.bottom + spacing.section,
-      }}
-      keyboardShouldPersistTaps="handled"
-    >
-      <AppText variant="title">Manage Feeds</AppText>
-      {view.status === 'ready' && feeds.length === 0 ? (
-        <AppText variant="reading" className="text-text-muted">
-          No Feeds yet. Add one from the + on Feeds.
-        </AppText>
-      ) : null}
-      {pinned.length > 0 ? (
-        <View className="gap-related">
-          <AppText variant="label" className="text-text-muted">
-            Pinned
+    <View className="flex-1 bg-background">
+      <ScrollView
+        className="flex-1 bg-background"
+        contentContainerClassName="gap-section px-edge"
+        contentContainerStyle={{
+          paddingTop: insets.top + spacing.section,
+          paddingBottom: insets.bottom + spacing.section,
+        }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <AppText variant="title">Manage Feeds</AppText>
+        {view.status === 'ready' && feeds.length === 0 ? (
+          <AppText variant="reading" className="text-text-muted">
+            No Feeds yet. Add one from the + on Feeds.
           </AppText>
-          <DragList ids={pinned.map((feed) => feed.id)} gap={spacing.related}>
-            {pinned.map((feed, index) => (
-              <DragRow
-                key={feed.id}
-                id={feed.id}
-                index={index}
-                count={pinned.length}
-                handleLabel={`Reorder ${feed.title}`}
-                onDrop={(to) => move(index, to)}
-                handle={
-                  <View className="pr-related">
-                    <SymbolView
-                      name={{
-                        ios: 'line.3.horizontal',
-                        android: 'drag_indicator',
-                      }}
-                      size={HANDLE}
-                      tintColor={themes[colorScheme].textMuted}
-                    />
-                  </View>
-                }
-              >
-                <FeedRow feed={feed} />
-              </DragRow>
-            ))}
-          </DragList>
-        </View>
-      ) : null}
-      {others.length > 0 ? (
-        <View className="gap-related">
-          {pinned.length > 0 ? (
+        ) : null}
+        {pinned.length > 0 ? (
+          <View className="gap-related">
             <AppText variant="label" className="text-text-muted">
-              Feeds
+              Pinned
             </AppText>
-          ) : null}
-          {others.map((feed) => (
-            <FeedRow key={feed.id} feed={feed} />
-          ))}
-        </View>
-      ) : null}
-    </ScrollView>
+            <DragList ids={pinned.map((feed) => feed.id)} gap={spacing.related}>
+              {pinned.map((feed, index) => (
+                <DragRow
+                  key={feed.id}
+                  id={feed.id}
+                  index={index}
+                  count={pinned.length}
+                  handleLabel={`Reorder ${feed.title}`}
+                  onDrop={(to) => move(index, to)}
+                  handle={
+                    <View className="pr-related">
+                      <SymbolView
+                        name={{
+                          ios: 'line.3.horizontal',
+                          android: 'drag_indicator',
+                        }}
+                        size={HANDLE}
+                        tintColor={themes[colorScheme].textMuted}
+                      />
+                    </View>
+                  }
+                >
+                  <FeedRow feed={feed} />
+                </DragRow>
+              ))}
+            </DragList>
+          </View>
+        ) : null}
+        {others.length > 0 ? (
+          <View className="gap-related">
+            {pinned.length > 0 ? (
+              <AppText variant="label" className="text-text-muted">
+                Feeds
+              </AppText>
+            ) : null}
+            {others.map((feed) => (
+              <FeedRow key={feed.id} feed={feed} />
+            ))}
+          </View>
+        ) : null}
+      </ScrollView>
+      {/* Pin and Unpin's Undo, above the gesture bar (Q35). */}
+      <UndoToastHost bottom={insets.bottom} />
+    </View>
   );
 }
