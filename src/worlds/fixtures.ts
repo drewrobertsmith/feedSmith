@@ -199,6 +199,13 @@ export const FIXTURE_TWO_PINS: FeedChip[] = [
   { id: 'f2', title: 'Calm Notes', pinned: false },
 ];
 
+/** No Pinned Feeds: no Pinned chip, no group (FEE-60). */
+export const FIXTURE_NO_PINS: FeedChip[] = [
+  { id: 'f1', title: VERGE, faviconUrl: 'https://www.theverge.com/favicon.ico', pinned: false },
+  { id: 'f2', title: 'Calm Notes', pinned: false },
+  { id: 'f3', title: 'Daring Fireball', faviconUrl: 'https://daringfireball.net/favicon.ico', pinned: false },
+];
+
 /** Two Pinned Feeds with nothing in the last 30 days: Pinned is empty (FEE-59). */
 export const FIXTURE_QUIET_PINS: FeedChip[] = [
   { id: 'f3', title: 'Daring Fireball', faviconUrl: 'https://daringfireball.net/favicon.ico', pinned: true },

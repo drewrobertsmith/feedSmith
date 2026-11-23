@@ -231,3 +231,24 @@ export const PINNED_WORLDS = [
 ] as const satisfies readonly CatalogWorld[];
 
 export type PinnedWorldId = (typeof PINNED_WORLDS)[number]['id'];
+
+/** The Pinned group (FEE-60): the Pinned Feeds' chips show inline after Pinned while it, or one of them, is chosen. */
+export const PINNED_GROUP_WORLDS = [
+  { id: 'group-open', label: 'Group open, a Pinned Feed chosen', spec: { colorScheme: 'dark', feeds: 'some', pins: 'two', feed: 'f1' } },
+  { id: 'group-folded-all', label: 'Folded, All chosen', spec: { colorScheme: 'dark', feeds: 'some', pins: 'two' } },
+  {
+    id: 'group-folded-other',
+    label: 'Folded, a Feed that isn\'t Pinned chosen',
+    spec: { colorScheme: 'light', feeds: 'some', pins: 'two', feed: 'f2' },
+  },
+  { id: 'group-one-pin', label: 'One Pin: no group', spec: { colorScheme: 'dark', feeds: 'some' } },
+  { id: 'group-no-pins', label: 'No Pins', spec: { colorScheme: 'dark', feeds: 'some', pins: 'none' } },
+  { id: 'group-link', label: 'Opened from a link to a Pinned Feed', spec: { colorScheme: 'dark', feeds: 'some', pins: 'two', feed: 'f3' } },
+  {
+    id: 'group-remove-animations',
+    label: 'Group open, Remove animations',
+    spec: { colorScheme: 'dark', feeds: 'some', pins: 'two', feed: 'pinned', reduceMotion: true },
+  },
+] as const satisfies readonly CatalogWorld[];
+
+export type PinnedGroupWorldId = (typeof PINNED_GROUP_WORLDS)[number]['id'];
