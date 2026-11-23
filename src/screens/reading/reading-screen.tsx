@@ -114,18 +114,31 @@ const textOf = (block: Block | undefined) =>
         .trim()
     : undefined;
 
-/** The Article's headline, Subtitle and meta: the deck is left out where the text already says it. */
-function ArticleHeader({ id, article }: { id: string; article: ReadingArticle }) {
-  const { title, subtitle, authors, feedId, feedTitle, publishedAt, page, blocks } = article;
-  const credit = byline(authors);
-  // A summary-only Article's text is its Subtitle; a Feed's text often opens with it too.
-  const deck = subtitle && !page && textOf(blocks[0]) !== subtitle.trim() ? subtitle : undefined;
+/**
+ * The Article's headline, Subtitle and meta: the deck is left out where the text already says it. While the
+ * Article loads, only the headline shows, with the title its row had, and it's the same headline once the
+ * Article arrives (FEE-48): a headline swapped for another while a title flies to it is left invisible.
+ */
+function ArticleHeader({ id, title, article }: { id: string; title: string; article?: ReadingArticle }) {
   return (
     <View className="gap-related">
       {/* Where the row's title lands when the Article opens (FEE-48). */}
       <SharedTitle articleId={id}>
         <AppText variant="headline">{title}</AppText>
       </SharedTitle>
+      {article ? <ArticleMeta article={article} /> : null}
+    </View>
+  );
+}
+
+/** Beneath the headline: the deck, the credit, then the Feed and date. */
+function ArticleMeta({ article }: { article: ReadingArticle }) {
+  const { subtitle, authors, feedId, feedTitle, publishedAt, page, blocks } = article;
+  const credit = byline(authors);
+  // A summary-only Article's text is its Subtitle; a Feed's text often opens with it too.
+  const deck = subtitle && !page && textOf(blocks[0]) !== subtitle.trim() ? subtitle : undefined;
+  return (
+    <>
       {deck ? (
         <AppText variant="deck" className="text-text-muted">
           {deck}
@@ -163,7 +176,7 @@ function ArticleHeader({ id, article }: { id: string; article: ReadingArticle })
           {publishedDate(publishedAt)}
         </AppText>
       </View>
-    </View>
+    </>
   );
 }
 
@@ -195,10 +208,12 @@ export function ReadingScreen({ id }: { id: string }) {
   }, [ready, id]);
 
   if (view.status === 'missing') return <ArticleMissing />;
-  if (view.status === 'loading') return <View className="flex-1 bg-background" />;
-  const { article } = view;
+  // While it loads, the title its row had (FEE-48); opened from a link, nothing until the Article arrives.
+  const article = view.status === 'ready' ? view.article : undefined;
+  const title = article?.title ?? (view.status === 'loading' ? view.title : undefined);
+  if (title === undefined) return <View className="flex-1 bg-background" />;
   // The lead image, unless the text opens with an image of its own (often the same one, resized).
-  const lead = article.imageUrl && article.blocks[0]?.type !== 'image' ? article.imageUrl : undefined;
+  const lead = article?.imageUrl && article.blocks[0]?.type !== 'image' ? article.imageUrl : undefined;
 
   return (
     // Only the screen in front carries titles (FEE-48).
@@ -213,8 +228,8 @@ export function ReadingScreen({ id }: { id: string }) {
           }}
         >
           <View className="w-full gap-section" style={{ maxWidth: MEASURE * scale }}>
-            <ArticleHeader id={id} article={article} />
-            {article.page === 'unavailable' ? (
+            <ArticleHeader id={id} title={title} article={article} />
+            {!article ? null : article.page === 'unavailable' ? (
               <PageUnavailable article={article} />
             ) : (
               <>
@@ -237,9 +252,13 @@ export function ReadingScreen({ id }: { id: string }) {
             )}
           </View>
         </ScrollView>
-        <SaveOrDone id={id} saved={article.saved} />
-        {/* The Undo note sits above Save and Done, never over them. */}
-        <UndoToastHost bottom={insets.bottom + spacing.group + PILL_HEIGHT * scale} />
+        {article ? (
+          <>
+            <SaveOrDone id={id} saved={article.saved} />
+            {/* The Undo note sits above Save and Done, never over them. */}
+            <UndoToastHost bottom={insets.bottom + spacing.group + PILL_HEIGHT * scale} />
+          </>
+        ) : null}
         {/* Edge-to-edge (Q18): the text scrolls behind the status bar, and this still strip keeps its icons legible. */}
         <View
           testID="status-bar-backing"

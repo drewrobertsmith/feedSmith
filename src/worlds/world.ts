@@ -97,6 +97,8 @@ export type WorldSpec = {
     | 'unextracted-no-image'
     | 'missing'
     | 'loading'
+    /** Still loading, with the title the list had (FEE-48). */
+    | 'loading-with-title'
     | 'removed-feed';
   /** The Article the Reading view opens is Saved (FEE-30). */
   articleSaved?: true;
@@ -254,9 +256,11 @@ export function worldFeeds(
   const articleView: ArticleView =
     article === 'loading'
       ? { status: 'loading' }
-      : article === 'missing'
-        ? { status: 'missing' }
-        : { status: 'ready', article: READING_FIXTURES[article ?? 'full'] };
+      : article === 'loading-with-title'
+        ? { status: 'loading', title: READING_FIXTURES.full.title }
+        : article === 'missing'
+          ? { status: 'missing' }
+          : { status: 'ready', article: READING_FIXTURES[article ?? 'full'] };
 
   return {
     useAll: (feedId) => {

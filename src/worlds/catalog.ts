@@ -80,6 +80,7 @@ export type AddFeedWorldId = (typeof ADD_FEED_WORLDS)[number]['id'];
 /** The Reading view (FEE-23). */
 export const READING_WORLDS = [
   { id: 'reading-dark', label: 'Reading, dark', spec: { colorScheme: 'dark', section: 'article' } },
+  { id: 'reading-opening', label: 'Opening, before the text arrives', spec: { colorScheme: 'dark', section: 'article', article: 'loading-with-title' } },
   { id: 'reading-light', label: 'Reading, light', spec: { colorScheme: 'light', section: 'article' } },
   { id: 'reading-no-lead-image', label: 'No lead image', spec: { colorScheme: 'dark', section: 'article', article: 'no-lead-image' } },
   {

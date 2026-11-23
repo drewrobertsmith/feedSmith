@@ -2,6 +2,7 @@ import { faceOf } from '../../../test/depth';
 import { act, fireEvent, userEvent, waitFor, within } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
 import { screen } from 'expo-router/testing-library';
+import { useState } from 'react';
 import { Animated, Dimensions, ScrollView, ToastAndroid } from 'react-native';
 import { State, type LegacyPanGesture } from 'react-native-gesture-handler';
 import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
@@ -36,6 +37,7 @@ import {
   FIXTURE_ROWS,
   FIXTURE_UNEXTRACTED_ARTICLE,
 } from '@/worlds/fixtures';
+import type { ArticleView } from '@/feeds/feeds-data';
 import { createWorld, type World, type WorldSpec } from '@/worlds/world';
 import { layOutList, renderWorld } from '../../../test/world-router';
 
@@ -920,6 +922,20 @@ describe('the Reading view', () => {
     'reading-largest-font': { ...full, heading: ARTICLE, body: 'Talks resume next year.', titleSize: 60, theme: 'dark', feed: 'The Verge', pill: 'Save' },
     'reading-saved': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'dark', feed: 'The Verge', pill: 'Done' },
     'reading-saved-light': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'light', feed: 'The Verge', pill: 'Done' },
+    // Opening, before the Article arrives: only the headline the list had, ready for its title to land on (FEE-48).
+    'reading-opening': {
+      heading: ARTICLE,
+      body: null,
+      omittedLines: 0,
+      titleSize: 30,
+      theme: 'dark',
+      note: null,
+      byline: null,
+      openButton: false,
+      leadImage: false,
+      feed: null,
+      pill: null,
+    },
     // Its Feed is gone: the name stays, as plain text, with nowhere to link (T23).
     'reading-removed-feed': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'dark', feed: null, pill: 'Done' },
   };
@@ -1186,5 +1202,41 @@ describe('the title carries from the row into the headline (FEE-48)', () => {
   test('with Remove animations on, nothing is tagged, so opening is a plain cut (Q17)', async () => {
     await open({ colorScheme: 'dark', feeds: 'some', reduceMotion: true });
     expect(tagOf(await screen.findByText(first.title))).toBeUndefined();
+  });
+});
+
+// FEE-48: the title can only travel to a headline that exists from the Reading view's first frame, and a
+// headline swapped for another mid-flight is left invisible on Android. So while the Article loads, the title
+// the list already had is shown, in the same headline that stays once the Article arrives.
+describe('the headline is there from the first frame, and stays the same headline (FEE-48)', () => {
+  const [first] = FIXTURE_ROWS;
+
+  test('while the Article loads, the headline shows the title the list had, ready to land on', async () => {
+    await open({ colorScheme: 'dark', section: 'article', article: 'loading-with-title' });
+    const headline = await screen.findByRole('heading', { name: first.title });
+    expect(headline).toBeOnTheScreen();
+    // Nothing else yet: no Save, no text.
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeOnTheScreen();
+  });
+
+  test('when the Article arrives, the same headline stays: it is never swapped for another', async () => {
+    let arrive: () => void = () => {};
+    const world = createWorld({ colorScheme: 'dark', section: 'article' });
+    // Loading, with the row's title, until `arrive`; then the world's real Article.
+    const feeds = {
+      ...world.feeds,
+      useArticle: (id: string): ArticleView => {
+        const real = world.feeds.useArticle(id);
+        const [arrived, setArrived] = useState(false);
+        arrive = () => setArrived(true);
+        return arrived ? real : { status: 'loading', title: first.title };
+      },
+    };
+    await renderWorld({ ...world, feeds });
+    const before = await screen.findByRole('heading', { name: first.title });
+    await act(async () => arrive());
+    expect(await screen.findByRole('button', { name: 'Save' })).toBeOnTheScreen();
+    expect(screen.getByRole('heading', { name: first.title })).toBe(before);
+    world.dispose();
   });
 });

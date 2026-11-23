@@ -1,7 +1,7 @@
 import { useAction, useConvexAuth, useMutation, useQuery } from 'convex/react';
 import type { OptimisticLocalStore } from 'convex/browser';
 import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex/server';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 import { api } from '../../convex/_generated/api';
 import { useAuth } from '@/auth/auth-context';
@@ -36,13 +36,34 @@ function useSignedInQuery<Query extends FunctionReference<'query'>>(query: Query
   return useQuery(query, ...((live ? [args] : ['skip']) as [FunctionArgs<Query> | 'skip']));
 }
 
+/**
+ * The titles of the Articles the lists have shown, by id, so the Reading view can show an Article's headline
+ * from its first frame, before the Article itself arrives (FEE-48). Only titles the User already saw; kept in
+ * memory for this run of the app, and at most `TITLES_KEPT` of them.
+ */
+const shownTitles = new Map<string, string>();
+const TITLES_KEPT = 500;
+
+function rememberTitles(articles: { id: string; title: string }[] | undefined) {
+  for (const { id, title } of articles ?? []) {
+    shownTitles.delete(id);
+    shownTitles.set(id, title);
+  }
+  for (const oldest of shownTitles.keys()) {
+    if (shownTitles.size <= TITLES_KEPT) break;
+    shownTitles.delete(oldest);
+  }
+}
+
 function useAll(feedId: string | null): AllView {
   const articles = useSignedInQuery(api.articles.all, feedId === null ? {} : { feedId });
+  useEffect(() => rememberTitles(articles), [articles]);
   return articles === undefined ? { status: 'loading' } : { status: 'ready', articles };
 }
 
 function useSaved(): SavedView {
   const articles = useSignedInQuery(api.articles.saved, {});
+  useEffect(() => rememberTitles(articles), [articles]);
   return articles === undefined ? { status: 'loading' } : { status: 'ready', articles };
 }
 
@@ -122,7 +143,7 @@ function useRestorePin() {
 
 function useArticle(id: string): ArticleView {
   const article = useSignedInQuery(api.articles.get, { id });
-  if (article === undefined) return { status: 'loading' };
+  if (article === undefined) return { status: 'loading', title: shownTitles.get(id) };
   return article === null ? { status: 'missing' } : { status: 'ready', article };
 }
 
