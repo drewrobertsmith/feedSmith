@@ -73,6 +73,18 @@ export const ADD_FEED_WORLDS = [
     label: 'Add a Feed, largest font size',
     spec: { colorScheme: 'dark', section: 'add-feed', addFeed: 'choose', fontScale: 2 },
   },
+  // Finding a Feed by its site's name (FEE-80).
+  { id: 'add-find-searching', label: 'Searching for a name', spec: { colorScheme: 'dark', section: 'add-feed', addFeed: 'find-searching' } },
+  { id: 'add-find-arriving', label: 'Results arriving', spec: { colorScheme: 'light', section: 'add-feed', addFeed: 'find-arriving' } },
+  { id: 'add-find-known', label: 'Found', spec: { colorScheme: 'dark', section: 'add-feed', addFeed: 'find-known' } },
+  { id: 'add-find-following', label: 'Found one you follow', spec: { colorScheme: 'light', section: 'add-feed', addFeed: 'find-following' } },
+  { id: 'add-find-nothing', label: 'Nothing found', spec: { colorScheme: 'dark', section: 'add-feed', addFeed: 'find-nothing' } },
+  { id: 'add-find-failed', label: 'Search failed', spec: { colorScheme: 'light', section: 'add-feed', addFeed: 'find-failed' } },
+  {
+    id: 'add-find-largest-font',
+    label: 'Found, largest font size',
+    spec: { colorScheme: 'dark', section: 'add-feed', addFeed: 'find-following', fontScale: 2 },
+  },
 ] as const satisfies readonly CatalogWorld[];
 
 export type AddFeedWorldId = (typeof ADD_FEED_WORLDS)[number]['id'];

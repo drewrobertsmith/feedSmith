@@ -1,5 +1,5 @@
 import type { Account } from '@/auth/auth-context';
-import type { ArticleRow, FeedChip, ManagedFeed, ReadingArticle } from '@/feeds/feeds-data';
+import type { ArticleRow, FeedChip, FoundFeed, ManagedFeed, ReadingArticle } from '@/feeds/feeds-data';
 import { FARNAM_ICON, FIREBALL_ICON, FRAME_PHOTO, RUNWAY_PHOTO, VERGE_ICON } from '@/worlds/fixture-images';
 
 /** Midday UTC, so the date reads the same in every time zone a test runs in. */
@@ -188,6 +188,18 @@ export const FIXTURE_CHOICES = [
   { url: 'https://www.theverge.com/rss/index.xml', title: 'The Verge' },
   { url: 'https://www.theverge.com/rss/reviews/index.xml', title: 'The Verge – Reviews' },
   { url: 'https://www.theverge.com/rss/policy/index.xml', title: 'The Verge – Policy' },
+];
+
+/** Feeds found for "the verge" (FEE-80): The Verge itself, and a look-alike further down. */
+export const FIXTURE_FOUND: FoundFeed[] = [
+  { kind: 'new', url: 'https://www.theverge.com/rss/index.xml', title: VERGE, host: 'theverge.com', iconUrl: VERGE_ICON },
+  { kind: 'new', url: 'https://vergeagency.com/feed', title: 'Verge Agency', host: 'vergeagency.com' },
+];
+
+/** The same search when you already follow The Verge: it says so, by its Feed (T22). */
+export const FIXTURE_FOUND_FOLLOWING: FoundFeed[] = [
+  { kind: 'following', feedId: 'f1', title: VERGE, host: 'theverge.com', iconUrl: VERGE_ICON },
+  FIXTURE_FOUND[1],
 ];
 
 /**

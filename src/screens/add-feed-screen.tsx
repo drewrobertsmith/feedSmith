@@ -1,12 +1,15 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, TextInput, ToastAndroid, View } from 'react-native';
+import Animated, { Easing, Keyframe, LinearTransition, ReduceMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/app-button';
 import { AppText } from '@/components/app-text';
+import { FeedIcon } from '@/components/feed-icon';
 import { useEnvironment } from '@/environment';
-import { useAddFeed, type AddFeedReason, type FeedChoice } from '@/feeds/feeds-data';
+import { isAddress, useAddFeed, type AddFeedReason, type AddFeedView, type FeedChoice, type FoundFeed } from '@/feeds/feeds-data';
+import { motion } from '@/theme/motion';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
 import { typeScale } from '@/theme/type';
@@ -20,6 +23,20 @@ const ERRORS: Record<AddFeedReason, string> = {
   'not-a-feed': 'That address isn’t an RSS or Atom feed. Try the site’s feed URL.',
   'no-feed-found': 'No feed found at that address. Try the site’s feed URL.',
 };
+/** Nothing found, or the search failed: both point to the way that always works, the site's address (FEE-80). */
+const PASTE = 'Paste the site’s address instead, like theverge.com.';
+
+const ICON = 24;
+const ARRIVE_EASING = Easing.bezier(...motion.resultArrive.easing);
+/** A found Feed fades in, rising a few points into its place (motion.resultArrive). */
+const ARRIVE = new Keyframe({
+  0: { opacity: 0, transform: [{ translateY: motion.resultArrive.distance }] },
+  100: { opacity: 1, transform: [{ translateY: 0 }], easing: ARRIVE_EASING },
+})
+  .duration(motion.resultArrive.duration)
+  .reduceMotion(ReduceMotion.System);
+/** The rows after it make room on the same curve, so nothing jumps. */
+const MAKE_ROOM = LinearTransition.duration(motion.resultArrive.duration).easing(ARRIVE_EASING).reduceMotion(ReduceMotion.System);
 
 /** One of a site's feeds, to choose (T21): its title, and the site it's on. */
 function Choice({ choice, onChoose }: { choice: FeedChoice; onChoose: (url: string) => void }) {
@@ -41,28 +58,92 @@ function Choice({ choice, onChoose }: { choice: FeedChoice; onChoose: (url: stri
   );
 }
 
-/** Adding a Feed from a website or feed URL. One action: Add Feed. */
+/** One Feed found by name (FEE-80): its icon, name and site, and whether you already follow it. */
+function Found({ found, onChoose }: { found: FoundFeed; onChoose: (found: FoundFeed) => void }) {
+  const following = found.kind === 'following';
+  return (
+    <Animated.View entering={ARRIVE} layout={MAKE_ROOM}>
+      <Pressable
+        role="button"
+        aria-label={`${found.title}, ${found.host}${following ? ', following' : ''}`}
+        onPress={() => onChoose(found)}
+        className="flex-row items-center gap-related rounded-lg border border-text-muted px-group py-related"
+      >
+        <FeedIcon url={found.iconUrl} title={found.title} size={ICON} />
+        <View className="flex-1 gap-inside">
+          <AppText variant="reading" className="text-text" accessible={false}>
+            {found.title}
+          </AppText>
+          <AppText variant="label" className="text-text-muted" accessible={false}>
+            {found.host}
+          </AppText>
+        </View>
+        {following ? (
+          <AppText variant="label" className="text-text-muted" accessible={false}>
+            Following
+          </AppText>
+        ) : null}
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+/** What's found for a name, best first, under a line saying whether the search is still going. */
+function FoundList({ view, onChoose }: { view: Extract<AddFeedView, { status: 'found' }>; onChoose: (found: FoundFeed) => void }) {
+  return (
+    <View className="gap-related">
+      <AppText variant="label" className="text-text-muted" aria-live="polite">
+        {view.searching ? `Looking for “${view.name}”…` : `Feeds for “${view.name}”`}
+      </AppText>
+      {view.results.map((found) => (
+        <Found key={found.kind === 'new' ? found.url : found.feedId} found={found} onChoose={onChoose} />
+      ))}
+    </View>
+  );
+}
+
+/** Why a search for a name came to nothing, or null while there's something to show. */
+function findMessage(view: AddFeedView): string | null {
+  if (view.status !== 'found' || view.searching || view.results.length > 0) return null;
+  return view.failed ? `Couldn’t search just now. ${PASTE}` : `No feeds found for “${view.name}”. ${PASTE}`;
+}
+
+/** Back to Feeds with a followed Feed's chip chosen, and a quiet note naming it (T22). */
+function showFollowed(title: string, feedId: string) {
+  ToastAndroid.show(`You already follow ${title}.`, ToastAndroid.SHORT);
+  router.dismissTo({ pathname: '/', params: { feed: feedId } });
+}
+
+/**
+ * Adding a Feed from a website or feed URL, or finding one by its site's name (FEE-80). One action:
+ * Add Feed for an address, Find Feeds for a name.
+ */
 export function AddFeedScreen() {
   const insets = useSafeAreaInsets();
   const { colorScheme, fontScale } = useEnvironment();
   const { view, add } = useAddFeed();
-  const [url, setUrl] = useState('');
-  const busy = view.status === 'busy';
+  // A search shown on arrival (the state gallery) keeps the name it was for in the field.
+  const [typed, setTyped] = useState(() => (view.status === 'found' ? view.name : ''));
+  const adding = view.status === 'busy';
+  const searching = view.status === 'found' && view.searching;
+  const byName = typed.trim() !== '' && !isAddress(typed);
   const field = typeScale.reading;
+  const error = view.status === 'error' ? ERRORS[view.reason] : findMessage(view);
 
   const addFrom = async (address: string) => {
-    if (!address.trim() || busy) return;
+    if (!address.trim() || adding || searching) return;
     const outcome = await add(address);
-    if (outcome.kind === 'already') {
-      // Already followed: back to Feeds with its chip chosen, and a quiet note naming it (T22).
-      ToastAndroid.show(`You already follow ${outcome.title}.`, ToastAndroid.SHORT);
-      router.dismissTo({ pathname: '/', params: { feed: outcome.feedId } });
-    } else if (outcome.kind === 'added') router.back();
+    if (outcome.kind === 'already') showFollowed(outcome.title, outcome.feedId);
+    else if (outcome.kind === 'added') router.back();
   };
-  const submit = () => addFrom(url);
+  const choose = (found: FoundFeed) => {
+    if (found.kind === 'following') showFollowed(found.title, found.feedId);
+    else void addFrom(found.url);
+  };
+  const submit = () => addFrom(typed);
 
   return (
-    // Scrolls: a site can offer up to ten feeds, and the largest font size needs the room (Q16).
+    // Scrolls: a site can offer up to ten feeds, a search finds several, and the largest font size needs the room (Q16).
     <ScrollView
       className="flex-1 bg-background"
       contentContainerClassName="gap-section px-edge"
@@ -73,15 +154,15 @@ export function AddFeedScreen() {
       <View className="gap-group">
         <View className="gap-related">
           <AppText variant="label" className="text-text-muted" accessible={false}>
-            Website or feed URL
+            Website, feed URL or name
           </AppText>
           <TextInput
-            aria-label="Website or feed URL"
-            value={url}
-            onChangeText={setUrl}
+            aria-label="Website, feed URL or name"
+            value={typed}
+            onChangeText={setTyped}
             onSubmitEditing={submit}
-            editable={!busy}
-            placeholder="theverge.com"
+            editable={!adding}
+            placeholder="theverge.com or The Verge"
             placeholderTextColor={themes[colorScheme].textMuted}
             inputMode="url"
             keyboardType="url"
@@ -93,9 +174,9 @@ export function AddFeedScreen() {
             style={{ fontFamily: field.fontFamily, fontSize: field.fontSize * fontScale, minHeight: 48 * fontScale }}
           />
         </View>
-        {view.status === 'error' ? (
+        {error ? (
           <AppText variant="label" role="alert" className="text-text">
-            {ERRORS[view.reason]}
+            {error}
           </AppText>
         ) : null}
         {view.status === 'choose' ? (
@@ -108,7 +189,13 @@ export function AddFeedScreen() {
             ))}
           </View>
         ) : null}
-        <AppButton label={busy ? 'Adding…' : 'Add Feed'} onPress={submit} busy={busy} disabled={!url.trim()} />
+        {view.status === 'found' && error === null ? <FoundList view={view} onChoose={choose} /> : null}
+        <AppButton
+          label={adding ? 'Adding…' : searching ? 'Finding…' : byName ? 'Find Feeds' : 'Add Feed'}
+          onPress={submit}
+          busy={adding || searching}
+          disabled={!typed.trim()}
+        />
       </View>
     </ScrollView>
   );

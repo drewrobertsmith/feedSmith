@@ -4,12 +4,14 @@ import { Uniwind } from 'uniwind';
 import type { Account, Auth } from '@/auth/auth-context';
 import type { SignInView } from '@/auth/sign-in-outcome';
 import type { Environment } from '@/environment';
-import type { AddFeedReason, AddFeedView, ArticleRow, ArticleView, FeedsData, SavedBefore } from '@/feeds/feeds-data';
+import { isAddress, type AddFeedReason, type AddFeedView, type ArticleRow, type ArticleView, type FeedsData, type FoundFeed, type SavedBefore } from '@/feeds/feeds-data';
 import {
   FIXTURE_ACCOUNT,
   FIXTURE_ARTICLE,
   FIXTURE_CHIPS,
   FIXTURE_CHOICES,
+  FIXTURE_FOUND,
+  FIXTURE_FOUND_FOLLOWING,
   FIXTURE_LAST_UPDATED_AGO,
   FIXTURE_EXTRACTING_ARTICLE,
   FIXTURE_LONG_FEED_ARTICLE,
@@ -38,6 +40,18 @@ import { PINNED } from '../../convex/lib/pinned';
  * One state the app can be in, as plain data (T13). Later tickets extend it with their
  * own axes (signed in or out, network, fixture Feeds…), reached through the real modules.
  */
+/** Searching for a site's name, as a world shows it (FEE-80). */
+type FindWorld = 'find-searching' | 'find-arriving' | 'find-known' | 'find-following' | 'find-nothing' | 'find-failed';
+const found = (results: FoundFeed[], searching: boolean, failed = false): AddFeedView => ({ status: 'found', name: 'the verge', results, searching, failed });
+const FIND_VIEWS: Record<FindWorld, AddFeedView> = {
+  'find-searching': found([], true),
+  'find-arriving': found(FIXTURE_FOUND.slice(0, 1), true),
+  'find-known': found(FIXTURE_FOUND, false),
+  'find-following': found(FIXTURE_FOUND_FOLLOWING, false),
+  'find-nothing': found([], false),
+  'find-failed': found([], false, true),
+};
+
 export type WorldSpec = {
   colorScheme: ThemeName;
   reduceMotion?: boolean;
@@ -61,9 +75,11 @@ export type WorldSpec = {
   chips?: 'many';
   /**
    * Where adding a Feed is up to. Defaults to idle, where adding succeeds. `choose`: a site with
-   * several feeds. `already`: adding finds The Verge, already followed.
+   * several feeds. `already`: adding finds The Verge, already followed. `find-…`: searching for
+   * "the verge" by name (FEE-80): still searching with nothing yet, results arriving, found, found
+   * one you follow, nothing found, or the search failed.
    */
-  addFeed?: 'idle' | 'busy' | 'choose' | 'already' | AddFeedReason;
+  addFeed?: 'idle' | 'busy' | 'choose' | 'already' | AddFeedReason | FindWorld;
   /** Whether a pull-down refresh is under way. */
   refreshing?: boolean;
   /**
@@ -225,7 +241,9 @@ export function worldFeeds(
         ? { status: 'busy' }
         : addFeed === 'choose'
           ? { status: 'choose', choices: FIXTURE_CHOICES }
-          : { status: 'error', reason: addFeed };
+          : addFeed.startsWith('find-')
+            ? FIND_VIEWS[addFeed as FindWorld]
+            : { status: 'error', reason: addFeed as AddFeedReason };
   const universe = [...FIXTURE_ROWS, ...FIXTURE_SAVED_ROWS.filter((row) => !FIXTURE_ROWS.some((r) => r.id === row.id))];
   // Saved has Articles when the world has Feeds, unless it says otherwise.
   const savedSpec = spec.saved ?? (feeds === 'some' || feeds === 'read' ? 'some' : 'none');
@@ -343,6 +361,8 @@ export function worldFeeds(
         log.added.push(url);
         // Busy stays busy; an error stays on the screen; idle adds the Feed.
         if (addFeed === 'busy') return new Promise(() => {});
+        // A name is searched for, not added: the view shows what's found.
+        if (!isAddress(url)) return Promise.resolve({ kind: 'stay' });
         if (addFeed === 'idle') return Promise.resolve({ kind: 'added' });
         if (addFeed === 'already') return Promise.resolve({ kind: 'already', title: 'The Verge', feedId: 'f1' });
         return Promise.resolve({ kind: 'stay' });

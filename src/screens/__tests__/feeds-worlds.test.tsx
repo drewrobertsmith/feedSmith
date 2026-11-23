@@ -32,6 +32,7 @@ import {
 import {
   FIXTURE_ARTICLE,
   FIXTURE_CHOICES,
+  FIXTURE_FOUND,
   FIXTURE_EXTRACTING_ARTICLE,
   FIXTURE_NOW,
   FIXTURE_ROWS,
@@ -777,37 +778,67 @@ describe("the Pinned chip's stacked icons (FEE-61)", () => {
 });
 
 describe('Add a Feed', () => {
+  const FIELD = 'Website, feed URL or name';
   const ERRORS = {
     'not-a-feed': 'That address isn’t an RSS or Atom feed. Try the site’s feed URL.',
     unreachable: 'Couldn’t reach that address. Check it, or enter the site’s feed URL.',
     'invalid-url': 'Enter a website or feed URL, like theverge.com.',
     'no-feed-found': 'No feed found at that address. Try the site’s feed URL.',
+    'find-nothing': 'No feeds found for “the verge”. Paste the site’s address instead, like theverge.com.',
+    'find-failed': 'Couldn’t search just now. Paste the site’s address instead, like theverge.com.',
   };
-  type Shows = { busy: boolean; error: string | null; choices: number; titleSize: number; theme: 'dark' | 'light' };
+  const LOOKING = 'Looking for “the verge”…';
+  const FOUND_FOR = 'Feeds for “the verge”';
+  /** Each found Feed as TalkBack hears it: its name and site, and whether you follow it. */
+  const NEW = ['The Verge, theverge.com', 'Verge Agency, vergeagency.com'];
+  const FOLLOWING = 'The Verge, theverge.com, following';
+  type Shows = {
+    button: 'Add Feed' | 'Adding…' | 'Find Feeds' | 'Finding…';
+    error: string | null;
+    status: string | null;
+    choices: number;
+    found: readonly string[];
+    titleSize: number;
+    theme: 'dark' | 'light';
+  };
+  const base = { error: null, status: null, choices: 0, found: [], titleSize: 24 } as const;
   const SHOWS: Record<AddFeedWorldId, Shows> = {
-    'add-idle': { busy: false, error: null, choices: 0, titleSize: 24, theme: 'dark' },
-    'add-busy': { busy: true, error: null, choices: 0, titleSize: 24, theme: 'dark' },
-    'add-choose': { busy: false, error: null, choices: FIXTURE_CHOICES.length, titleSize: 24, theme: 'dark' },
-    'add-no-feed': { busy: false, error: ERRORS['no-feed-found'], choices: 0, titleSize: 24, theme: 'light' },
-    'add-not-a-feed': { busy: false, error: ERRORS['not-a-feed'], choices: 0, titleSize: 24, theme: 'dark' },
-    'add-unreachable': { busy: false, error: ERRORS.unreachable, choices: 0, titleSize: 24, theme: 'light' },
-    'add-largest-font': { busy: false, error: null, choices: FIXTURE_CHOICES.length, titleSize: 48, theme: 'dark' },
+    'add-idle': { ...base, button: 'Add Feed', theme: 'dark' },
+    'add-busy': { ...base, button: 'Adding…', theme: 'dark' },
+    'add-choose': { ...base, button: 'Add Feed', choices: FIXTURE_CHOICES.length, theme: 'dark' },
+    'add-no-feed': { ...base, button: 'Add Feed', error: ERRORS['no-feed-found'], theme: 'light' },
+    'add-not-a-feed': { ...base, button: 'Add Feed', error: ERRORS['not-a-feed'], theme: 'dark' },
+    'add-unreachable': { ...base, button: 'Add Feed', error: ERRORS.unreachable, theme: 'light' },
+    'add-largest-font': { ...base, button: 'Add Feed', choices: FIXTURE_CHOICES.length, titleSize: 48, theme: 'dark' },
+    'add-find-searching': { ...base, button: 'Finding…', status: LOOKING, theme: 'dark' },
+    'add-find-arriving': { ...base, button: 'Finding…', status: LOOKING, found: NEW.slice(0, 1), theme: 'light' },
+    'add-find-known': { ...base, button: 'Find Feeds', status: FOUND_FOR, found: NEW, theme: 'dark' },
+    'add-find-following': { ...base, button: 'Find Feeds', status: FOUND_FOR, found: [FOLLOWING, NEW[1]], theme: 'light' },
+    'add-find-nothing': { ...base, button: 'Find Feeds', error: ERRORS['find-nothing'], theme: 'dark' },
+    'add-find-failed': { ...base, button: 'Find Feeds', error: ERRORS['find-failed'], theme: 'light' },
+    'add-find-largest-font': { ...base, button: 'Find Feeds', status: FOUND_FOR, found: [FOLLOWING, NEW[1]], titleSize: 48, theme: 'dark' },
   };
 
   test.each(ADD_FEED_WORLDS)('$label', async ({ id, spec }) => {
     const shows = SHOWS[id];
     await open(spec);
     expect(await screen.findByRole('heading', { name: 'Add a Feed' })).toHaveStyle({ fontSize: shows.titleSize });
-    const field = screen.getByLabelText('Website or feed URL');
-    if (shows.busy) {
-      expect(screen.getByRole('button', { name: 'Adding…' })).toBeDisabled();
+    const field = screen.getByLabelText(FIELD);
+    const button = screen.getByRole('button', { name: shows.button });
+    if (shows.button === 'Adding…') {
+      expect(button).toBeDisabled();
       expect(field).toHaveProp('editable', false);
+    } else if (shows.button === 'Finding…') {
+      expect(button).toBeBusy();
     } else {
-      expect(screen.getByRole('button', { name: 'Add Feed' })).toBeOnTheScreen();
+      expect(button).toBeOnTheScreen();
     }
     if (shows.error) expect(screen.getByRole('alert')).toHaveTextContent(shows.error);
     else expect(screen.queryByRole('alert')).not.toBeOnTheScreen();
-    expect(screen.queryAllByRole('button', { name: /, theverge\.com$/ })).toHaveLength(shows.choices);
+    if (shows.status) expect(screen.getByText(shows.status)).toBeOnTheScreen();
+    for (const name of shows.found) expect(screen.getByRole('button', { name })).toBeOnTheScreen();
+    // A site's feeds to choose from, or Feeds found by name: never both.
+    expect(screen.queryAllByRole('button', { name: /, (theverge|vergeagency)\.com(, following)?$/ })).toHaveLength(shows.choices + shows.found.length);
     expect(Uniwind.currentTheme).toBe(shows.theme);
   });
 
@@ -820,16 +851,50 @@ describe('Add a Feed', () => {
     expect(w.feedsLog.added).toEqual([first.url]);
   });
 
-  test('Add Feed waits for a URL', async () => {
+  test('Add Feed waits for a URL or a name', async () => {
     await open({ colorScheme: 'dark', section: 'add-feed' });
     expect(await screen.findByRole('button', { name: 'Add Feed' })).toBeDisabled();
+  });
+
+  test('a name is searched for, an address is added', async () => {
+    const user = userEvent.setup();
+    const w = await open({ colorScheme: 'dark', section: 'add-feed' });
+    const field = await screen.findByLabelText(FIELD);
+    await user.type(field, 'the verge');
+    await user.press(screen.getByRole('button', { name: 'Find Feeds' }));
+    expect(w.feedsLog.added).toEqual(['the verge']);
+    // A name keeps you here, to choose from what's found.
+    expect(screen.getByRole('heading', { name: 'Add a Feed' })).toBeOnTheScreen();
+    await user.clear(field);
+    await user.type(field, 'theverge.com');
+    expect(screen.getByRole('button', { name: 'Add Feed' })).toBeEnabled();
+  });
+
+  test('choosing a found Feed adds it, exactly as choosing a discovered one does', async () => {
+    const user = userEvent.setup();
+    const w = await open({ colorScheme: 'dark', section: 'add-feed', addFeed: 'find-known' });
+    await user.press(await screen.findByRole('button', { name: NEW[0] }));
+    expect(w.feedsLog.added).toEqual([FIXTURE_FOUND[0].kind === 'new' ? FIXTURE_FOUND[0].url : '']);
+  });
+
+  test('choosing a found Feed you already follow takes you back to its chip, with a quiet note naming it (T22)', async () => {
+    const toast = jest.spyOn(ToastAndroid, 'show').mockImplementation(() => {});
+    const user = userEvent.setup();
+    const w = await open({ colorScheme: 'dark', feeds: 'some', addFeed: 'find-following' });
+    await user.press(await screen.findByRole('button', { name: 'Add a Feed' }));
+    await user.press(await screen.findByRole('button', { name: FOLLOWING }));
+    expect(await screen.findByRole('heading', { name: 'Feeds' })).toBeOnTheScreen();
+    expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName('The Verge, Pinned');
+    expect(toast).toHaveBeenCalledWith('You already follow The Verge.', ToastAndroid.SHORT);
+    expect(w.feedsLog.added).toEqual([]);
+    toast.mockRestore();
   });
 
   test('adding a Feed sends the URL and returns to All', async () => {
     const user = userEvent.setup();
     const w = await open({ colorScheme: 'dark', feeds: 'some' });
     await user.press(await screen.findByRole('button', { name: 'Add a Feed' }));
-    await user.type(await screen.findByLabelText('Website or feed URL'), 'https://www.theverge.com/rss/index.xml');
+    await user.type(await screen.findByLabelText(FIELD), 'https://www.theverge.com/rss/index.xml');
     await user.press(screen.getByRole('button', { name: 'Add Feed' }));
     expect(w.feedsLog.added).toEqual(['https://www.theverge.com/rss/index.xml']);
     expect(await screen.findByRole('heading', { name: 'Feeds' })).toBeOnTheScreen();
@@ -840,7 +905,7 @@ describe('Add a Feed', () => {
     const user = userEvent.setup();
     await open({ colorScheme: 'dark', feeds: 'some', addFeed: 'already' });
     await user.press(await screen.findByRole('button', { name: 'Add a Feed' }));
-    await user.type(await screen.findByLabelText('Website or feed URL'), 'theverge.com');
+    await user.type(await screen.findByLabelText(FIELD), 'theverge.com');
     await user.press(screen.getByRole('button', { name: 'Add Feed' }));
     expect(await screen.findByRole('heading', { name: 'Feeds' })).toBeOnTheScreen();
     expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName('The Verge, Pinned');
@@ -852,11 +917,11 @@ describe('Add a Feed', () => {
   test('a failed add stays on the screen with the URL kept', async () => {
     const user = userEvent.setup();
     const w = await open({ colorScheme: 'dark', section: 'add-feed', addFeed: 'not-a-feed' });
-    await user.type(await screen.findByLabelText('Website or feed URL'), 'https://example.com/');
+    await user.type(await screen.findByLabelText(FIELD), 'https://example.com/');
     await user.press(screen.getByRole('button', { name: 'Add Feed' }));
     expect(w.feedsLog.added).toEqual(['https://example.com/']);
     expect(screen.getByRole('heading', { name: 'Add a Feed' })).toBeOnTheScreen();
-    expect(screen.getByLabelText('Website or feed URL')).toHaveDisplayValue('https://example.com/');
+    expect(screen.getByLabelText(FIELD)).toHaveDisplayValue('https://example.com/');
   });
 });
 
