@@ -57,6 +57,15 @@ export type AddFeedReason = Infer<typeof vAddFeedReason>;
 /** What a Feed said about its version last time (T19). */
 export const vValidators = { etag: v.optional(v.string()), lastModified: v.optional(v.string()) };
 
+/** Where reading an Article from its page is up to (T8, FEE-25). */
+export const vExtraction = v.union(v.literal('pending'), v.literal('extracted'), v.literal('failed'));
+
+/** What reading an Article's page came to: its blocks, or a failure. Either may bring the page's image. */
+export const vExtractOutcome = v.union(
+  v.object({ _tag: v.literal('Extracted'), blocks: v.array(vBlock), omitted: v.array(vOmittedKind), imageUrl: v.optional(v.string()) }),
+  v.object({ _tag: v.literal('Failed'), imageUrl: v.optional(v.string()) }),
+);
+
 /** An Article as a fetch hands it to be stored: fields and its cleaned content. */
 export const vStoredArticle = v.object({
   guid: v.string(),
@@ -67,6 +76,8 @@ export const vStoredArticle = v.object({
   imageUrl: v.optional(v.string()),
   blocks: v.array(vBlock),
   omitted: v.array(vOmittedKind),
+  /** Summary only, with a page to read it from (T8). */
+  extraction: v.optional(v.literal('pending')),
 });
 
 export type StoredArticle = Infer<typeof vStoredArticle>;

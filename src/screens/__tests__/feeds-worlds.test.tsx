@@ -22,7 +22,14 @@ import {
   type AllWorldId,
   type ReadingWorldId,
 } from '@/worlds/catalog';
-import { FIXTURE_ARTICLE, FIXTURE_CHOICES, FIXTURE_NOW, FIXTURE_ROWS } from '@/worlds/fixtures';
+import {
+  FIXTURE_ARTICLE,
+  FIXTURE_CHOICES,
+  FIXTURE_EXTRACTING_ARTICLE,
+  FIXTURE_NOW,
+  FIXTURE_ROWS,
+  FIXTURE_UNEXTRACTED_ARTICLE,
+} from '@/worlds/fixtures';
 import { createWorld, type World, type WorldSpec } from '@/worlds/world';
 
 jest.mock('expo-web-browser', () => ({ openBrowserAsync: jest.fn() }));
@@ -390,15 +397,36 @@ describe('Add a Feed', () => {
 });
 
 describe('the Reading view', () => {
-  type Shows = { heading: string; body: string | null; omittedLines: number; titleSize: number; theme: 'dark' | 'light' };
+  type Shows = {
+    heading: string;
+    body: string | null;
+    omittedLines: number;
+    titleSize: number;
+    theme: 'dark' | 'light';
+    /** The quiet line about the page, for a summary-only Article (FEE-25). */
+    note: string | null;
+    openButton: boolean;
+    leadImage: boolean;
+  };
   const ARTICLE = FIXTURE_ARTICLE.title;
+  const CALM = FIXTURE_EXTRACTING_ARTICLE.title;
+  const SUBTITLE = FIXTURE_EXTRACTING_ARTICLE.subtitle!;
   const MISSING = 'This Article isn’t available.';
+  const BRINGING = 'Bringing in the full Article from its page…';
+  const UNREAD = 'This Article couldn’t be brought in from its page.';
+  const full = { omittedLines: 0, titleSize: 24, note: null, openButton: false, leadImage: false } as const;
+  const fallback = { heading: CALM, body: SUBTITLE, omittedLines: 0, titleSize: 24, note: UNREAD, openButton: true, leadImage: true } as const;
   const SHOWS: Record<ReadingWorldId, Shows> = {
-    'reading-dark': { heading: ARTICLE, body: 'Talks resume next year.', omittedLines: 0, titleSize: 24, theme: 'dark' },
-    'reading-light': { heading: ARTICLE, body: 'Talks resume next year.', omittedLines: 0, titleSize: 24, theme: 'light' },
-    'reading-omitted': { heading: ARTICLE, body: 'And how the prices compare:', omittedLines: 2, titleSize: 24, theme: 'dark' },
-    'reading-missing': { heading: MISSING, body: null, omittedLines: 0, titleSize: 24, theme: 'dark' },
-    'reading-largest-font': { heading: ARTICLE, body: 'Talks resume next year.', omittedLines: 0, titleSize: 48, theme: 'dark' },
+    'reading-dark': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'dark' },
+    'reading-light': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'light' },
+    'reading-omitted': { ...full, heading: ARTICLE, body: 'And how the prices compare:', omittedLines: 2, theme: 'dark' },
+    'reading-missing': { ...full, heading: MISSING, body: null, theme: 'dark' },
+    'reading-extracting': { ...full, heading: CALM, body: SUBTITLE, note: BRINGING, theme: 'dark' },
+    'reading-unextracted': { ...fallback, theme: 'dark' },
+    'reading-unextracted-no-image': { ...fallback, leadImage: false, theme: 'dark' },
+    'reading-unextracted-light': { ...fallback, theme: 'light' },
+    'reading-unextracted-largest-font': { ...fallback, titleSize: 48, theme: 'dark' },
+    'reading-largest-font': { ...full, heading: ARTICLE, body: 'Talks resume next year.', titleSize: 48, theme: 'dark' },
   };
 
   test.each(READING_WORLDS)('$label', async ({ id, spec }) => {
@@ -407,7 +435,24 @@ describe('the Reading view', () => {
     expect(await screen.findByRole('heading', { name: shows.heading })).toHaveStyle({ fontSize: shows.titleSize });
     if (shows.body) expect(screen.getByText(shows.body)).toBeOnTheScreen();
     expect(screen.queryAllByText(/isn’t shown here\./)).toHaveLength(shows.omittedLines);
+    if (shows.note) expect(screen.getByText(shows.note)).toBeOnTheScreen();
+    else expect(screen.queryByText(new RegExp(`${BRINGING}|${UNREAD}`))).not.toBeOnTheScreen();
+    expect(screen.queryAllByRole('button', { name: 'Open original' })).toHaveLength(shows.openButton ? 1 : 0);
+    // The fallback draws only the lead image, when there is one.
+    if (shows.openButton) expect(screen.queryAllByTestId('block-image')).toHaveLength(shows.leadImage ? 1 : 0);
     expect(Uniwind.currentTheme).toBe(shows.theme);
+  });
+
+  test("when the page couldn't be read, Open original opens it in the browser (Q6)", async () => {
+    const user = userEvent.setup();
+    await open({ colorScheme: 'dark', section: 'article', article: 'unextracted' });
+    await user.press(await screen.findByRole('button', { name: 'Open original' }));
+    expect(WebBrowser.openBrowserAsync).toHaveBeenLastCalledWith(FIXTURE_UNEXTRACTED_ARTICLE.link);
+  });
+
+  test('while the page is read, TalkBack hears it when the text arrives (Q15)', async () => {
+    await open({ colorScheme: 'dark', section: 'article', article: 'extracting' });
+    expect(await screen.findByText(BRINGING)).toHaveProp('accessibilityLiveRegion', 'polite');
   });
 
   test('draws every kind of block with native components (T17, Q8)', async () => {

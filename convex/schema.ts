@@ -1,7 +1,7 @@
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
 
-import { vBlock, vOmittedKind } from './lib/feed/validators';
+import { vBlock, vOmittedKind, vExtraction } from './lib/feed/validators';
 
 export default defineSchema({
   users: defineTable({
@@ -46,8 +46,14 @@ export default defineSchema({
     imageUrl: v.optional(v.string()),
     /** When the User first opened it (P7). */
     readAt: v.optional(v.number()),
+    /**
+     * Reading a summary-only Article in full from its page (T8, FEE-25): `pending` until its
+     * page has been read, then `extracted` or `failed`. Absent when the Feed carries its full text.
+     */
+    extraction: v.optional(vExtraction),
   })
     .index('by_user_published', ['userId', 'publishedAt'])
+    .index('by_feed_extraction', ['feedId', 'extraction'])
     .index('by_feed_guid', ['feedId', 'guid'])
     .index('by_feed_published', ['feedId', 'publishedAt'])
     .index('by_published', ['publishedAt']),

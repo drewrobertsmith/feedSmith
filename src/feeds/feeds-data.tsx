@@ -28,8 +28,16 @@ export type ReadingArticle = {
   publishedAt: number;
   /** The original page, when the Feed gave an https one. */
   link?: string;
+  subtitle?: string;
+  /** The lead image (the Feed's, else its page's), for when the text couldn't be brought in. */
+  imageUrl?: string;
   blocks: Block[];
   omitted: OmittedKind[];
+  /**
+   * A summary-only Article (T8): its page is still being read, or couldn't be (Q6). Absent once
+   * the text is whole.
+   */
+  page?: 'extracting' | 'unavailable';
 };
 
 export type AllView = { status: 'loading' } | { status: 'ready'; articles: ArticleRow[] };

@@ -40,6 +40,8 @@ export function articlesToStore(articles: ParsedArticle[], budget = MAX_FETCH_SI
     const bodySize = JSON.stringify(body).length;
     if (size + bodySize > budget) body = subtitleOnly(articles[i]);
     else size += bodySize;
-    return [{ ...fields, ...(imageUrl ? { imageUrl } : {}), ...body }];
+    // Summary only, but with a page to read: its page is read after it's stored (T8).
+    const extraction = !articles[i].html && fields.link ? { extraction: 'pending' as const } : {};
+    return [{ ...fields, ...(imageUrl ? { imageUrl } : {}), ...body, ...extraction }];
   });
 }

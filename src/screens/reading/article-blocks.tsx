@@ -81,6 +81,7 @@ function BlockView({ block, link }: { block: Block; link?: string }) {
       return (
         <View className="gap-related">
           <Image
+            testID="block-image"
             source={{ uri: block.src }}
             accessible={!!block.alt}
             role={block.alt ? 'img' : undefined}

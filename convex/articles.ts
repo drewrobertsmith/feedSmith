@@ -106,8 +106,12 @@ export const get = query({
       feedTitle: v.string(),
       publishedAt: v.number(),
       link: v.optional(v.string()),
+      subtitle: v.optional(v.string()),
+      imageUrl: v.optional(v.string()),
       blocks: v.array(vBlock),
       omitted: v.array(vOmittedKind),
+      /** Summary only: its page is still being read, or couldn't be (T8, Q6). Absent once the text is whole. */
+      page: v.optional(v.union(v.literal('extracting'), v.literal('unavailable'))),
     }),
   ),
   handler: async (ctx, args) => {
@@ -123,16 +127,23 @@ export const get = query({
     ]);
     // A removed Feed's Articles are on their way out (T23); a link to one opens nothing.
     if (!feed) return null;
+    const page = PAGE[article.extraction ?? 'none'];
     return {
       title: article.title,
       feedTitle: feed.title,
       publishedAt: article.publishedAt,
       link: article.link,
+      subtitle: article.subtitle,
+      imageUrl: article.imageUrl,
       blocks: body?.blocks ?? [],
       omitted: body?.omitted ?? [],
+      ...(page ? { page } : {}),
     };
   },
 });
+
+/** What the Reading view is told about an Article's page, by where reading it is up to. */
+const PAGE = { pending: 'extracting', failed: 'unavailable', extracted: undefined, none: undefined } as const;
 
 /** Opening an Article marks it Read (P7). Only the User's own; the first opening counts. */
 export const markRead = mutation({
