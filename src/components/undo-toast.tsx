@@ -11,14 +11,19 @@ const SHOWN_FOR = 4000;
 const ENTER = FadeIn.duration(200).easing(Easing.bezier(0.23, 1, 0.32, 1)).reduceMotion(ReduceMotion.System);
 const EXIT = FadeOut.duration(150).reduceMotion(ReduceMotion.System);
 
-type Toast = { key: number; message: string; undo: () => void };
-type UndoState = { toast: Toast | null; show: (message: string, undo: () => void) => void; dismiss: () => void };
+type Toast = { key: number; message: string; undo?: () => void };
+type Show = (message: string, undo?: () => void) => void;
+type UndoState = { toast: Toast | null; dismiss: () => void };
 
+/** The note on screen, for the hosts that draw it. */
 const UndoContext = createContext<UndoState | null>(null);
+/** Showing a note: never changes, so a list whose rows can show one doesn't re-render when one does. */
+const ShowContext = createContext<Show | null>(null);
 
 /**
  * Undo for reversible actions (Q35): an action happens at once, then a short note says what
- * happened, with Undo, for a few seconds. One at a time: a new one replaces the last. It's
+ * happened, with Undo, for a few seconds. A note can also come without Undo, when there's nothing
+ * to undo (a fourth Pin refused). One at a time: a new one replaces the last. It's
  * announced to TalkBack, which can ask for it to stay longer, and its timer is cleared when it
  * goes or the app does (Q20).
  */
@@ -34,19 +39,23 @@ export function UndoProvider({ children }: { children: ReactNode }) {
       const shownFor = typeof ms === 'number' && ms > SHOWN_FOR ? ms : SHOWN_FOR;
       if (!gone) timer = setTimeout(() => setToast((now) => (now?.key === toast.key ? null : now)), shownFor);
     });
-    AccessibilityInfo.announceForAccessibility(`${toast.message} Undo is available.`);
+    AccessibilityInfo.announceForAccessibility(toast.undo ? `${toast.message} Undo is available.` : toast.message);
     return () => {
       gone = true;
       if (timer) clearTimeout(timer);
     };
   }, [toast]);
 
-  const state: UndoState = {
-    toast,
-    show: (message, undo) => setToast((last) => ({ key: (last?.key ?? 0) + 1, message, undo })),
-    dismiss: () => setToast(null),
-  };
-  return <UndoContext value={state}>{children}</UndoContext>;
+  const [show] = useState(() => {
+    const showNote: Show = (message, undo) => setToast((last) => ({ key: (last?.key ?? 0) + 1, message, undo }));
+    return showNote;
+  });
+  const state: UndoState = { toast, dismiss: () => setToast(null) };
+  return (
+    <ShowContext value={show}>
+      <UndoContext value={state}>{children}</UndoContext>
+    </ShowContext>
+  );
 }
 
 function useUndoState(): UndoState {
@@ -55,9 +64,11 @@ function useUndoState(): UndoState {
   return state;
 }
 
-/** Shows what just happened, with Undo (Q35). */
-export function useUndo(): UndoState['show'] {
-  return useUndoState().show;
+/** Shows what just happened, with Undo when it can be undone (Q35). */
+export function useUndo(): Show {
+  const show = use(ShowContext);
+  if (!show) throw new Error('useUndo needs an <UndoProvider> above it');
+  return show;
 }
 
 /**
@@ -68,10 +79,7 @@ export function UndoToastHost({ bottom = 0 }: { bottom?: number }) {
   const { toast, dismiss } = useUndoState();
   const focused = useIsFocused();
   if (!toast || !focused) return null;
-  const undo = () => {
-    dismiss();
-    toast.undo();
-  };
+  const { undo } = toast;
   return (
     <View pointerEvents="box-none" className="absolute left-0 right-0 px-edge" style={{ bottom: bottom + spacing.group }}>
       <Animated.View
@@ -86,17 +94,22 @@ export function UndoToastHost({ bottom = 0 }: { bottom?: number }) {
           {toast.message}
         </AppText>
         {/* An outlined button, as the app's other quiet actions are (Open original). */}
-        <Pressable
-          role="button"
-          aria-label="Undo"
-          onPress={undo}
-          hitSlop={spacing.related}
-          className="rounded-full border border-text-muted px-group py-related"
-        >
-          <AppText variant="label" className="text-text" accessible={false}>
-            Undo
-          </AppText>
-        </Pressable>
+        {undo ? (
+          <Pressable
+            role="button"
+            aria-label="Undo"
+            onPress={() => {
+              dismiss();
+              undo();
+            }}
+            hitSlop={spacing.related}
+            className="rounded-full border border-text-muted px-group py-related"
+          >
+            <AppText variant="label" className="text-text" accessible={false}>
+              Undo
+            </AppText>
+          </Pressable>
+        ) : null}
       </Animated.View>
     </View>
   );

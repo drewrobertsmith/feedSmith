@@ -106,6 +106,7 @@ export type FeedsLog = {
   saves: string[];
   dones: string[];
   restores: { id: string; before: SavedBefore }[];
+  restoredPins: { id: string; place?: number }[];
 };
 
 const emptyLog = (): FeedsLog => ({
@@ -119,6 +120,7 @@ const emptyLog = (): FeedsLog => ({
   saves: [],
   dones: [],
   restores: [],
+  restoredPins: [],
 });
 
 /**
@@ -289,8 +291,14 @@ export function worldFeeds(
       },
     }),
     useSetPinned: () => async (id, pinned) => {
-      if (pinned && spec.pins === 'full') return 'pins-full';
+      if (pinned && spec.pins === 'full') return { outcome: 'pins-full' };
       log.pins.push({ id, pinned });
+      // An Unpin says where the Feed was among the Pins, for Undo.
+      const place = someChips.filter((chip) => chip.pinned).findIndex((chip) => chip.id === id);
+      return pinned || place < 0 ? { outcome: 'ok' } : { outcome: 'ok', place };
+    },
+    useRestorePin: () => async (id, place) => {
+      log.restoredPins.push({ id, place });
       return 'ok';
     },
     useArticle: (id) => {

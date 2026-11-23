@@ -95,6 +95,71 @@ describe('chip order (P9)', () => {
   });
 });
 
+describe('Undo for Pin and Unpin (FEE-46, Q35)', () => {
+  const four = [
+    { title: 'A', ago: HOUR },
+    { title: 'B', ago: 2 * HOUR },
+    { title: 'C', ago: 3 * HOUR },
+    { title: 'D', ago: 4 * HOUR },
+  ];
+  const pinAll = async (s: Awaited<ReturnType<typeof setup>>, ids: Id<'feeds'>[]) => {
+    for (const id of ids) await s.a.mutation(api.feeds.setPinned, { id, pinned: true });
+  };
+
+  test('unpinning says where the Feed was among the Pins, and Undo puts it back there', async () => {
+    const s = await setup(four);
+    const [a, b, c] = s.feedIds;
+    await pinAll(s, [c, a, b]);
+    const result = await s.a.mutation(api.feeds.setPinned, { id: a, pinned: false });
+    expect(result).toEqual({ ok: true, place: 1 });
+    expect((await titles(s)).slice(0, 2)).toEqual(['C', 'B']);
+
+    expect(await s.a.mutation(api.feeds.restorePin, { id: a, place: 1 })).toEqual({ ok: true });
+    expect((await titles(s)).slice(0, 3)).toEqual(['C', 'A', 'B']);
+  });
+
+  test('Undo still works after the Pins were reordered meanwhile, as near its place as it can', async () => {
+    const s = await setup(four);
+    const [a, b, c] = s.feedIds;
+    await pinAll(s, [a, b, c]);
+    await s.a.mutation(api.feeds.setPinned, { id: a, pinned: false });
+    await s.a.mutation(api.feeds.orderPins, { ids: [c, b] });
+    await s.a.mutation(api.feeds.restorePin, { id: a, place: 0 });
+    expect((await titles(s)).slice(0, 3)).toEqual(['A', 'C', 'B']);
+  });
+
+  test('Undo is refused when three other Feeds were Pinned meanwhile', async () => {
+    const s = await setup(four);
+    const [a, b, c, d] = s.feedIds;
+    await pinAll(s, [a, b, c]);
+    await s.a.mutation(api.feeds.setPinned, { id: a, pinned: false });
+    await s.a.mutation(api.feeds.setPinned, { id: d, pinned: true });
+    expect(await s.a.mutation(api.feeds.restorePin, { id: a, place: 0 })).toEqual({ ok: false, reason: 'pins-full' });
+    expect((await titles(s)).slice(0, 3)).toEqual(['B', 'C', 'D']);
+  });
+
+  test('no place, or a place that is no place, puts it last; a Feed already Pinned stays where it is', async () => {
+    const s = await setup(four);
+    const [a, b, c] = s.feedIds;
+    await pinAll(s, [b, c]);
+    for (const place of [Number.NaN, Number.POSITIVE_INFINITY, -3, 1.5, 99, undefined]) {
+      await s.a.mutation(api.feeds.restorePin, { id: a, place });
+      expect((await titles(s)).slice(0, 3)).toEqual(['B', 'C', 'A']);
+      await s.a.mutation(api.feeds.setPinned, { id: a, pinned: false });
+    }
+    await s.a.mutation(api.feeds.restorePin, { id: b, place: 1 });
+    expect((await titles(s)).slice(0, 2)).toEqual(['B', 'C']);
+  });
+
+  test("only the User's own Feed, and never signed out (Q10)", async () => {
+    const s = await setup(four);
+    expect(await s.b.mutation(api.feeds.restorePin, { id: s.feedIds[0], place: 0 })).toEqual({ ok: false, reason: 'not-found' });
+    expect(await s.a.mutation(api.feeds.restorePin, { id: 'nope', place: 0 })).toEqual({ ok: false, reason: 'not-found' });
+    await expect(s.t.mutation(api.feeds.restorePin, { id: s.feedIds[0], place: 0 })).rejects.toThrow(/SIGNED_OUT/);
+    expect((await s.a.query(api.feeds.chips, {})).every((chip) => !chip.pinned)).toBe(true);
+  });
+});
+
 describe("each User's own Feeds (Q10)", () => {
   test("another User sees no chips, can't Pin A's Feed, and can't read its Articles", async () => {
     const s = await setup([{ title: 'A', ago: HOUR }]);

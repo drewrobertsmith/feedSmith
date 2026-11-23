@@ -85,6 +85,8 @@ export type ManageActions = {
 
 /** What Pinning or unpinning came to: a fourth Pin is refused (P9). */
 export type PinOutcome = 'ok' | 'pins-full' | 'not-found';
+/** Pinning or unpinning, and for an Unpin, where the Feed was among the Pins (from 0), for Undo (Q35). */
+export type PinResult = { outcome: PinOutcome; place?: number };
 export type ArticleView = { status: 'loading' } | { status: 'missing' } | { status: 'ready'; article: ReadingArticle };
 /**
  * What adding a Feed came to: added; already followed at that URL (by its name), which takes
@@ -115,8 +117,10 @@ export type FeedsData = {
   useSaved: () => SavedView;
   /** Saving, marking Done, and Undo. */
   useSavedActions: () => SavedActions;
-  /** Pins or unpins a Feed. */
-  useSetPinned: () => (id: string, pinned: boolean) => Promise<PinOutcome>;
+  /** Pins or unpins a Feed, at once (optimistic). */
+  useSetPinned: () => (id: string, pinned: boolean) => Promise<PinResult>;
+  /** Undo for Unpin: Pins a Feed again at its old place among the Pins, or last with none (Q35). */
+  useRestorePin: () => (id: string, place?: number) => Promise<PinOutcome>;
   /** Manage Feeds' list, Pinned first in order (D13). */
   useManage: () => ManageView;
   /** Renaming, removing and ordering Pinned Feeds. */
@@ -176,6 +180,12 @@ export function useManage(): ManageView {
 /** Renaming, removing and ordering. */
 export function useManageActions(): ManageActions {
   const { useManageActions: read } = useFeedsData();
+  return read();
+}
+
+/** Undo for Unpin. */
+export function useRestorePin(): ReturnType<FeedsData['useRestorePin']> {
+  const { useRestorePin: read } = useFeedsData();
   return read();
 }
 
