@@ -197,3 +197,98 @@ describe('a summary-only Feed reads in full, from its pages (FEE-25, T8)', () =>
     expect(await s.other.query(api.articles.get, { id: await s.idOf('slow') })).toBeNull();
   });
 });
+
+describe("reading pages never touches what All reads, unless it brings an image (FEE-62)", () => {
+  /** The article page without its preview image: reading it adds text, and nothing All shows. */
+  const imageless = article.replace(/<meta[^>]+(og:image|twitter:image)[^>]*>/g, '');
+  const rows = (t: ReturnType<typeof convexTest>) => t.run((ctx) => ctx.db.query('articles').collect());
+
+  test('the Article rows are exactly as they were after their pages are read', async () => {
+    pages['https://calmnotes.example/one'] = imageless;
+    pages['https://calmnotes.example/two'] = imageless;
+    const s = await follow([
+      { guid: 'one', link: 'https://calmnotes.example/one' },
+      { guid: 'two', link: 'https://calmnotes.example/two' },
+    ]);
+    const before = await rows(s.t);
+
+    await s.finish();
+
+    expect(pageFetches()).toHaveLength(2);
+    expect(await rows(s.t)).toEqual(before);
+    // The text did arrive: the Reading view has it.
+    expect(textOf(await s.open('one'))).not.toContain('"page"');
+  });
+
+  test("a page that couldn't be read leaves the rows alone too, and the Reading view still knows", async () => {
+    pages['https://calmnotes.example/gone'] = 500;
+    const s = await follow([{ guid: 'gone', link: 'https://calmnotes.example/gone' }]);
+    const before = await rows(s.t);
+
+    await s.finish();
+
+    expect(await rows(s.t)).toEqual(before);
+    expect(await s.open('gone')).toMatchObject({ page: 'unavailable' });
+  });
+});
+
+describe('moving page-reading state off the Article (FEE-62 migration)', () => {
+  test('each state moves exactly; extracted needs no row; the Articles lose the old field; a second run changes nothing', async () => {
+    const t = convexTest(schema, modules);
+    const ids = await t.run(async (ctx) => {
+      const userId = await ctx.db.insert('users', { email: 'a@example.com' });
+      const feedId = await ctx.db.insert('feeds', { userId, url: FEED, title: 'Calm Notes' });
+      const article = (guid: string, extraction?: 'pending' | 'reading' | 'extracted' | 'failed') =>
+        ctx.db.insert('articles', { userId, feedId, guid, title: guid, publishedAt: NOW, ...(extraction ? { extraction } : {}) });
+      return {
+        pending: await article('p', 'pending'),
+        reading: await article('r', 'reading'),
+        extracted: await article('e', 'extracted'),
+        failed: await article('f', 'failed'),
+        full: await article('full'),
+      };
+    });
+
+    await t.mutation(internal.migrations.movePageReads, {});
+    const afterFirst = await t.run(async (ctx) => [await ctx.db.query('articles').collect(), await ctx.db.query('pageReads').collect()]);
+    await t.mutation(internal.migrations.movePageReads, {});
+
+    const [articles, reads] = await t.run(async (ctx) => [await ctx.db.query('articles').collect(), await ctx.db.query('pageReads').collect()]);
+    // A claim made by the code before this move belongs to a run that's gone: its page is read again.
+    expect(Object.fromEntries(reads.map((read) => [read.articleId, read.state]))).toEqual({
+      [ids.pending]: 'pending',
+      [ids.reading]: 'pending',
+      [ids.failed]: 'failed',
+    });
+    for (const article of articles) expect(article).not.toHaveProperty('extraction');
+    expect([articles, reads]).toEqual(afterFirst);
+  });
+});
+
+test("a Feed whose pages were waiting when the code changed has them read, not stranded (FEE-62 migration)", async () => {
+  const t = convexTest(schema, modules);
+  pages['https://calmnotes.example/waiting'] = article;
+  const articleId = await t.run(async (ctx) => {
+    const userId = await ctx.db.insert('users', { email: 'a@example.com' });
+    const feedId = await ctx.db.insert('feeds', { userId, url: FEED, title: 'Calm Notes' });
+    const id = await ctx.db.insert('articles', {
+      userId,
+      feedId,
+      guid: 'waiting',
+      title: 'waiting',
+      link: 'https://calmnotes.example/waiting',
+      publishedAt: NOW,
+      extraction: 'reading',
+    });
+    await ctx.db.insert('articleBodies', { userId, articleId: id, blocks: [], omitted: [] });
+    return id;
+  });
+
+  await t.mutation(internal.migrations.movePageReads, {});
+  await runScheduledNow(t);
+
+  expect(network.mock.calls.map(([url]) => url)).toContain('https://calmnotes.example/waiting');
+  expect(await t.run((ctx) => ctx.db.query('pageReads').collect())).toEqual([]);
+  const body = await t.run((ctx) => ctx.db.query('articleBodies').withIndex('by_article', (q) => q.eq('articleId', articleId)).unique());
+  expect(body!.blocks.length).toBeGreaterThan(0);
+});

@@ -5,7 +5,7 @@ import { mutation, query, type QueryCtx } from './_generated/server';
 import { requireUserId } from './lib/currentUser';
 import { ownFeed } from './feeds';
 import { faviconOf } from './lib/feed/face';
-import { type Extraction, type ReadingPage, vBlock, vOmittedKind, vReadingPage } from './lib/feed/validators';
+import { type ReadingPage, vBlock, vOmittedKind, vReadingPage } from './lib/feed/validators';
 
 /** All shows a User's newest Articles, up to this many: the scrolling budget's 300 (FEE-27). */
 const ALL_LIMIT = 300;
@@ -132,7 +132,11 @@ export const get = query({
     ]);
     // A removed Feed's Articles are on their way out (T23); a link to one opens nothing.
     if (!feed) return null;
-    const page = pageOf(article.extraction);
+    const read = await ctx.db
+      .query('pageReads')
+      .withIndex('by_article', (q) => q.eq('articleId', article._id))
+      .unique();
+    const page = pageOf(read?.state);
     return {
       title: article.title,
       feedId: feed._id,
@@ -150,9 +154,9 @@ export const get = query({
 });
 
 /** What the Reading view is told about an Article's page: nothing once its text is whole (T8). */
-function pageOf(extraction: Extraction | undefined): ReadingPage | undefined {
-  if (extraction === 'pending' || extraction === 'reading') return 'extracting';
-  if (extraction === 'failed') return 'unavailable';
+function pageOf(state: 'pending' | 'reading' | 'failed' | undefined): ReadingPage | undefined {
+  if (state === 'pending' || state === 'reading') return 'extracting';
+  if (state === 'failed') return 'unavailable';
   return undefined;
 }
 
