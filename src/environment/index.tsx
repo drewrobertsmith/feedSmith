@@ -1,5 +1,5 @@
 import { createContext, use, useEffect, useState, type ReactNode } from 'react';
-import { AccessibilityInfo, useColorScheme } from 'react-native';
+import { AccessibilityInfo, useColorScheme, useWindowDimensions } from 'react-native';
 
 import { MotionConfig } from '@/environment/motion-config';
 import type { ThemeName } from '@/theme/tokens';
@@ -21,6 +21,17 @@ export function useEnvironment(): Environment {
   const environment = use(EnvironmentContext);
   if (!environment) throw new Error('useEnvironment needs an <EnvironmentProvider> above it');
   return environment;
+}
+
+/**
+ * How much a non-text size (an icon, the tile behind an initial) grows with the type: the
+ * world's font scale times Android's font size setting. Text gets Android's setting on its own;
+ * anything sized beside it has to ask, or text outgrows it and clips (Q16).
+ */
+export function useSizeScale(): number {
+  const { fontScale } = useEnvironment();
+  const { fontScale: system } = useWindowDimensions();
+  return fontScale * system;
 }
 
 function useSystemReduceMotion(): boolean {

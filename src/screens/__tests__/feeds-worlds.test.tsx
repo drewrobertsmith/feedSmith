@@ -254,6 +254,26 @@ describe('All', () => {
     expect(screen.getByText('C')).toBeOnTheScreen();
   });
 
+  test.each([
+    ["a tiny icon (a placeholder, or blurry at row size) gives way to the Feed's initial", 16, true],
+    ['a real icon stays', 32, false],
+  ])('%s (D14)', async (_case, width, initial) => {
+    await open({ colorScheme: 'dark', feeds: 'some' });
+    await screen.findAllByRole('link');
+    const [icon] = screen.getAllByTestId('row-favicon');
+    await act(async () => fireEvent(icon, 'load', { nativeEvent: { source: { width, height: width } } }));
+    expect(screen.queryAllByTestId('row-favicon')).toHaveLength(initial ? 2 : 3);
+    if (initial) expect(screen.getByText('T')).toBeOnTheScreen();
+    else expect(screen.queryByText('T')).not.toBeOnTheScreen();
+  });
+
+  test("an icon that won't load shows the Feed's initial", async () => {
+    await open({ colorScheme: 'dark', feeds: 'some' });
+    await screen.findAllByRole('link');
+    await act(async () => fireEvent(screen.getAllByTestId('row-favicon')[0], 'error', { nativeEvent: { error: 'failed' } }));
+    expect(screen.getByText('T')).toBeOnTheScreen();
+  });
+
   test('a Subtitle is two lines at most', async () => {
     await open({ colorScheme: 'dark', feeds: 'some' });
     expect(await screen.findByText(FIXTURE_ROWS[0].subtitle!)).toHaveProp('numberOfLines', 2);

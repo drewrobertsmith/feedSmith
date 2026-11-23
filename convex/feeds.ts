@@ -7,7 +7,7 @@ import type { Id } from './_generated/dataModel';
 import { action, internalMutation, internalQuery, mutation, query, type QueryCtx } from './_generated/server';
 import { requireUserId } from './lib/currentUser';
 import { findFeedLinks, siteMeta, type FeedLink, type SiteMeta } from './lib/feed/discover';
-import { faviconOf } from './lib/feed/face';
+import { faviconOf, hostOf } from './lib/feed/face';
 import { fetchFeed, type FetchOutcome } from './lib/feed/fetch';
 import { safeUrl } from './lib/feed/http';
 import { markWorking, storeNewArticles } from './lib/feed/record';
@@ -317,7 +317,7 @@ export const manage = query({
       } = {
         id: feed._id,
         title: feed.title,
-        host: new URL(feed.url).hostname,
+        host: hostOf(feed),
         pinned: feed.pinOrder !== undefined,
         working: feed.status !== 'failing',
       };

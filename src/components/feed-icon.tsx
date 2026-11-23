@@ -3,13 +3,19 @@ import { useState } from 'react';
 import { View } from 'react-native';
 
 import { AppText } from '@/components/app-text';
-import { useEnvironment } from '@/environment';
+import { useSizeScale } from '@/environment';
 
 /**
- * A Feed's icon at `size` (scaled with the font size), clipped round: expo-image doesn't take
- * Uniwind's rounding classes. When there's no icon, or it won't load, the Feed's initial
- * shows instead, or nothing (`fallback="none"`). Key it by `url` so a failure never carries
- * over to another Feed.
+ * An icon this small or smaller isn't used (D14): it's a placeholder (some sites serve a blank
+ * 16 px favicon) or would be blurry at row size. Real site icons are 32 px or more.
+ */
+const TINY_ICON_PX = 16;
+
+/**
+ * A Feed's icon at `size` (growing with the type, Android's font size included), clipped round: expo-image doesn't take
+ * Uniwind's rounding classes. When there's no icon, it won't load, or it's tiny, the Feed's
+ * initial shows instead, or nothing (`fallback="none"`). Key it by `url` so a failure never
+ * carries over to another Feed.
  */
 export function FeedIcon({
   url,
@@ -24,18 +30,21 @@ export function FeedIcon({
   fallback?: 'initial' | 'none';
   testID?: string;
 }) {
-  const { fontScale } = useEnvironment();
-  const [failed, setFailed] = useState(false);
-  const side = size * fontScale;
+  const scale = useSizeScale();
+  const [unusable, setUnusable] = useState(false);
+  const side = size * scale;
 
-  if (url && !failed) {
+  if (url && !unusable) {
     return (
       <View className="overflow-hidden rounded-sm" style={{ width: side, height: side }}>
         <Image
           testID={testID}
           source={{ uri: url }}
           recyclingKey={url}
-          onError={() => setFailed(true)}
+          onLoad={(event) => {
+            if (Math.max(event.source.width, event.source.height) <= TINY_ICON_PX) setUnusable(true);
+          }}
+          onError={() => setUnusable(true)}
           accessible={false}
           style={{ width: side, height: side }}
         />
@@ -44,7 +53,11 @@ export function FeedIcon({
   }
   if (fallback === 'none') return null;
   return (
-    <View className="items-center justify-center rounded-sm bg-surface" style={{ width: side, height: side }}>
+    <View
+      testID={testID ? `${testID}-initial` : undefined}
+      className="items-center justify-center rounded-sm bg-surface"
+      style={{ width: side, height: side }}
+    >
       <AppText variant="label" className="text-text-muted" accessible={false}>
         {title.charAt(0).toUpperCase()}
       </AppText>

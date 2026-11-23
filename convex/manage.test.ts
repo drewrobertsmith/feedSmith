@@ -50,7 +50,14 @@ describe('the Manage Feeds list (D13)', () => {
     await s.a.mutation(api.feeds.setPinned, { id: s.feedIds[2], pinned: true });
     const list = await s.a.query(api.feeds.manage, {});
     expect(list.map((f) => f.title)).toEqual(['Mid', 'alpha', 'Zeta']);
-    expect(list[0]).toMatchObject({ pinned: true, host: 'feeds2.example.com', faviconUrl: 'https://site2.example.com/favicon.ico', working: true });
+    expect(list[0]).toMatchObject({ pinned: true, host: 'site2.example.com', faviconUrl: 'https://site2.example.com/favicon.ico', working: true });
+  });
+
+  test("shows the site's host; a Feed with no site falls back to the feed's host (D13)", async () => {
+    const s = await setup(['Has site', 'No site']);
+    await s.t.run((ctx) => ctx.db.patch(s.feedIds[1], { siteUrl: undefined }));
+    const hosts = Object.fromEntries((await s.a.query(api.feeds.manage, {})).map((f) => [f.title, f.host]));
+    expect(hosts).toEqual({ 'Has site': 'site0.example.com', 'No site': 'feeds1.example.com' });
   });
 
   test('never shows a feed URL in full (Q9)', async () => {
