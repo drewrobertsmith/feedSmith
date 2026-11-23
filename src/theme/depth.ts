@@ -35,7 +35,7 @@ export const depth: Record<ThemeName, Record<DepthLevel, Layers>> = {
   },
   light: {
     soft: { face: palette.paper, light: 0.5, sheen: 0.8, shadow: { y: 1, blur: 2, alpha: 0.16 } },
-    raised: { face: palette.paperRaised, light: 0.6, sheen: 0.9, shadow: { y: 3, blur: 8, alpha: 0.2 } },
+    raised: { face: palette.paperRaised, light: 0.6, sheen: 0.9, shadow: { y: 3, blur: 10, alpha: 0.24 } },
     pressed: { face: palette.sand, light: 0, sheen: 0, shadow: { y: 0, blur: 0, alpha: 0 } },
   },
 };
