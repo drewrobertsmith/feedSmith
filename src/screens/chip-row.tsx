@@ -276,14 +276,16 @@ export function ChipRow({
           {/* Every chip stays mounted: the reveal needs each one measured, and a person's Feeds are tens of small pills. */}
           {/* react-doctor-disable-next-line react-doctor/rn-no-scrollview-mapped-list */}
           {shownChips.map((chip) => (
-            // The group's chips fade in from the Pinned chip, and the rest move over with them; Remove animations makes it instant (Q17).
+            // The group's chips fade in from the Pinned chip, and the rest move over with them. Remove animations (Q17)
+            // takes the animations away entirely, read from the environment like all motion here: Reanimated's own
+            // reduced-motion skip left a revealed chip's gradient face invisible on Android (FEE-74).
             // Measured here, on the chip's place in the row, so a chosen chip scrolls into view (D18).
             <Reanimated.View
               key={chip.id}
-              entering={REVEAL}
-              exiting={FOLD}
+              entering={reduceMotion ? undefined : REVEAL}
+              exiting={reduceMotion ? undefined : FOLD}
               // Chosen as the row changes: open makes room at once, folding closes up after the fade.
-              layout={groupOpen ? MAKE_ROOM : CLOSE_UP}
+              layout={reduceMotion ? undefined : groupOpen ? MAKE_ROOM : CLOSE_UP}
               onLayout={(event) => chipAt.current.set(chip.id, event.nativeEvent.layout)}
             >
               <Chip
