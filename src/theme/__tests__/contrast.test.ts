@@ -1,4 +1,4 @@
-import { DEPTH_LEVELS, depth } from '@/theme/depth';
+import { DEPTH_LEVELS, depth, depthStyle, rippleColor } from '@/theme/depth';
 import { googleButton } from '@/theme/google';
 import { contrastRatio, palette, TEXT_ROLES, SURFACE_ROLES, themes } from '@/theme/tokens';
 
@@ -95,8 +95,21 @@ describe.each(['dark', 'light'] as const)('depth in %s', (scheme) => {
     expect(contrastRatio(depth[scheme][level].face, theme.background)).toBeGreaterThan(1.03);
   });
 
-  test('pressed sinks: no shadow and no sheen', () => {
+  test('pressed sinks: no shadow', () => {
     expect(depth[scheme].pressed.shadow.alpha).toBe(0);
-    expect(depth[scheme].pressed.sheen).toBe(0);
+  });
+
+  // D29: Android's terms. Material lights no surface from above, so there's no gradient or top-edge
+  // sheen, only a tonal face and a soft shadow; and a press shows Android's ripple.
+  test.each(DEPTH_LEVELS)('the %s level is a face and a shadow only, in Material\'s terms', (level) => {
+    const style = depthStyle(scheme, level);
+    expect(style).not.toHaveProperty('backgroundImage');
+    expect(style.boxShadow).toHaveLength(1);
+    expect(style.boxShadow).not.toEqual([expect.objectContaining({ inset: true })]);
+  });
+
+  test('the ripple is the text colour at Material\'s pressed-state strength', () => {
+    // Cream on Midnight, Midnight on cream, each at 10%.
+    expect(rippleColor(scheme)).toBe({ dark: 'rgba(243, 236, 221, 0.1)', light: 'rgba(29, 37, 50, 0.1)' }[scheme]);
   });
 });

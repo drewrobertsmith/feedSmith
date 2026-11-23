@@ -1135,17 +1135,15 @@ describe('buttons have depth, not outlines (FEE-75, D27)', () => {
   test.each(['dark', 'light'] as const)('in %s, the Reading view\'s Save is soft above the page and sinks when pressed', async (colorScheme) => {
     await open({ colorScheme, section: 'article' });
     const save = await screen.findByRole('button', { name: 'Save' });
-    const pill = within(save).getByTestId('save-pill');
-    expect(pill).toHaveStyle(depthStyle(colorScheme, 'soft'));
-    expect(pill).not.toHaveStyle({ borderWidth: expect.any(Number) });
+    expect(save).toHaveStyle(depthStyle(colorScheme, 'soft'));
+    expect(save).not.toHaveStyle({ borderWidth: expect.any(Number) });
     await fireEvent(save, 'pressIn');
-    expect(within(screen.getByRole('button', { name: 'Save' })).getByTestId('save-pill')).toHaveStyle(depthStyle(colorScheme, 'pressed'));
+    expect(screen.getByRole('button', { name: 'Save' })).toHaveStyle(depthStyle(colorScheme, 'pressed'));
   });
 
   test('Done, on a Saved Article, is soft too', async () => {
     await open({ colorScheme: 'dark', section: 'article', articleSaved: true });
-    const done = await screen.findByRole('button', { name: 'Done' });
-    expect(within(done).getByTestId('save-pill')).toHaveStyle(depthStyle('dark', 'soft'));
+    expect(await screen.findByRole('button', { name: 'Done' })).toHaveStyle(depthStyle('dark', 'soft'));
   });
 
   test.each([

@@ -1,12 +1,12 @@
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useEffect, useEffectEvent, useState } from 'react';
+import { useEffect, useEffectEvent } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
-import Animated, { cubicBezier } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/app-button';
 import { AppText } from '@/components/app-text';
+import { DepthPressable } from '@/components/depth-pressable';
 import { UndoToastHost } from '@/components/undo-toast';
 import { useEnvironment, useSizeScale } from '@/environment';
 import { useArticle, useMarkRead, type Block, type ReadingArticle } from '@/feeds/feeds-data';
@@ -14,7 +14,6 @@ import { byline, publishedDate } from '@/feeds/format';
 import { openLink } from '@/feeds/open-link';
 import { useSaveAndDone } from '@/feeds/use-save-and-done';
 import { ArticleBlocks } from '@/screens/reading/article-blocks';
-import { depthStyle } from '@/theme/depth';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
 
@@ -61,8 +60,6 @@ const SAVE_AND_DONE_ROOM = spacing.section * 3;
 const PILL_HEIGHT = 48;
 const PILL_ICON = 20;
 /** Press feedback: a near-imperceptible squeeze, quick enough for something tapped often. */
-const PRESS = { transitionProperty: 'transform', transitionDuration: 120, transitionTimingFunction: cubicBezier(0.23, 1, 0.32, 1) } as const;
-
 const leave = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
 /**
@@ -74,10 +71,9 @@ const leave = () => (router.canGoBack() ? router.back() : router.replace('/'));
 function SaveOrDone({ id, saved }: { id: string; saved: boolean }) {
   const insets = useSafeAreaInsets();
   const scale = useSizeScale();
-  const { colorScheme, reduceMotion } = useEnvironment();
+  const { colorScheme } = useEnvironment();
   const theme = themes[colorScheme];
   const saveOrDone = useSaveAndDone();
-  const [pressed, setPressed] = useState(false);
   const label = saved ? 'Done' : 'Save';
   const press = () => {
     saveOrDone(id, saved ? 'done' : 'save');
@@ -85,36 +81,27 @@ function SaveOrDone({ id, saved }: { id: string; saved: boolean }) {
   };
   return (
     <View pointerEvents="box-none" className="absolute right-0 px-edge" style={{ bottom: insets.bottom + spacing.group }}>
-      <Pressable
+      {/* A soft object above the flat page (D27, D15): it ripples and sinks under the finger, as Android's controls do (D29). */}
+      <DepthPressable
+        level="soft"
         role="button"
         aria-label={label}
         onPress={press}
-        onPressIn={() => setPressed(true)}
-        onPressOut={() => setPressed(false)}
         hitSlop={spacing.related}
+        className="flex-row items-center gap-related rounded-full px-group"
+        style={{ minHeight: PILL_HEIGHT * scale }}
       >
-        {/* A soft object above the flat page (D27, D15), sinking to pressed under the finger. */}
-        <Animated.View
-          testID="save-pill"
-          style={[
-            depthStyle(colorScheme, pressed ? 'pressed' : 'soft'),
-            { minHeight: PILL_HEIGHT * scale, transform: [{ scale: pressed && !reduceMotion ? 0.97 : 1 }] },
-            PRESS,
-          ]}
-          className="flex-row items-center gap-related rounded-full px-group"
-        >
-          <SymbolView
-            testID="save-icon"
-            name={saved ? { ios: 'bookmark.fill', android: 'bookmark_added' } : { ios: 'bookmark', android: 'bookmark' }}
-            size={PILL_ICON * scale}
-            tintColor={saved ? theme.accent : theme.text}
-            accessible={false}
-          />
-          <AppText variant="action" className="text-text" accessible={false}>
-            {label}
-          </AppText>
-        </Animated.View>
-      </Pressable>
+        <SymbolView
+          testID="save-icon"
+          name={saved ? { ios: 'bookmark.fill', android: 'bookmark_added' } : { ios: 'bookmark', android: 'bookmark' }}
+          size={PILL_ICON * scale}
+          tintColor={saved ? theme.accent : theme.text}
+          accessible={false}
+        />
+        <AppText variant="action" className="text-text" accessible={false}>
+          {label}
+        </AppText>
+      </DepthPressable>
     </View>
   );
 }

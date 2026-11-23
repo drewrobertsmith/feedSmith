@@ -2,7 +2,7 @@ import { createContext, use, useState, type ReactNode } from 'react';
 import { Pressable, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useEnvironment } from '@/environment';
-import { depth, depthStyle, type DepthLevel } from '@/theme/depth';
+import { depth, depthStyle, rippleColor, type DepthLevel } from '@/theme/depth';
 
 /** The face colour of the control something is drawn on, so it can ring itself in that colour (D25). */
 const ControlFace = createContext<string | undefined>(undefined);
@@ -14,7 +14,7 @@ export function useControlFace(): string | undefined {
 
 /**
  * A pressable control with depth (D27): at its `level` at rest, and pressed, flat and sunk, while
- * the finger is down. Pressing is tracked here, through `onPressIn` and `onPressOut`, rather than
+ * the finger is down, with Android's ripple over its face as Material controls have (D29). Pressing is tracked here, through `onPressIn` and `onPressOut`, rather than
  * Pressable's internal state, so tests can see it; a press that turns into a scroll still ends with
  * `onPressOut`. The face colour is shared with what's drawn on the control.
  */
@@ -37,6 +37,7 @@ export function DepthPressable({
   return (
     <Pressable
       {...props}
+      android_ripple={{ color: rippleColor(colorScheme), borderless: false, foreground: true }}
       onPressIn={(event) => {
         setPressed(true);
         onPressIn?.(event);
