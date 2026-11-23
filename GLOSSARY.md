@@ -28,6 +28,10 @@ _Avoid_: Summary, excerpt, dek, description
 One of up to three Feeds you have chosen to keep first, right after All.
 _Avoid_: Favorite, starred, priority
 
+**Pinned** (the view):
+Your Pinned Feeds' Articles together, newest first, chosen by the Pinned chip. A view to read, not a folder.
+_Avoid_: Favorites, group, folder
+
 **All**:
 Every Article from every Feed together, newest first.
 _Avoid_: Latest, stream, timeline, home, the feed

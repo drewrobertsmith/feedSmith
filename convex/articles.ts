@@ -3,7 +3,8 @@ import { v } from 'convex/values';
 import type { Doc, Id } from './_generated/dataModel';
 import { mutation, query, type QueryCtx } from './_generated/server';
 import { requireUserId } from './lib/currentUser';
-import { ownFeed } from './feeds';
+import { ownFeed, pinnedFeeds } from './feeds';
+import { PINNED } from './lib/pinned';
 import { faviconOf } from './lib/feed/face';
 import { type ReadingPage, vBlock, vOmittedKind, vReadingPage } from './lib/feed/validators';
 
@@ -72,7 +73,8 @@ async function ownArticle(ctx: QueryCtx, userId: Id<'users'>, rawId: string) {
 
 /**
  * All: every Article from the signed-in User's Feeds, newest first; with `feedId`, only that
- * Feed's (P5). The id may come from a link, so any string is checked here (Q25). Never a feed URL (Q9).
+ * Feed's (P5); with `PINNED`, the Pinned Feeds' Articles interleaved, as All interleaves every Feed
+ * (FEE-59). The id may come from a link, so any string is checked here (Q25). Never a feed URL (Q9).
  */
 export const all = query({
   args: { feedId: v.optional(v.string()) },
@@ -80,7 +82,23 @@ export const all = query({
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     let articles;
-    if (args.feedId === undefined) {
+    if (args.feedId === PINNED) {
+      // At most three Pinned Feeds (P9): each one's newest, merged, newest first, under All's limit.
+      const pins = await pinnedFeeds(ctx, userId);
+      const each = await Promise.all(
+        pins.map((feed) =>
+          ctx.db
+            .query('articles')
+            .withIndex('by_feed_published', (q) => q.eq('feedId', feed._id))
+            .order('desc')
+            .take(ALL_LIMIT),
+        ),
+      );
+      articles = each
+        .flat()
+        .sort((a, b) => b.publishedAt - a.publishedAt)
+        .slice(0, ALL_LIMIT);
+    } else if (args.feedId === undefined) {
       articles = await ctx.db
         .query('articles')
         .withIndex('by_user_published', (q) => q.eq('userId', userId))

@@ -13,6 +13,7 @@ import { FeedIcon } from '@/components/feed-icon';
 import { useEnvironment } from '@/environment';
 import type { FeedChip } from '@/feeds/feeds-data';
 import { usePin } from '@/feeds/use-pin';
+import { PINNED } from '../../convex/lib/pinned';
 import { chipLabel, fadeRanges, revealOffset, transparent } from '@/screens/chip-row-layout';
 import { motion } from '@/theme/motion';
 import { spacing } from '@/theme/spacing';
@@ -108,11 +109,12 @@ export function ChipRow({
   onSelect,
 }: {
   chips: FeedChip[];
-  /** The chosen Feed's id, or null for All. */
+  /** The chosen Feed's id, `PINNED` for the Pinned view, or null for All. */
   selected: string | null;
   onSelect: (feedId: string | null) => void;
 }) {
   const pin = usePin();
+  const pinned = chips.filter((chip) => chip.pinned);
   const { colorScheme, reduceMotion } = useEnvironment();
   const background = themes[colorScheme].background;
   const scroller = useRef<ScrollViewInstance>(null);
@@ -174,6 +176,16 @@ export function ChipRow({
           onPress={() => onSelect(null)}
           onLayout={(event) => chipAt.current.set('', event.nativeEvent.layout)}
         />
+        {/* Two or more Pinned Feeds read together, right after All (FEE-59). It names them for TalkBack. */}
+        {pinned.length >= 2 ? (
+          <Chip
+            label="Pinned"
+            accessibleName={`Pinned: ${pinned.map((chip) => chip.title).join(', ')}`}
+            selected={selected === PINNED}
+            onPress={() => onSelect(PINNED)}
+            onLayout={(event) => chipAt.current.set(PINNED, event.nativeEvent.layout)}
+          />
+        ) : null}
         {/* Every chip stays mounted: the reveal needs each one measured, and a person's Feeds are tens of small pills. */}
         {/* react-doctor-disable-next-line react-doctor/rn-no-scrollview-mapped-list */}
         {chips.map((chip) => (

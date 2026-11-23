@@ -21,13 +21,16 @@ import {
   FIXTURE_NOW,
   FIXTURE_OMITTED_ARTICLE,
   FIXTURE_READ_ROWS,
+  FIXTURE_QUIET_PINS,
   FIXTURE_ROWS,
   FIXTURE_SAVED_ROWS,
+  FIXTURE_TWO_PINS,
   FIXTURE_SEVERAL_AUTHORS_ARTICLE,
   FIXTURE_UNEXTRACTED_ARTICLE,
 } from '@/worlds/fixtures';
 import type { ThemeName } from '@/theme/tokens';
 import { accountInitial } from '../../convex/lib/account';
+import { PINNED } from '../../convex/lib/pinned';
 
 /**
  * One state the app can be in, as plain data (T13). Later tickets extend it with their
@@ -70,8 +73,11 @@ export type WorldSpec = {
   savedWrites?: 'fail';
   /** The chosen Feed's chip, by id: All shows only its Articles (P5). */
   feed?: string;
-  /** `full`: three Feeds are Pinned already, so another Pin is refused (P9). */
-  pins?: 'full';
+  /**
+   * `full`: three Feeds are Pinned already, so another Pin is refused (P9). `two`: The Verge and Calm
+   * Notes are Pinned, so the Pinned chip shows (FEE-59). `quiet`: two Pinned Feeds with nothing new.
+   */
+  pins?: 'full' | 'two' | 'quiet';
   /** What Manage Feeds lists. Defaults to `some`: one Pinned Feed, one not working. */
   manage?: 'some' | 'pinned' | 'none' | 'loading';
   /** Manage Feeds' writes don't reach the server, or the server refuses the name. */
@@ -192,7 +198,16 @@ export function worldFeeds(
   const manage = spec.manage ?? 'some';
   const feeds = spec.feeds ?? 'none';
   /** The chips a world with Feeds shows: a few, or enough to run off the screen (FEE-44). */
-  const someChips = spec.chips === 'many' ? FIXTURE_MANY_CHIPS : FIXTURE_CHIPS;
+  const someChips =
+    spec.chips === 'many'
+      ? FIXTURE_MANY_CHIPS
+      : spec.pins === 'two'
+        ? FIXTURE_TWO_PINS
+        : spec.pins === 'quiet'
+          ? FIXTURE_QUIET_PINS
+          : FIXTURE_CHIPS;
+  /** The Feeds the Pinned view reads (FEE-59). */
+  const pinnedIds = new Set(someChips.filter((chip) => chip.pinned).map((chip) => chip.id));
   const addFeed = spec.addFeed ?? 'idle';
   const article = spec.article ?? 'full';
   const addView: AddFeedView =
@@ -243,7 +258,13 @@ export function worldFeeds(
       if (feeds === 'loading') return { status: 'loading' };
       return viewOf(state, `all:${feedId}`, () => {
         const rows = (feeds === 'some' ? FIXTURE_ROWS : feeds === 'read' ? FIXTURE_READ_ROWS : []).map((row) => live(row, state));
-        return { status: 'ready' as const, articles: feedId === null ? rows : rows.filter((row) => row.feedId === feedId) };
+        const shown =
+          feedId === null
+            ? rows
+            : feedId === PINNED
+              ? rows.filter((row) => row.feedId !== undefined && pinnedIds.has(row.feedId))
+              : rows.filter((row) => row.feedId === feedId);
+        return { status: 'ready' as const, articles: shown };
       });
     },
     useSaved: () => {
@@ -416,7 +437,7 @@ export function createWorld(spec: WorldSpec): World {
     initialUrl: !signedIn
       ? '/sign-in'
       : spec.feed && (spec.section ?? 'feeds') === 'feeds'
-        ? `/?feed=${spec.feed}`
+        ? `/?feed=${encodeURIComponent(spec.feed)}`
         : SECTION_URLS[spec.section ?? 'feeds'],
     dispose: () => Uniwind.setTheme('system'),
   };
