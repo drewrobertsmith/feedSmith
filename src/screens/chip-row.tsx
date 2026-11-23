@@ -148,7 +148,12 @@ export function ChipRow({
   const scrolled = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const x = event.nativeEvent.contentOffset.x;
     scrollX.current = x;
-    setRow((now) => (Math.abs(now.x - x) < 1 ? now : { ...now, x }));
+    // Only a fade turning on or off re-renders the row, not every scroll tick.
+    setRow((now) => {
+      const was = edgeFades(now.x, now.width, now.content);
+      const will = edgeFades(x, now.width, now.content);
+      return was.start === will.start && was.end === will.end ? now : { ...now, x };
+    });
   };
 
   return (
