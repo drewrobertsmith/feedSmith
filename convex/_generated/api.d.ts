@@ -20,6 +20,7 @@ import type * as lib_account from "../lib/account.js";
 import type * as lib_appReturn from "../lib/appReturn.js";
 import type * as lib_authErrors from "../lib/authErrors.js";
 import type * as lib_currentUser from "../lib/currentUser.js";
+import type * as lib_deleteArticles from "../lib/deleteArticles.js";
 import type * as lib_feed_blocks from "../lib/feed/blocks.js";
 import type * as lib_feed_discover from "../lib/feed/discover.js";
 import type * as lib_feed_errors from "../lib/feed/errors.js";
@@ -56,6 +57,7 @@ declare const fullApi: ApiFromModules<{
   "lib/appReturn": typeof lib_appReturn;
   "lib/authErrors": typeof lib_authErrors;
   "lib/currentUser": typeof lib_currentUser;
+  "lib/deleteArticles": typeof lib_deleteArticles;
   "lib/feed/blocks": typeof lib_feed_blocks;
   "lib/feed/discover": typeof lib_feed_discover;
   "lib/feed/errors": typeof lib_feed_errors;
