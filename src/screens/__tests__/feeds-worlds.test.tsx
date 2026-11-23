@@ -487,6 +487,14 @@ describe('the Reading view', () => {
     expect(screen.getByText(publishedDate(FIXTURE_ARTICLE.publishedAt))).not.toHaveProp('numberOfLines');
   });
 
+  test("scrolled text passes under a still, page-coloured backing, never under the status bar's icons (Q18)", async () => {
+    await open({ colorScheme: 'dark', section: 'article' });
+    await screen.findByRole('heading', { name: ARTICLE });
+    const backing = screen.getByTestId('status-bar-backing');
+    expect(backing).toHaveProp('pointerEvents', 'none');
+    expect(backing).toHaveProp('className', expect.stringContaining('bg-background'));
+  });
+
   test('the Article ends plainly: a rule, then Open original, as a button (Q8)', async () => {
     const user = userEvent.setup();
     await open({ colorScheme: 'dark', section: 'article' });

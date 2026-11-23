@@ -1,27 +1,40 @@
-import { router } from 'expo-router';
-import { useEffect, useEffectEvent } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { router } from "expo-router";
+import { useEffect, useEffectEvent } from "react";
+import { Pressable, ScrollView, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { AppButton } from '@/components/app-button';
-import { AppText } from '@/components/app-text';
-import { useSizeScale } from '@/environment';
-import { useArticle, useMarkRead, type Block, type ReadingArticle } from '@/feeds/feeds-data';
-import { publishedDate } from '@/feeds/format';
-import { openLink } from '@/feeds/open-link';
-import { ArticleBlocks } from '@/screens/reading/article-blocks';
-import { spacing } from '@/theme/spacing';
+import { AppButton } from "@/components/app-button";
+import { AppText } from "@/components/app-text";
+import { useSizeScale } from "@/environment";
+import {
+  useArticle,
+  useMarkRead,
+  type Block,
+  type ReadingArticle,
+} from "@/feeds/feeds-data";
+import { publishedDate } from "@/feeds/format";
+import { openLink } from "@/feeds/open-link";
+import { ArticleBlocks } from "@/screens/reading/article-blocks";
+import { spacing } from "@/theme/spacing";
 
 /** When the link names no Article of this User's, or one that's gone. */
 export function ArticleMissing() {
   const insets = useSafeAreaInsets();
   return (
-    <View className="flex-1 gap-group bg-background px-edge" style={{ paddingTop: insets.top + spacing.section }}>
+    <View
+      className="flex-1 gap-group bg-background px-edge"
+      style={{ paddingTop: insets.top + spacing.section }}
+    >
       <AppText variant="title">This Article isn’t available.</AppText>
       <AppText variant="reading" className="text-text-muted">
         It may have been removed from its Feed.
       </AppText>
-      <AppButton label="Back to All" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
+      <AppButton
+        label="Back to All"
+        onPress={() =>
+          router.canGoBack() ? router.back() : router.replace("/")
+        }
+      />
     </View>
   );
 }
@@ -33,8 +46,10 @@ export function ArticleMissing() {
 function PageUnavailable({ article }: { article: ReadingArticle }) {
   const { imageUrl, subtitle, link } = article;
   const blocks: Block[] = [
-    ...(imageUrl ? [{ type: 'image' as const, src: imageUrl }] : []),
-    ...(subtitle ? [{ type: 'paragraph' as const, spans: [{ text: subtitle }] }] : []),
+    ...(imageUrl ? [{ type: "image" as const, src: imageUrl }] : []),
+    ...(subtitle
+      ? [{ type: "paragraph" as const, spans: [{ text: subtitle }] }]
+      : []),
   ];
   return (
     <View className="gap-group">
@@ -42,7 +57,9 @@ function PageUnavailable({ article }: { article: ReadingArticle }) {
       <AppText variant="label" className="text-text-muted">
         This Article couldn’t be brought in from its page.
       </AppText>
-      {link ? <AppButton label="Open original" onPress={() => openLink(link)} /> : null}
+      {link ? (
+        <AppButton label="Open original" onPress={() => openLink(link)} />
+      ) : null}
     </View>
   );
 }
@@ -53,13 +70,21 @@ const MEASURE = 680;
 const SAVE_AND_DONE_ROOM = 96;
 
 const textOf = (block: Block | undefined) =>
-  block?.type === 'paragraph' ? block.spans.map((span) => span.text).join('').trim() : undefined;
+  block?.type === "paragraph"
+    ? block.spans
+        .map((span) => span.text)
+        .join("")
+        .trim()
+    : undefined;
 
 /** The Article's headline, Subtitle and meta: the deck is left out where the text already says it. */
 function ArticleHeader({ article }: { article: ReadingArticle }) {
   const { title, subtitle, feedTitle, publishedAt, page, blocks } = article;
   // A summary-only Article's text is its Subtitle; a Feed's text often opens with it too.
-  const deck = subtitle && !page && textOf(blocks[0]) !== subtitle.trim() ? subtitle : undefined;
+  const deck =
+    subtitle && !page && textOf(blocks[0]) !== subtitle.trim()
+      ? subtitle
+      : undefined;
   return (
     <View className="gap-related">
       <AppText variant="headline">{title}</AppText>
@@ -70,7 +95,11 @@ function ArticleHeader({ article }: { article: ReadingArticle }) {
       ) : null}
       <View className="flex-row items-baseline gap-related pt-inside">
         <View className="shrink">
-          <AppText variant="label" className="text-text-muted" numberOfLines={1}>
+          <AppText
+            variant="label"
+            className="text-text-muted"
+            numberOfLines={1}
+          >
             {feedTitle}
           </AppText>
         </View>
@@ -85,7 +114,11 @@ function ArticleHeader({ article }: { article: ReadingArticle }) {
 /** Where an Article ends: a short rule, the way to the original, and room for Save and Done. */
 function ArticleEnd({ link }: { link: string }) {
   return (
-    <View testID="article-end" className="items-start gap-group" style={{ paddingBottom: SAVE_AND_DONE_ROOM }}>
+    <View
+      testID="article-end"
+      className="items-start gap-group"
+      style={{ paddingBottom: SAVE_AND_DONE_ROOM }}
+    >
       <View className="h-px w-12 bg-decor" />
       <Pressable
         role="button"
@@ -111,49 +144,72 @@ export function ReadingScreen({ id }: { id: string }) {
   const scale = useSizeScale();
   const view = useArticle(id);
   const markRead = useMarkRead();
-  const ready = view.status === 'ready';
+  const ready = view.status === "ready";
   // Opening an Article marks it Read (P7): once per Article shown, not on every render.
   const markOpened = useEffectEvent(() => markRead(id));
   useEffect(() => {
     if (ready) markOpened();
   }, [ready, id]);
 
-  if (view.status === 'missing') return <ArticleMissing />;
-  if (view.status === 'loading') return <View className="flex-1 bg-background" />;
+  if (view.status === "missing") return <ArticleMissing />;
+  if (view.status === "loading")
+    return <View className="flex-1 bg-background" />;
   const { article } = view;
   // The lead image, unless the text opens with an image of its own (often the same one, resized).
-  const lead = article.imageUrl && article.blocks[0]?.type !== 'image' ? article.imageUrl : undefined;
+  const lead =
+    article.imageUrl && article.blocks[0]?.type !== "image"
+      ? article.imageUrl
+      : undefined;
 
   return (
-    <ScrollView
-      className="flex-1 bg-background"
-      contentContainerClassName="items-center px-edge"
-      contentContainerStyle={{ paddingTop: insets.top + spacing.section, paddingBottom: insets.bottom + spacing.section }}
-    >
-      <View className="w-full gap-section" style={{ maxWidth: MEASURE * scale }}>
-        <ArticleHeader article={article} />
-        {article.page === 'unavailable' ? (
-          <PageUnavailable article={article} />
-        ) : (
-          <>
-            {lead ? (
-              <View testID="lead-image">
-                <ArticleBlocks blocks={[{ type: 'image', src: lead }]} />
-              </View>
-            ) : null}
-            <View className="gap-group">
-              {article.page === 'extracting' ? (
-                // Announced when it goes: the full text replaces the Subtitle as soon as it's read.
-                <AppText variant="label" className="text-text-muted" accessibilityLiveRegion="polite">
-                  Bringing in the full Article from its page…
-                </AppText>
+    <View className="flex-1 bg-background">
+      <ScrollView
+        className="flex-1"
+        contentContainerClassName="items-center px-edge"
+        contentContainerStyle={{
+          paddingTop: insets.top + spacing.section,
+          paddingBottom: insets.bottom + spacing.section,
+        }}
+      >
+        <View
+          className="w-full gap-section"
+          style={{ maxWidth: MEASURE * scale }}
+        >
+          <ArticleHeader article={article} />
+          {article.page === "unavailable" ? (
+            <PageUnavailable article={article} />
+          ) : (
+            <>
+              {lead ? (
+                <View testID="lead-image">
+                  <ArticleBlocks blocks={[{ type: "image", src: lead }]} />
+                </View>
               ) : null}
-              <ArticleBlocks blocks={article.blocks} link={article.link} />
-            </View>
-            {article.link ? <ArticleEnd link={article.link} /> : null}
-          </>
-        )}
-      </View>
-    </ScrollView>
+              <View className="gap-group">
+                {article.page === "extracting" ? (
+                  // Announced when it goes: the full text replaces the Subtitle as soon as it's read.
+                  <AppText
+                    variant="label"
+                    className="text-text-muted"
+                    accessibilityLiveRegion="polite"
+                  >
+                    Bringing in the full Article from its page…
+                  </AppText>
+                ) : null}
+                <ArticleBlocks blocks={article.blocks} link={article.link} />
+              </View>
+              {article.link ? <ArticleEnd link={article.link} /> : null}
+            </>
+          )}
+        </View>
+      </ScrollView>
+      {/* Edge-to-edge (Q18): the text scrolls behind the status bar, and this still strip keeps its icons legible. */}
+      <View
+        testID="status-bar-backing"
+        pointerEvents="none"
+        className="absolute inset-x-0 top-0 bg-background"
+        style={{ height: insets.top }}
+      />
+    </View>
   );
 }
