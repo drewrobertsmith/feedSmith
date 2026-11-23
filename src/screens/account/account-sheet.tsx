@@ -1,9 +1,10 @@
 import { router } from 'expo-router';
-import { SymbolView, type SymbolViewProps } from 'expo-symbols';
+import type { SymbolViewProps } from 'expo-symbols';
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { useAuth } from '@/auth/auth-context';
+import { AppSymbol } from '@/components/app-symbol';
 import { AppText } from '@/components/app-text';
 import { DepthPressable } from '@/components/depth-pressable';
 import { NativeSheet } from '@/components/native-sheet';
@@ -34,7 +35,6 @@ function SheetRow({
   tone?: 'plain' | 'destructive';
 }) {
   const { colorScheme } = useEnvironment();
-  const box = ICON * useSizeScale();
   const shown = busy && busyLabel ? busyLabel : label;
   const destructive = tone === 'destructive';
   const colour = destructive ? themes[colorScheme].destructive : themes[colorScheme].text;
@@ -51,11 +51,11 @@ function SheetRow({
       style={{ minHeight: ROW }}
     >
       {/* The icon grows with the text, as its words do, and never shrinks to make room (Q16). */}
-      <SymbolView
+      <AppSymbol
         name={icon}
         size={ICON}
         tintColor={colour}
-        style={{ width: box, height: box, flexShrink: 0 }}
+        style={{ flexShrink: 0 }}
       />
       <AppText variant="action" className={destructive ? 'shrink text-destructive' : 'shrink text-text'} accessible={false}>
         {shown}

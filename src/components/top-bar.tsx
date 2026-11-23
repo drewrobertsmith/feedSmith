@@ -1,7 +1,8 @@
-import { SymbolView, type SymbolViewProps } from 'expo-symbols';
+import type { SymbolViewProps } from 'expo-symbols';
 import type { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 
+import { AppSymbol } from '@/components/app-symbol';
 import { AppText } from '@/components/app-text';
 import { useEnvironment } from '@/environment';
 import { spacing } from '@/theme/spacing';
@@ -50,7 +51,7 @@ export function TopBarIcon({ label, icon, onPress }: { label: string; icon: Symb
   const { colorScheme } = useEnvironment();
   return (
     <Pressable role="button" aria-label={label} onPress={onPress} hitSlop={spacing.related} className="p-inside">
-      <SymbolView name={icon} size={ICON} tintColor={themes[colorScheme].text} />
+      <AppSymbol name={icon} size={ICON} tintColor={themes[colorScheme].text} />
     </Pressable>
   );
 }

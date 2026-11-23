@@ -1,14 +1,14 @@
-import { SymbolView } from 'expo-symbols';
 import { useEffect, useState, type ReactNode } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { Easing, ReduceMotion, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
+import { AppSymbol } from '@/components/app-symbol';
 import { AppText } from '@/components/app-text';
 import { ROW_ACTIONS, type RowActionName } from '@/components/row-action';
 import { commits, dragOffset, pastCommitPoint } from '@/components/swipe-physics';
-import { useEnvironment, useSizeScale } from '@/environment';
+import { useEnvironment } from '@/environment';
 import { thresholdHaptic } from '@/environment/haptics';
 import { themes } from '@/theme/tokens';
 
@@ -52,7 +52,6 @@ export function SwipeRow({
 }) {
   const { width } = useWindowDimensions();
   const { colorScheme } = useEnvironment();
-  const scale = useSizeScale();
   const theme = themes[colorScheme];
   const offset = useSharedValue(0);
   const armed = useSharedValue(false);
@@ -127,7 +126,7 @@ export function SwipeRow({
           {look.label}
         </AppText>
         <Animated.View style={iconStyle}>
-          <SymbolView name={look.icon} size={ICON * scale} tintColor={ink} />
+          <AppSymbol name={look.icon} size={ICON} tintColor={ink} />
         </Animated.View>
       </Animated.View>
       <GestureDetector gesture={pan}>
