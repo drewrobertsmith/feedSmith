@@ -121,15 +121,18 @@ export function ChipRow({
   /** Each chip's left edge in the row, by Feed id (All is ''), measured as it lays out. */
   const chipX = useRef(new Map<string, number>());
   const [row, setRow] = useState({ x: 0, width: 0, content: 0 });
+  /** Where the row is scrolled to, for the effect below: a user's own scroll must never re-run it. */
+  const scrollX = useRef(0);
   const fades = edgeFades(row.x, row.width, row.content);
 
-  // A chip chosen from elsewhere (a link) is brought into view; one tapped in the row already is.
+  // A chip chosen from elsewhere (a link) is brought into view; one tapped in the row already is. It runs when the
+  // choice changes or the row lays out, never on a scroll, so it can't pull the row back from under a finger.
   useEffect(() => {
     const x = chipX.current.get(selected ?? '');
     if (x === undefined) return;
-    if (x >= row.x && x <= row.x + row.width - FADE * 2) return;
+    if (x >= scrollX.current && x <= scrollX.current + row.width - FADE * 2) return;
     scroller.current?.scrollTo({ x: Math.max(0, x - spacing.edge), animated: !reduceMotion });
-  }, [selected, reduceMotion, row.x, row.width]);
+  }, [selected, reduceMotion, row.width, row.content]);
 
   const togglePin = async (chip: FeedChip) => {
     const outcome = await setPinned(chip.id, !chip.pinned);
@@ -144,6 +147,7 @@ export function ChipRow({
 
   const scrolled = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const x = event.nativeEvent.contentOffset.x;
+    scrollX.current = x;
     setRow((now) => (Math.abs(now.x - x) < 1 ? now : { ...now, x }));
   };
 
@@ -153,6 +157,7 @@ export function ChipRow({
         ref={scroller}
         horizontal
         showsHorizontalScrollIndicator={false}
+        testID="chip-row"
         role="tablist"
         aria-label="Feeds"
         onScroll={scrolled}

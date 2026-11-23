@@ -1,6 +1,6 @@
 import { act, fireEvent, userEvent, within } from '@testing-library/react-native';
 import { renderRouter, screen } from 'expo-router/testing-library';
-import { Animated, ToastAndroid } from 'react-native';
+import { Animated, ScrollView, ToastAndroid } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { Uniwind } from 'uniwind';
 
@@ -14,6 +14,7 @@ import GalleryRoute from '@/app/gallery';
 import SignInRoute from '@/app/sign-in';
 import { publishedAgo, publishedDate } from '@/feeds/format';
 import { AppRoot } from '@/navigation/app-root';
+import { spacing } from '@/theme/spacing';
 import {
   ADD_FEED_WORLDS,
   ALL_WORLDS,
@@ -165,6 +166,38 @@ describe('All', () => {
     const chip = await screen.findByRole('tab', { name: 'The Verge - Full RSS for subscribers | The Verge, Pinned' });
     expect(chip).toBeOnTheScreen();
     expect(screen.getByText('The Verge - Full…')).toBeOnTheScreen();
+  });
+
+  test("a scroll through the row stays put: the chosen chip never pulls it back (FEE-44)", async () => {
+    await open({ colorScheme: 'dark', feeds: 'some', chips: 'many' });
+    await screen.findAllByRole('tab');
+    const row = screen.getByTestId('chip-row');
+    const scrollTo = jest.spyOn(ScrollView.prototype, 'scrollTo');
+    const layout = (width: number, x = 0) => ({ nativeEvent: { layout: { x, y: 0, width, height: 48 } } });
+    // The chosen chip (All) sits at the row's start; the row shows 400 of 1200.
+    await fireEvent(screen.getByRole('tab', { name: 'All' }).parent!, 'layout', layout(60, 16));
+    await fireEvent(row, 'layout', layout(400));
+    await fireEvent(row, 'contentSizeChange', 1200, 48);
+    expect(screen.getByTestId('chip-fade-end')).toBeOnTheScreen();
+    scrollTo.mockClear();
+    await fireEvent.scroll(row, { nativeEvent: { contentOffset: { x: 300, y: 0 } } });
+    expect(screen.getByTestId('chip-fade-start')).toBeOnTheScreen();
+    expect(scrollTo).not.toHaveBeenCalled();
+    scrollTo.mockRestore();
+  });
+
+  test('a chip chosen by a link, past the edge of the row, scrolls into view (FEE-44)', async () => {
+    await open({ colorScheme: 'dark', feeds: 'some', chips: 'many' }, '/?feed=f8');
+    await screen.findAllByRole('tab');
+    const row = screen.getByTestId('chip-row');
+    const scrollTo = jest.spyOn(ScrollView.prototype, 'scrollTo');
+    const layout = (width: number, x = 0) => ({ nativeEvent: { layout: { x, y: 0, width, height: 48 } } });
+    // Kottke, the last chip, sits at 1100 of a 1200-wide row that shows 400.
+    await fireEvent(screen.getByRole('tab', { name: 'Kottke' }).parent!, 'layout', layout(90, 1100));
+    await fireEvent(row, 'layout', layout(400));
+    await fireEvent(row, 'contentSizeChange', 1200, 48);
+    expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ x: 1100 - spacing.edge }));
+    scrollTo.mockRestore();
   });
 
   test('unchosen chips are quieter than the chosen one: a hairline and muted text (FEE-44, Q14)', async () => {
