@@ -9,10 +9,10 @@ import SavedRoute from '@/app/(tabs)/saved';
 import ManageFeedsRoute from '@/app/manage-feeds';
 import SignInRoute from '@/app/sign-in';
 import { NativeSheet } from '@/components/native-sheet';
-import { MotionConfig } from '@/environment/motion-config';
 import { AppRoot } from '@/navigation/app-root';
 import { ACCOUNT_WORLDS, type AccountWorldId } from '@/worlds/catalog';
 import { createWorld, type World } from '@/worlds/world';
+import { reanimatedReducesMotion } from '../../../test/reduced-motion';
 
 type Shows = {
   theme: 'dark' | 'light';
@@ -123,7 +123,8 @@ describe.each(ACCOUNT_WORLDS)('$label', ({ id, spec }) => {
     expect(screen.queryByRole('button', { name: 'Manage Feeds' })).toBeNull();
     expect(screen.queryByTestId('account-sheet')).toBeNull();
     expect(Uniwind.currentTheme).toBe(shows.theme);
-    expect(jest.mocked(MotionConfig)).toHaveBeenLastCalledWith({ reduceMotion: shows.reduceMotion }, undefined);
+    // Reanimated itself reduces motion exactly when the world's Remove animations is on (Q17).
+    expect(reanimatedReducesMotion()).toBe(shows.reduceMotion);
 
     world.dispose();
   });

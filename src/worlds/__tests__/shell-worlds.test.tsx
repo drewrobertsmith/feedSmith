@@ -7,10 +7,10 @@ import SavedRoute from '@/app/(tabs)/saved';
 import AuthReturnRoute from '@/app/auth';
 import GalleryRoute from '@/app/gallery';
 import SignInRoute from '@/app/sign-in';
-import { MotionConfig } from '@/environment/motion-config';
 import { AppRoot } from '@/navigation/app-root';
 import { SHELL_WORLDS, type ShellWorldId } from '@/worlds/catalog';
 import { createWorld } from '@/worlds/world';
+import { reanimatedReducesMotion } from '../../../test/reduced-motion';
 
 type Shows = {
   heading: 'Feeds' | 'Saved';
@@ -52,7 +52,8 @@ test.each(SHELL_WORLDS)('$label', async ({ id, spec }) => {
   expect(await screen.findByRole('heading', { name: shows.heading })).toHaveStyle({ fontSize: shows.titleSize });
   expect(screen.getByText(shows.message)).toBeOnTheScreen();
   expect(Uniwind.currentTheme).toBe(shows.theme);
-  expect(jest.mocked(MotionConfig)).toHaveBeenLastCalledWith({ reduceMotion: shows.reduceMotion }, undefined);
+  // Reanimated itself reduces motion exactly when the world's Remove animations is on (Q17).
+    expect(reanimatedReducesMotion()).toBe(shows.reduceMotion);
 
   world.dispose();
 });
