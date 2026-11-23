@@ -1,4 +1,4 @@
-import { chipDirection } from '@/screens/chip-direction';
+import { chipDirection } from '@/components/chip-direction';
 
 describe('which way the list slides when the chosen chip changes (FEE-42)', () => {
   test.each([

@@ -7,13 +7,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/app-button';
 import { AppText } from '@/components/app-text';
+import { ChipSwitch, SlideRow } from '@/components/chip-switch';
 import { FeedIcon } from '@/components/feed-icon';
 import { useEnvironment } from '@/environment';
 import { useAll, useChips, useRefresh, type ArticleRow } from '@/feeds/feeds-data';
 import { byline, publishedAgo } from '@/feeds/format';
 import { useShownRows } from '@/feeds/use-shown-rows';
 import { ChipRow } from '@/screens/chip-row';
-import { ChipSwitch, SlideRow } from '@/components/chip-switch';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
 

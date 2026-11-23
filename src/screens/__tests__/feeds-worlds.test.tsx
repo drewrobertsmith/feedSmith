@@ -96,17 +96,17 @@ describe('All', () => {
   const READ = FIXTURE_ROWS.filter((r) => r.read).length;
   const VERGE_ROWS = FIXTURE_ROWS.filter((r) => r.feedId === 'f1').length;
   const SHOWS: Record<AllWorldId, Shows> = {
-    'all-dark': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All' , feedNames: ROWS },
-    'all-light': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'light', titleSize: 24, selected: 'All' , feedNames: ROWS },
-    'all-read': { rows: ROWS, read: ROWS, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All' , feedNames: ROWS },
-    'all-empty': { rows: 0, read: 0, empty: true, refreshing: false, theme: 'dark', titleSize: 24, selected: '' , feedNames: 0 },
-    'all-loading': { rows: 0, read: 0, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: '' , feedNames: 0 },
-    'all-refreshing': { rows: ROWS, read: READ, empty: false, refreshing: true, theme: 'light', titleSize: 24, selected: 'All' , feedNames: ROWS },
-    'all-largest-font': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 48, selected: 'All' , feedNames: ROWS },
-    'all-feed': { rows: VERGE_ROWS, read: 1, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'The Verge, Pinned' , feedNames: 0 },
-    'all-feed-light': { rows: 1, read: 0, empty: false, refreshing: false, theme: 'light', titleSize: 24, selected: 'Calm Notes' , feedNames: 0 },
-    'all-feed-empty': { rows: 0, read: 0, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'Daring Fireball' , feedNames: 0 },
-    'all-remove-animations': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All' , feedNames: ROWS },
+    'all-dark': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All', feedNames: ROWS },
+    'all-light': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'light', titleSize: 24, selected: 'All', feedNames: ROWS },
+    'all-read': { rows: ROWS, read: ROWS, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All', feedNames: ROWS },
+    'all-empty': { rows: 0, read: 0, empty: true, refreshing: false, theme: 'dark', titleSize: 24, selected: '', feedNames: 0 },
+    'all-loading': { rows: 0, read: 0, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: '', feedNames: 0 },
+    'all-refreshing': { rows: ROWS, read: READ, empty: false, refreshing: true, theme: 'light', titleSize: 24, selected: 'All', feedNames: ROWS },
+    'all-largest-font': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 48, selected: 'All', feedNames: ROWS },
+    'all-feed': { rows: VERGE_ROWS, read: 1, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'The Verge, Pinned', feedNames: 0 },
+    'all-feed-light': { rows: 1, read: 0, empty: false, refreshing: false, theme: 'light', titleSize: 24, selected: 'Calm Notes', feedNames: 0 },
+    'all-feed-empty': { rows: 0, read: 0, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'Daring Fireball', feedNames: 0 },
+    'all-remove-animations': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All', feedNames: ROWS },
   };
 
   test.each(ALL_WORLDS)('$label', async ({ id, spec }) => {
@@ -124,7 +124,7 @@ describe('All', () => {
     if (!shows.empty && shows.rows > 0) {
       expect(screen.getByTestId('all-list').props.refreshControl.props.refreshing).toBe(shows.refreshing);
     }
-    if (shows.selected) expect(screen.getAllByRole('tab', { selected: true })[0]).toHaveAccessibleName(shows.selected);
+    if (shows.selected) expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName(shows.selected);
     expect(screen.queryAllByTestId('row-feed-name')).toHaveLength(shows.feedNames);
     expect(Uniwind.currentTheme).toBe(shows.theme);
   });
@@ -305,6 +305,7 @@ describe('All', () => {
     const [first] = FIXTURE_ROWS;
     expect(screen.getAllByTestId('row-feed-name')[0]).toHaveStyle({ fontFamily: 'InstrumentSans' });
     expect(screen.getAllByTestId('row-feed-name')[0]).toHaveProp('className', expect.stringContaining('text-text-muted'));
+    expect(screen.getByText(first.title)).toHaveStyle({ fontFamily: 'Literata' });
     const credit = screen.getByText('By Terrence O’Brien');
     expect(credit).toHaveStyle({ fontFamily: 'InstrumentSans' });
     expect(credit).not.toHaveProp('className', expect.stringContaining('text-text-muted'));

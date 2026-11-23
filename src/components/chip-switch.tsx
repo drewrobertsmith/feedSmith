@@ -1,4 +1,4 @@
-import { createContext, use, useEffect, useRef, type ReactNode } from 'react';
+import { createContext, use, useLayoutEffect, useRef, type ReactNode } from 'react';
 import Animated, {
   Easing,
   interpolate,
@@ -8,7 +8,7 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 
-import { chipDirection } from '@/screens/chip-direction';
+import { chipDirection } from '@/components/chip-direction';
 import { motion } from '@/theme/motion';
 
 const ShiftContext = createContext<SharedValue<number> | null>(null);
@@ -25,7 +25,8 @@ export function ChipSwitch({ index, children }: { index: number; children: React
   const shift = useSharedValue(0);
   const previous = useRef<number | null>(null);
 
-  useEffect(() => {
+  // Before paint, so new rows never show once at rest before the slide starts.
+  useLayoutEffect(() => {
     const direction = chipDirection(previous.current, index);
     previous.current = index;
     if (direction === 0) return;

@@ -3,8 +3,8 @@
 // tests assert what it receives.
 jest.mock('@/environment/motion-config', () => ({ MotionConfig: jest.fn(() => null) }));
 
-// The drag gesture needs Reanimated too (D13): its one adapter becomes a plain row whose handle
-// carries `onDrop`, so tests drop a row where a drag would.
+// The chip switch's slide needs Reanimated too (FEE-42): it becomes a plain wrapper that shows
+// which chip's rows are shown.
 jest.mock('@/components/chip-switch', () => {
   const { View } = require('react-native');
   return {
@@ -17,6 +17,9 @@ jest.mock('@/components/chip-switch', () => {
     SlideRow: ({ children }) => children,
   };
 });
+
+// The drag gesture needs Reanimated too (D13): its one adapter becomes a plain row whose handle
+// carries `onDrop`, so tests drop a row where a drag would.
 jest.mock('@/components/drag-row', () => {
   const { View } = require('react-native');
   return {
