@@ -1,3 +1,4 @@
+import { faceOf } from '../../../test/depth';
 import { act, fireEvent, userEvent, waitFor, within } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
 import { screen } from 'expo-router/testing-library';
@@ -242,17 +243,17 @@ describe('controls have depth, not outlines (FEE-75, D27)', () => {
   test.each(['dark', 'light'] as const)('in %s, Go to Feeds is soft, sinks when pressed, and has no outline', async (colorScheme) => {
     await open({ colorScheme, section: 'saved', feeds: 'some', saved: 'none' });
     const button = await screen.findByRole('button', { name: 'Go to Feeds' });
-    expect(button).toHaveStyle(depthStyle(colorScheme, 'soft'));
+    expect(faceOf(button)).toMatchObject(depthStyle(colorScheme, 'soft'));
     expect(button).not.toHaveStyle({ borderWidth: expect.any(Number) });
     await fireEvent(button, 'pressIn');
-    expect(screen.getByRole('button', { name: 'Go to Feeds' })).toHaveStyle(depthStyle(colorScheme, 'pressed'));
+    expect(faceOf(screen.getByRole('button', { name: 'Go to Feeds' }))).toMatchObject(depthStyle(colorScheme, 'pressed'));
   });
 
   test.each(['dark', 'light'] as const)('in %s, the Undo note rests raised over the list, with a soft Undo on it', async (colorScheme) => {
     await open({ colorScheme, section: 'saved', feeds: 'some' });
     const toast = await markDone();
-    expect(toast).toHaveStyle(depthStyle(colorScheme, 'raised'));
-    expect(within(toast).getByRole('button', { name: 'Undo' })).toHaveStyle(depthStyle(colorScheme, 'soft'));
+    expect(faceOf(toast)).toMatchObject(depthStyle(colorScheme, 'raised'));
+    expect(faceOf(within(toast).getByRole('button', { name: 'Undo' }))).toMatchObject(depthStyle(colorScheme, 'soft'));
   });
 
   // A gradient face inside a Reanimated entering animation never showed when Reanimated skipped motion itself (FEE-74).

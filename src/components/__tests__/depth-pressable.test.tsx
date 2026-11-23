@@ -1,3 +1,4 @@
+import { faceOf } from '../../../test/depth';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import { AppText } from '@/components/app-text';
@@ -20,7 +21,7 @@ const press = async (colorScheme: 'dark' | 'light') =>
 test('a press also sinks the control to pressed, and letting go raises it again', async () => {
   await press('dark');
   await fireEvent(screen.getByRole('button', { name: 'Go' }), 'pressIn');
-  expect(screen.getByRole('button', { name: 'Go' })).toHaveStyle(depthStyle('dark', 'pressed'));
+  expect(faceOf(screen.getByRole('button', { name: 'Go' }))).toMatchObject(depthStyle('dark', 'pressed'));
   await fireEvent(screen.getByRole('button', { name: 'Go' }), 'pressOut');
-  expect(screen.getByRole('button', { name: 'Go' })).toHaveStyle(depthStyle('dark', 'soft'));
+  expect(faceOf(screen.getByRole('button', { name: 'Go' }))).toMatchObject(depthStyle('dark', 'soft'));
 });

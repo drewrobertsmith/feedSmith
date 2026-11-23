@@ -26,7 +26,8 @@ export function AppButton({
       aria-busy={busy}
       disabled={off}
       onPress={onPress}
-      className={off ? 'self-start rounded-full px-group py-related opacity-60' : 'self-start rounded-full px-group py-related'}
+      frameClassName="self-start"
+      className={off ? 'rounded-full px-group py-related opacity-60' : 'rounded-full px-group py-related'}
     >
       <AppText variant="label" className="text-text">
         {label}
