@@ -1,4 +1,4 @@
-import { router, useRouter } from 'expo-router';
+import { router } from 'expo-router';
 import { useEffect, useEffectEvent } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -63,7 +63,6 @@ const textOf = (block: Block | undefined) =>
 /** The Article's headline, Subtitle and meta: the deck is left out where the text already says it. */
 function ArticleHeader({ article }: { article: ReadingArticle }) {
   const { title, subtitle, authors, feedId, feedTitle, publishedAt, page, blocks } = article;
-  const navigation = useRouter();
   const credit = byline(authors);
   // A summary-only Article's text is its Subtitle; a Feed's text often opens with it too.
   const deck = subtitle && !page && textOf(blocks[0]) !== subtitle.trim() ? subtitle : undefined;
@@ -86,7 +85,7 @@ function ArticleHeader({ article }: { article: ReadingArticle }) {
         <Pressable
           role="link"
           aria-label={`${feedTitle}, open its Articles`}
-          onPress={() => navigation.dismissTo(`/?feed=${feedId}`)}
+          onPress={() => router.dismissTo({ pathname: '/', params: { feed: feedId } })}
           hitSlop={spacing.related}
           className="shrink flex-row items-baseline gap-inside"
         >
