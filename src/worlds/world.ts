@@ -1,9 +1,10 @@
+import { useSyncExternalStore } from 'react';
 import { Uniwind } from 'uniwind';
 
 import type { Account, Auth } from '@/auth/auth-context';
 import type { SignInView } from '@/auth/sign-in-outcome';
 import type { Environment } from '@/environment';
-import type { AddFeedReason, AddFeedView, ArticleView, FeedsData } from '@/feeds/feeds-data';
+import type { AddFeedReason, AddFeedView, ArticleRow, ArticleView, FeedsData, SavedBefore } from '@/feeds/feeds-data';
 import {
   FIXTURE_ACCOUNT,
   FIXTURE_ARTICLE,
@@ -21,6 +22,7 @@ import {
   FIXTURE_OMITTED_ARTICLE,
   FIXTURE_READ_ROWS,
   FIXTURE_ROWS,
+  FIXTURE_SAVED_ROWS,
   FIXTURE_SEVERAL_AUTHORS_ARTICLE,
   FIXTURE_UNEXTRACTED_ARTICLE,
 } from '@/worlds/fixtures';
@@ -59,6 +61,13 @@ export type WorldSpec = {
   addFeed?: 'idle' | 'busy' | 'choose' | 'already' | AddFeedReason;
   /** Whether a pull-down refresh is under way. */
   refreshing?: boolean;
+  /**
+   * What Saved holds. With Feeds, defaults to `some`: two Articles from All and one whose Feed was
+   * removed (T23); without, to `none`.
+   */
+  saved?: 'some' | 'none' | 'loading';
+  /** Save, Done and Undo don't reach the server. */
+  savedWrites?: 'fail';
   /** The chosen Feed's chip, by id: All shows only its Articles (P5). */
   feed?: string;
   /** `full`: three Feeds are Pinned already, so another Pin is refused (P9). */
@@ -79,7 +88,10 @@ export type WorldSpec = {
     | 'unextracted'
     | 'unextracted-no-image'
     | 'missing'
-    | 'loading';
+    | 'loading'
+    | 'removed-feed';
+  /** The Article the Reading view opens is Saved (FEE-30). */
+  articleSaved?: true;
 };
 
 /** What a world's fake Feeds were asked to do. */
@@ -91,9 +103,64 @@ export type FeedsLog = {
   renames: { id: string; title: string }[];
   removed: string[];
   pinOrders: string[][];
+  saves: string[];
+  dones: string[];
+  restores: { id: string; before: SavedBefore }[];
 };
 
-const emptyLog = (): FeedsLog => ({ added: [], refreshes: 0, read: [], pins: [], renames: [], removed: [], pinOrders: [] });
+const emptyLog = (): FeedsLog => ({
+  added: [],
+  refreshes: 0,
+  read: [],
+  pins: [],
+  renames: [],
+  removed: [],
+  pinOrders: [],
+  saves: [],
+  dones: [],
+  restores: [],
+});
+
+/**
+ * A world's Saved and Read state, which Save, Done and Undo change as the real ones do, so a
+ * screen shows the change at once (Q3). Saved ids are kept most recently Saved first.
+ */
+function savedStore(saved: string[], read: string[]) {
+  let state = { saved, read: new Set(read) };
+  const listeners = new Set<() => void>();
+  const set = (next: typeof state) => {
+    state = next;
+    listeners.forEach((listener) => listener());
+  };
+  return {
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    get: () => state,
+    /** The Article's state as Undo would need it: a Saved time that keeps its place, and Read. */
+    before: (id: string): SavedBefore => ({
+      ...(state.saved.includes(id) ? { savedAt: state.saved.length - state.saved.indexOf(id) } : {}),
+      ...(state.read.has(id) ? { readAt: 1 } : {}),
+    }),
+    save: (id: string) => {
+      if (!state.saved.includes(id)) set({ ...state, saved: [id, ...state.saved] });
+    },
+    done: (id: string) => set({ saved: state.saved.filter((s) => s !== id), read: new Set([...state.read, id]) }),
+    /** Puts an Article back where `before` found it: its place in Saved, and Read or not. */
+    restore: (id: string, before: SavedBefore) => {
+      const rest = state.saved.filter((s) => s !== id);
+      const saved =
+        before.savedAt === undefined ? rest : rest.toSpliced(Math.max(0, rest.length + 1 - before.savedAt), 0, id);
+      const read = new Set(state.read);
+      if (before.readAt === undefined) read.delete(id);
+      else read.add(id);
+      set({ saved, read });
+    },
+  };
+}
 
 /** What a world's fake auth was asked to do. */
 export type SignInLog = { starts: number; completions: { code?: string; error?: string }[]; signOuts: number; deletes: number };
@@ -111,6 +178,8 @@ const READING_FIXTURES = {
   extracting: FIXTURE_EXTRACTING_ARTICLE,
   unextracted: FIXTURE_UNEXTRACTED_ARTICLE,
   'unextracted-no-image': { ...FIXTURE_UNEXTRACTED_ARTICLE, imageUrl: undefined },
+  // Saved, then its Feed removed: it keeps the Feed's name, with no Feed to link to (T23).
+  'removed-feed': { ...FIXTURE_ARTICLE, feedId: undefined, feedTitle: 'Morning Brief' },
 } as const;
 
 /** A world's Feeds and Articles: fixture data, and a log of what it's asked. */
@@ -132,6 +201,33 @@ export function worldFeeds(
         : addFeed === 'choose'
           ? { status: 'choose', choices: FIXTURE_CHOICES }
           : { status: 'error', reason: addFeed };
+  const universe = [...FIXTURE_ROWS, ...FIXTURE_SAVED_ROWS.filter((row) => !FIXTURE_ROWS.some((r) => r.id === row.id))];
+  // Saved has Articles when the world has Feeds, unless it says otherwise.
+  const savedSpec = spec.saved ?? (feeds === 'some' || feeds === 'read' ? 'some' : 'none');
+  const store = savedStore(
+    [...(spec.articleSaved ? [FIXTURE_ROWS[0].id] : []), ...(savedSpec === 'some' ? FIXTURE_SAVED_ROWS.map((row) => row.id) : [])],
+    universe.filter((row) => feeds === 'read' || row.read).map((row) => row.id),
+  );
+  const useStore = () => useSyncExternalStore(store.subscribe, store.get);
+  // Each view is built once per state, as a query's result stays the same object until it changes.
+  const views = new WeakMap<object, Map<string, unknown>>();
+  const viewOf = <T,>(state: object, key: string, build: () => T): T => {
+    const forState = views.get(state) ?? new Map<string, unknown>();
+    views.set(state, forState);
+    if (!forState.has(key)) forState.set(key, build());
+    return forState.get(key) as T;
+  };
+  const live = (row: ArticleRow, state: ReturnType<typeof store.get>): ArticleRow => ({
+    ...row,
+    saved: state.saved.includes(row.id),
+    read: state.read.has(row.id),
+  });
+  const writes = async (record: () => void, change: () => void) => {
+    if (spec.savedWrites === 'fail') return null;
+    record();
+    change();
+    return null;
+  };
   const articleView: ArticleView =
     article === 'loading'
       ? { status: 'loading' }
@@ -141,10 +237,36 @@ export function worldFeeds(
 
   return {
     useAll: (feedId) => {
+      const state = useStore();
       if (feeds === 'loading') return { status: 'loading' };
-      const rows = feeds === 'some' ? FIXTURE_ROWS : feeds === 'read' ? FIXTURE_READ_ROWS : [];
-      return { status: 'ready', articles: feedId === null ? rows : rows.filter((row) => row.feedId === feedId) };
+      return viewOf(state, `all:${feedId}`, () => {
+        const rows = (feeds === 'some' ? FIXTURE_ROWS : feeds === 'read' ? FIXTURE_READ_ROWS : []).map((row) => live(row, state));
+        return { status: 'ready' as const, articles: feedId === null ? rows : rows.filter((row) => row.feedId === feedId) };
+      });
     },
+    useSaved: () => {
+      const state = useStore();
+      if (savedSpec === 'loading') return { status: 'loading' };
+      return viewOf(state, 'saved', () => {
+        const byId = new Map(universe.map((row) => [row.id, row]));
+        return { status: 'ready' as const, articles: state.saved.flatMap((id) => (byId.has(id) ? [live(byId.get(id)!, state)] : [])) };
+      });
+    },
+    useSavedActions: () => ({
+      save: async (id) => {
+        const before = store.before(id);
+        await writes(() => log.saves.push(id), () => store.save(id));
+        return spec.savedWrites === 'fail' ? null : before;
+      },
+      done: async (id) => {
+        const before = store.before(id);
+        await writes(() => log.dones.push(id), () => store.done(id));
+        return spec.savedWrites === 'fail' ? null : before;
+      },
+      restore: async (id, before) => {
+        await writes(() => log.restores.push({ id, before }), () => store.restore(id, before));
+      },
+    }),
     useChips: () => (feeds === 'loading' ? { status: 'loading' } : { status: 'ready', chips: feeds === 'none' ? [] : someChips }),
     useManage: () =>
       manage === 'loading'
@@ -171,7 +293,11 @@ export function worldFeeds(
       log.pins.push({ id, pinned });
       return 'ok';
     },
-    useArticle: () => articleView,
+    useArticle: (id) => {
+      const state = useStore();
+      if (articleView.status !== 'ready') return articleView;
+      return viewOf(state, `article:${id}`, () => ({ ...articleView, article: { ...articleView.article, saved: state.saved.includes(id) } }));
+    },
     useAddFeed: () => ({
       view: addView,
       add: (url) => {

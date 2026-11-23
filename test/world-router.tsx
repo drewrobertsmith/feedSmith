@@ -1,0 +1,49 @@
+import { act, fireEvent } from '@testing-library/react-native';
+import { renderRouter, screen } from 'expo-router/testing-library';
+
+import TabsLayout from '@/app/(tabs)/_layout';
+import FeedsRoute from '@/app/(tabs)/index';
+import SavedRoute from '@/app/(tabs)/saved';
+import AddFeedRoute from '@/app/add-feed';
+import ArticleRoute from '@/app/article/[id]';
+import AuthReturnRoute from '@/app/auth';
+import GalleryRoute from '@/app/gallery';
+import ManageFeedsRoute from '@/app/manage-feeds';
+import SignInRoute from '@/app/sign-in';
+import { AppRoot } from '@/navigation/app-root';
+import type { World } from '@/worlds/world';
+
+/** Renders the whole app, every route, in a world. */
+export function renderWorld(world: World, initialUrl: string = world.initialUrl) {
+  return renderRouter(
+    {
+      _layout: () => <AppRoot environment={world.environment} auth={world.auth} feeds={world.feeds} />,
+      '(tabs)/_layout': TabsLayout,
+      '(tabs)/index': FeedsRoute,
+      '(tabs)/saved': SavedRoute,
+      'add-feed': AddFeedRoute,
+      'article/[id]': ArticleRoute,
+      'manage-feeds': ManageFeedsRoute,
+      'sign-in': SignInRoute,
+      auth: AuthReturnRoute,
+      gallery: GalleryRoute,
+    },
+    { initialUrl },
+  );
+}
+
+/**
+ * Legend List shows its rows once its scroll view and each row report a size, as they do at
+ * once on a phone; Jest has no layout, so the test reports them.
+ */
+export async function layOutList(testID: string) {
+  const list = screen.queryByTestId(testID);
+  if (!list) return;
+  const layout = (height: number) => ({ nativeEvent: { layout: { x: 0, y: 0, width: 412, height } } });
+  await act(async () => fireEvent(list, 'layout', layout(915)));
+  for (const row of screen.queryAllByRole('link')) {
+    let node = row.parent;
+    while (node && !node.props.onLayout) node = node.parent;
+    if (node) await act(async () => fireEvent(node!, 'layout', layout(112)));
+  }
+}

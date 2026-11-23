@@ -5,10 +5,11 @@ import type { AddFeedReason, ReadingPage } from '../../convex/lib/feed/validator
 
 export type { AddFeedReason, Block, OmittedKind, Span };
 
-/** One Article in All (P12). Never carries a feed URL (Q9). */
+/** One Article in All, a Feed's list, or Saved (P12). Never carries a feed URL (Q9). */
 export type ArticleRow = {
   id: string;
-  feedId: string;
+  /** Absent for a Saved Article whose Feed was removed (T23). */
+  feedId?: string;
   title: string;
   subtitle?: string;
   /** The lead image beside it, when there is one. */
@@ -21,13 +22,15 @@ export type ArticleRow = {
   publishedAt: number;
   /** Opened before (P7): dimmed, never hidden. */
   read: boolean;
+  /** Saved (Q3): marked in Gold (D5). */
+  saved: boolean;
 };
 
 /** One Article as the Reading view shows it. */
 export type ReadingArticle = {
   title: string;
-  /** Its Feed, which the Reading view's Feed name links to (FEE-47). */
-  feedId: string;
+  /** Its Feed, which the Reading view's Feed name links to (FEE-47); absent once removed (T23). */
+  feedId?: string;
   feedTitle: string;
   publishedAt: number;
   /** The original page, when the Feed gave an https one. */
@@ -44,9 +47,24 @@ export type ReadingArticle = {
    * the text is whole.
    */
   page?: ReadingPage;
+  /** Saved (Q3): the Reading view offers Done instead of Save. */
+  saved: boolean;
 };
 
 export type AllView = { status: 'loading' } | { status: 'ready'; articles: ArticleRow[] };
+/** Saved, most recently Saved first (P14). */
+export type SavedView = AllView;
+/** An Article's Saved and Read state before Save or Done, which Undo puts back (Q35). */
+export type SavedBefore = { savedAt?: number; readAt?: number };
+/**
+ * Saving and marking Done (Q3, P8). Each shows at once, before the server answers. `save` and
+ * `done` resolve to what the Article was before, for Undo, or null when it didn't go through.
+ */
+export type SavedActions = {
+  save: (id: string) => Promise<SavedBefore | null>;
+  done: (id: string) => Promise<SavedBefore | null>;
+  restore: (id: string, before: SavedBefore) => Promise<void>;
+};
 /** When All was last brought up to date (FEE-47); `at` is null with no Feeds, or none fetched yet. */
 export type LastUpdatedView = { status: 'loading' } | { status: 'ready'; at: number | null };
 
@@ -93,6 +111,10 @@ export type FeedsData = {
   useAll: (feedId: string | null) => AllView;
   /** The chip row's Feeds, in order (P9). */
   useChips: () => ChipsView;
+  /** Saved, most recently Saved first (P14). */
+  useSaved: () => SavedView;
+  /** Saving, marking Done, and Undo. */
+  useSavedActions: () => SavedActions;
   /** Pins or unpins a Feed. */
   useSetPinned: () => (id: string, pinned: boolean) => Promise<PinOutcome>;
   /** Manage Feeds' list, Pinned first in order (D13). */
@@ -125,6 +147,18 @@ export function useFeedsData(): FeedsData {
 export function useAll(feedId: string | null): AllView {
   const { useAll: read } = useFeedsData();
   return read(feedId);
+}
+
+/** Saved's Articles. */
+export function useSaved(): SavedView {
+  const { useSaved: read } = useFeedsData();
+  return read();
+}
+
+/** Saving, marking Done, and Undo. */
+export function useSavedActions(): SavedActions {
+  const { useSavedActions: read } = useFeedsData();
+  return read();
 }
 
 /** The chip row's Feeds. */

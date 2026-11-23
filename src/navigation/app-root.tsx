@@ -4,6 +4,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider, type Theme } from 'expo-router/
 import { StatusBar } from 'expo-status-bar';
 
 import { AuthContext, useAuth, type Auth } from '@/auth/auth-context';
+import { UndoProvider } from '@/components/undo-toast';
 import { ConvexAuth } from '@/auth/convex-auth';
 import { EnvironmentProvider, useEnvironment, type Environment } from '@/environment';
 import { ConvexFeeds } from '@/feeds/convex-feeds';
@@ -67,7 +68,10 @@ export function AppRoot({ environment, auth, feeds }: { environment?: Environmen
     // Gestures (dragging Pinned Feeds, D13) need a root that sees every touch.
     <GestureHandlerRootView style={{ flex: 1 }}>
       <EnvironmentProvider environment={environment}>
-        <ThemedStack />
+        {/* One Undo note at a time, across screens: Done in the Reading view shows it in Saved (Q35). */}
+        <UndoProvider>
+          <ThemedStack />
+        </UndoProvider>
       </EnvironmentProvider>
     </GestureHandlerRootView>
   );

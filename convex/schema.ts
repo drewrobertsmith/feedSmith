@@ -74,13 +74,21 @@ export default defineSchema({
     authors: v.optional(v.array(v.string())),
     /** When the User first opened it (P7). */
     readAt: v.optional(v.number()),
+    /** When the User Saved it (Q3); absent once Done (P8). Saved Articles outlive the cleanup (P14). */
+    savedAt: v.optional(v.number()),
+    /** Its Feed's name, kept when the Feed is removed while it's Saved, so Saved still names it (T23). */
+    feedTitle: v.optional(v.string()),
     /** Deprecated (FEE-62): moved to `pageReads` by `migrations.movePageReads`; removed with FEE-56. */
     extraction: v.optional(vExtraction),
   })
     .index('by_user_published', ['userId', 'publishedAt'])
     .index('by_feed_guid', ['feedId', 'guid'])
     .index('by_feed_published', ['feedId', 'publishedAt'])
-    .index('by_published', ['publishedAt']),
+    .index('by_user_saved', ['userId', 'savedAt'])
+    // Unsaved Articles (`savedAt` undefined sorts first) by age: what the cleanup may delete (P14).
+    .index('by_saved_published', ['savedAt', 'publishedAt'])
+    // A removed Feed's unsaved Articles, which go with it, and its Saved ones, which stay (T23).
+    .index('by_feed_saved', ['feedId', 'savedAt']),
   /**
    * Reading a summary-only Article in full from its page (T8, T24): `pending`, `reading` while
    * one run has it, or `failed`. No row once its text is whole, or when its Feed carried full

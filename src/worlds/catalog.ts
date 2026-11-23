@@ -113,6 +113,17 @@ export const READING_WORLDS = [
     label: 'Reading, largest font size',
     spec: { colorScheme: 'dark', section: 'article', fontScale: 2 },
   },
+  { id: 'reading-saved', label: 'Reading a Saved Article', spec: { colorScheme: 'dark', section: 'article', articleSaved: true } },
+  {
+    id: 'reading-saved-light',
+    label: 'Reading a Saved Article, light',
+    spec: { colorScheme: 'light', section: 'article', articleSaved: true },
+  },
+  {
+    id: 'reading-removed-feed',
+    label: 'Saved, its Feed removed',
+    spec: { colorScheme: 'dark', section: 'article', article: 'removed-feed', articleSaved: true },
+  },
 ] as const satisfies readonly CatalogWorld[];
 
 export type ReadingWorldId = (typeof READING_WORLDS)[number]['id'];
@@ -178,3 +189,28 @@ export const ACCOUNT_WORLDS = [
 ] as const satisfies readonly CatalogWorld[];
 
 export type AccountWorldId = (typeof ACCOUNT_WORLDS)[number]['id'];
+
+/** Saved (FEE-30): most recently Saved first, its empty state, and an Article whose Feed was removed (T23). */
+export const SAVED_WORLDS = [
+  { id: 'saved-dark', label: 'Saved, dark', spec: { colorScheme: 'dark', section: 'saved', feeds: 'some' } },
+  { id: 'saved-light', label: 'Saved, light', spec: { colorScheme: 'light', section: 'saved', feeds: 'some' } },
+  { id: 'saved-empty', label: 'Nothing Saved yet', spec: { colorScheme: 'dark', section: 'saved', feeds: 'some', saved: 'none' } },
+  {
+    id: 'saved-empty-light',
+    label: 'Nothing Saved yet, light',
+    spec: { colorScheme: 'light', section: 'saved', feeds: 'some', saved: 'none' },
+  },
+  { id: 'saved-loading', label: 'Saved, loading', spec: { colorScheme: 'dark', section: 'saved', feeds: 'some', saved: 'loading' } },
+  {
+    id: 'saved-largest-font',
+    label: 'Saved, largest font size',
+    spec: { colorScheme: 'dark', section: 'saved', feeds: 'some', fontScale: 2 },
+  },
+  {
+    id: 'saved-remove-animations',
+    label: 'Saved, Remove animations',
+    spec: { colorScheme: 'dark', section: 'saved', feeds: 'some', reduceMotion: true },
+  },
+] as const satisfies readonly CatalogWorld[];
+
+export type SavedWorldId = (typeof SAVED_WORLDS)[number]['id'];

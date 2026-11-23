@@ -21,7 +21,7 @@ type Shows = {
 };
 
 const FEEDS = /Add a Feed to see its Articles here/;
-const SAVED = /Articles you Save wait here until you mark them Done/;
+const SAVED = /Nothing Saved yet/;
 
 const SHOWS: Record<ShellWorldId, Shows> = {
   dark: { heading: 'Feeds', message: FEEDS, theme: 'dark', titleSize: 24, reduceMotion: false },

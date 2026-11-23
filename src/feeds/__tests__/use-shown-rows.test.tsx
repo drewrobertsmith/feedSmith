@@ -4,7 +4,7 @@ import type { AllView } from '@/feeds/feeds-data';
 import { useShownRows } from '@/feeds/use-shown-rows';
 
 const rowsOf = (...ids: string[]) =>
-  ids.map((id) => ({ id, feedId: 'f1', title: id, feedTitle: 'F', publishedAt: 0, read: false }));
+  ids.map((id) => ({ id, feedId: 'f1', title: id, feedTitle: 'F', publishedAt: 0, read: false, saved: false }));
 
 describe("while a chosen Feed's rows load, the list keeps showing the last ones (FEE-42)", () => {
   test('ready rows are shown, for the chip they belong to', async () => {
