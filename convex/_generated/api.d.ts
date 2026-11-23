@@ -32,6 +32,7 @@ import type * as lib_feed_pace from "../lib/feed/pace.js";
 import type * as lib_feed_parse from "../lib/feed/parse.js";
 import type * as lib_feed_record from "../lib/feed/record.js";
 import type * as lib_feed_store from "../lib/feed/store.js";
+import type * as lib_feed_timer from "../lib/feed/timer.js";
 import type * as lib_feed_validators from "../lib/feed/validators.js";
 import type * as lib_feedName from "../lib/feedName.js";
 import type * as lib_signUp from "../lib/signUp.js";
@@ -70,6 +71,7 @@ declare const fullApi: ApiFromModules<{
   "lib/feed/parse": typeof lib_feed_parse;
   "lib/feed/record": typeof lib_feed_record;
   "lib/feed/store": typeof lib_feed_store;
+  "lib/feed/timer": typeof lib_feed_timer;
   "lib/feed/validators": typeof lib_feed_validators;
   "lib/feedName": typeof lib_feedName;
   "lib/signUp": typeof lib_signUp;

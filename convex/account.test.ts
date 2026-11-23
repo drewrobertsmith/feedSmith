@@ -4,6 +4,8 @@ import { registerGoogleOauth } from '@convex-dev/auth/components/google/test';
 import { convexTest } from 'convex-test';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
+import { runScheduledNow } from '../test/convex-scheduled';
+
 import { api, components } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import schema from './schema';
@@ -99,7 +101,7 @@ describe('deleteAccount (P18)', () => {
     const { t, a, b, asA } = await setup();
 
     await asA.mutation(api.account.deleteAccount, {});
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await runScheduledNow(t);
 
     expect(await holdings(t, a, 'google-a')).toEqual(NOTHING);
     expect(await holdings(t, b, 'google-b')).toEqual(EVERYTHING);
@@ -116,7 +118,7 @@ describe('deleteAccount (P18)', () => {
   test('deleting an Account that is already gone fails cleanly', async () => {
     const { t, asA } = await setup();
     await asA.mutation(api.account.deleteAccount, {});
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await runScheduledNow(t);
 
     await expect(asA.mutation(api.account.deleteAccount, {})).rejects.toThrow(/ACCOUNT_GONE/);
   });
@@ -131,7 +133,7 @@ describe('deleteAccount (P18)', () => {
     });
 
     await asA.mutation(api.account.deleteAccount, {});
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await runScheduledNow(t);
 
     expect(await holdings(t, a, 'google-a')).toEqual(NOTHING);
   });

@@ -2,6 +2,8 @@
 import { convexTest } from 'convex-test';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
+import { runScheduledNow } from '../test/convex-scheduled';
+
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import schema from './schema';
@@ -59,7 +61,7 @@ async function setup() {
 async function checkDueFeeds(t: ReturnType<typeof convexTest>) {
   vi.setSystemTime(Date.now() + 2 * DAY);
   await t.mutation(internal.refresh.scheduleDue, {});
-  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  await runScheduledNow(t);
 }
 
 describe("a Feed's fetch schedule lives apart from the Feed (FEE-54)", () => {
@@ -117,7 +119,7 @@ describe("a Feed's fetch schedule lives apart from the Feed (FEE-54)", () => {
     await t.run((ctx) => ctx.db.patch(scheduleA!._id, { nextFetchAt: 0 }));
 
     await t.mutation(internal.refresh.scheduleDue, {});
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await runScheduledNow(t);
 
     expect(await scheduleOf(feedB._id)).toEqual(scheduleB);
   });
@@ -127,7 +129,7 @@ describe("a Feed's fetch schedule lives apart from the Feed (FEE-54)", () => {
     const feed = await feedOf(a);
 
     await asA.mutation(api.feeds.remove, { id: feed._id });
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await runScheduledNow(t);
 
     expect(await scheduleOf(feed._id)).toBeNull();
   });
@@ -192,13 +194,14 @@ test('more Feeds than one batch are all moved, across scheduled runs', async () 
   const userId = await t.run((ctx) => ctx.db.insert('users', { email: 'a@example.com' }));
   await t.run(async (ctx) => {
     for (let i = 0; i < 230; i++) {
-      await ctx.db.insert('feeds', { userId, url: `https://f${i}.example.com/feed`, title: `F${i}`, nextFetchAt: i });
+      await ctx.db.insert('feeds', { userId, url: `https://f${i}.example.com/feed`, title: `F${i}`, nextFetchAt: START + DAY + i });
     }
   });
 
   await t.mutation(internal.migrations.moveFeedSchedules, {});
-  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  await runScheduledNow(t);
 
+  // Each kept its own time (none was due, so the fetch scheduler leased none meanwhile).
   const schedules = await t.run((ctx) => ctx.db.query('feedSchedules').collect());
   expect(schedules).toHaveLength(230);
   expect(new Set(schedules.map((s) => s.nextFetchAt)).size).toBe(230);

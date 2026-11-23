@@ -7,6 +7,7 @@ import { DELETE_BATCH } from './lib/feed/blocks';
 import { deleteArticles } from './lib/deleteArticles';
 import { fetchFeed } from './lib/feed/fetch';
 import { markFailing, markWorking, RETENTION, scheduleOf, storeNewArticles } from './lib/feed/record';
+import { bookFetchTimer } from './lib/feed/timer';
 import { vStoredArticle, vValidators } from './lib/feed/validators';
 
 /** How long a Feed handed to a fetch stays out of the next tick, so a slow fetch isn't doubled. */
@@ -112,7 +113,10 @@ export const refreshFeed = internalAction({
   },
 });
 
-/** The cron's tick: starts a fetch for each Feed that's due (T19), leasing it meanwhile. */
+/**
+ * The fetch scheduler's run: starts a fetch for each Feed that's due (T19), leasing it meanwhile,
+ * then books its next run for when the next Feed falls due (FEE-55).
+ */
 export const scheduleDue = internalMutation({
   args: {},
   returns: v.null(),
@@ -129,8 +133,21 @@ export const scheduleDue = internalMutation({
         await ctx.scheduler.runAfter(0, internal.refresh.refreshFeed, { feedId: schedule.feedId });
       }),
     );
-    // More were due than one tick starts: come straight back for the rest.
-    if (due.length === PER_TICK) await ctx.scheduler.runAfter(0, internal.refresh.scheduleDue, {});
+    // More were due than one run starts: the soonest is still due, so the next run is now.
+    await bookFetchTimer(ctx, 'exact');
+    return null;
+  },
+});
+
+/**
+ * The hourly safety check (FEE-55): books the fetch scheduler again if its run was lost, so Feeds
+ * can't silently stop updating. With no Feeds, or a run already waiting, it does nothing.
+ */
+export const ensureFetchTimer = internalMutation({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx) => {
+    await bookFetchTimer(ctx, 'sooner');
     return null;
   },
 });

@@ -2,6 +2,8 @@
 import { convexTest } from 'convex-test';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
+import { runScheduledNow } from '../test/convex-scheduled';
+
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { MAX_INTERVAL, backoff } from './lib/feed/pace';
@@ -72,12 +74,12 @@ const feedOf = (s: Awaited<ReturnType<typeof setup>>, id: Id<'feeds'>) =>
     return { ...feed, nextFetchAt, lastFetchedAt, failures, etag, lastModified };
   });
 
-/** Feeds stored straight in the table, each with a schedule that's due now. */
-const insertDueFeeds = (s: Awaited<ReturnType<typeof setup>>, count: number) =>
+/** Feeds stored straight in the table, each with a schedule due at `nextFetchAt` (now, by default). */
+const insertFeeds = (s: Awaited<ReturnType<typeof setup>>, count: number, nextFetchAt = 0) =>
   s.t.run(async (ctx) => {
     for (let i = 0; i < count; i++) {
       const feedId = await ctx.db.insert('feeds', { userId: s.userA, url: `https://f${i}.example.com/feed`, title: `F${i}` });
-      await ctx.db.insert('feedSchedules', { feedId, userId: s.userA, nextFetchAt: 0, failures: 0 });
+      await ctx.db.insert('feedSchedules', { feedId, userId: s.userA, nextFetchAt, failures: 0 });
     }
   });
 const refresh = (s: Awaited<ReturnType<typeof setup>>, feedId: Id<'feeds'>) =>
@@ -98,14 +100,14 @@ describe('each Feed on its own pace (T19)', () => {
     network.mockClear();
 
     await s.t.mutation(internal.refresh.scheduleDue, {});
-    await s.t.finishAllScheduledFunctions(vi.runAllTimers);
+    await runScheduledNow(s.t);
     expect(network).not.toHaveBeenCalled();
 
     vi.setSystemTime(feed.nextFetchAt! + MINUTE);
     network.mockImplementation(async () => new Response(rss([{ guid: 'g0', ago: HOUR }])));
     await s.t.mutation(internal.refresh.scheduleDue, {});
     await s.t.mutation(internal.refresh.scheduleDue, {});
-    await s.t.finishAllScheduledFunctions(vi.runAllTimers);
+    await runScheduledNow(s.t);
     expect(network).toHaveBeenCalledTimes(1);
   });
 
@@ -199,7 +201,7 @@ describe('a Feed that stops working (Q7)', () => {
     network.mockClear();
     vi.setSystemTime(START + HOUR + 10 * MINUTE);
     await s.t.mutation(internal.refresh.scheduleDue, {});
-    await s.t.finishAllScheduledFunctions(vi.runAllTimers);
+    await runScheduledNow(s.t);
     expect(network).not.toHaveBeenCalled();
   });
 
@@ -238,10 +240,10 @@ describe('fetches that overlap or misbehave', () => {
 
   test('a tick with more due Feeds than it starts at once comes back for the rest', async () => {
     const s = await setup();
-    await insertDueFeeds(s, 60);
+    await insertFeeds(s, 60);
     network.mockImplementation(async () => new Response(rss([])));
     await s.t.mutation(internal.refresh.scheduleDue, {});
-    await s.t.finishAllScheduledFunctions(vi.runAllTimers);
+    await runScheduledNow(s.t);
     expect(network).toHaveBeenCalledTimes(60);
   });
 });
@@ -261,7 +263,8 @@ describe('pulling down fetches every Feed now', () => {
 
   test('a pull fetches at most a few Feeds at a time', async () => {
     const s = await setup();
-    await insertDueFeeds(s, 12);
+    // Not due: this is about pulling, so the fetch scheduler has nothing to start meanwhile.
+    await insertFeeds(s, 12, START + DAY);
     // Answers are held open until released, so overlapping fetches pile up here.
     const waiting: (() => void)[] = [];
     network.mockImplementation(() => new Promise((resolve) => waiting.push(() => resolve(new Response(rss([]))))));
@@ -304,7 +307,7 @@ describe('cleaning up old Articles (P14)', () => {
     ]);
     vi.setSystemTime(START + 2 * DAY);
     await s.t.mutation(internal.refresh.cleanup, {});
-    await s.t.finishAllScheduledFunctions(vi.runAllTimers);
+    await runScheduledNow(s.t);
     expect((await s.a.query(api.articles.all, {})).map((r) => r.title)).toEqual(['new']);
     expect(await s.t.run((ctx) => ctx.db.query('articleBodies').take(1000))).toHaveLength(1);
   });
@@ -325,7 +328,7 @@ describe('cleaning up old Articles (P14)', () => {
       }
     });
     await s.t.mutation(internal.refresh.cleanup, {});
-    await s.t.finishAllScheduledFunctions(vi.runAllTimers);
+    await runScheduledNow(s.t);
     expect(await s.t.run((ctx) => ctx.db.query('articles').take(1000))).toHaveLength(1);
     expect(await s.t.run((ctx) => ctx.db.query('articleBodies').take(1000))).toHaveLength(1);
   });

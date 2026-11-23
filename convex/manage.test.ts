@@ -2,6 +2,8 @@
 import { convexTest } from 'convex-test';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
+import { runScheduledNow } from '../test/convex-scheduled';
+
 import { api } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import schema from './schema';
@@ -96,7 +98,7 @@ describe('removing a Feed (T23)', () => {
   test('removes the Feed, its Articles and their bodies; other Feeds are untouched', async () => {
     const s = await setup(['Gone', 'Stays'], 3);
     expect(await s.a.mutation(api.feeds.remove, { id: s.feedIds[0] })).toEqual({ ok: true });
-    await s.t.finishAllScheduledFunctions(vi.runAllTimers);
+    await runScheduledNow(s.t);
     expect((await s.a.query(api.feeds.manage, {})).map((f) => f.title)).toEqual(['Stays']);
     expect((await s.a.query(api.articles.all, {})).map((r) => r.title)).toEqual(['Stays 0', 'Stays 1', 'Stays 2']);
     expect(await s.t.run((ctx) => ctx.db.query('articleBodies').take(100))).toHaveLength(3);
@@ -124,7 +126,7 @@ describe('removing a Feed (T23)', () => {
   test('a large Feed is removed in batches', async () => {
     const s = await setup(['Big'], 230);
     await s.a.mutation(api.feeds.remove, { id: s.feedIds[0] });
-    await s.t.finishAllScheduledFunctions(vi.runAllTimers);
+    await runScheduledNow(s.t);
     expect(await s.t.run((ctx) => ctx.db.query('articles').take(10))).toEqual([]);
     expect(await s.t.run((ctx) => ctx.db.query('articleBodies').take(10))).toEqual([]);
   });
