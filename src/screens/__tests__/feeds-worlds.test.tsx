@@ -11,6 +11,7 @@ import AddFeedRoute from '@/app/add-feed';
 import ArticleRoute from '@/app/article/[id]';
 import AuthReturnRoute from '@/app/auth';
 import GalleryRoute from '@/app/gallery';
+import ManageFeedsRoute from '@/app/manage-feeds';
 import SignInRoute from '@/app/sign-in';
 import { publishedAgo, publishedDate } from '@/feeds/format';
 import { AppRoot } from '@/navigation/app-root';
@@ -44,6 +45,7 @@ function renderWorld(world: World, initialUrl: string = world.initialUrl) {
       '(tabs)/saved': SavedRoute,
       'add-feed': AddFeedRoute,
       'article/[id]': ArticleRoute,
+      'manage-feeds': ManageFeedsRoute,
       'sign-in': SignInRoute,
       auth: AuthReturnRoute,
       gallery: GalleryRoute,
@@ -92,22 +94,26 @@ describe('All', () => {
     selected: string;
     /** Rows that name their Feed: none when one Feed is chosen, since its chip names it (FEE-42). */
     feedNames: number;
+    /** The line under the Feeds title (FEE-47): when All was last updated, or that it's updating. */
+    updated: string | null;
+    /** A chosen Feed with nothing new offers Manage this Feed (Q34). */
+    manage: boolean;
   };
   const ROWS = FIXTURE_ROWS.length;
   const READ = FIXTURE_ROWS.filter((r) => r.read).length;
   const VERGE_ROWS = FIXTURE_ROWS.filter((r) => r.feedId === 'f1').length;
   const SHOWS: Record<AllWorldId, Shows> = {
-    'all-dark': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All', feedNames: ROWS },
-    'all-light': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'light', titleSize: 24, selected: 'All', feedNames: ROWS },
-    'all-read': { rows: ROWS, read: ROWS, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All', feedNames: ROWS },
-    'all-empty': { rows: 0, read: 0, empty: true, refreshing: false, theme: 'dark', titleSize: 24, selected: '', feedNames: 0 },
-    'all-loading': { rows: 0, read: 0, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: '', feedNames: 0 },
-    'all-refreshing': { rows: ROWS, read: READ, empty: false, refreshing: true, theme: 'light', titleSize: 24, selected: 'All', feedNames: ROWS },
-    'all-largest-font': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 48, selected: 'All', feedNames: ROWS },
-    'all-feed': { rows: VERGE_ROWS, read: 1, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'The Verge, Pinned', feedNames: 0 },
-    'all-feed-light': { rows: 1, read: 0, empty: false, refreshing: false, theme: 'light', titleSize: 24, selected: 'Calm Notes', feedNames: 0 },
-    'all-feed-empty': { rows: 0, read: 0, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'Daring Fireball', feedNames: 0 },
-    'all-many-feeds': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All', feedNames: ROWS },
+    'all-dark': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All', feedNames: ROWS, updated: 'Updated 5 min ago', manage: false },
+    'all-light': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'light', titleSize: 24, selected: 'All', feedNames: ROWS, updated: 'Updated 5 min ago', manage: false },
+    'all-read': { rows: ROWS, read: ROWS, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All', feedNames: ROWS, updated: 'Updated 5 min ago', manage: false },
+    'all-empty': { rows: 0, read: 0, empty: true, refreshing: false, theme: 'dark', titleSize: 24, selected: '', feedNames: 0, updated: null, manage: false },
+    'all-loading': { rows: 0, read: 0, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: '', feedNames: 0, updated: null, manage: false },
+    'all-refreshing': { rows: ROWS, read: READ, empty: false, refreshing: true, theme: 'light', titleSize: 24, selected: 'All', feedNames: ROWS, updated: 'Updating…', manage: false },
+    'all-largest-font': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 48, selected: 'All', feedNames: ROWS, updated: 'Updated 5 min ago', manage: false },
+    'all-feed': { rows: VERGE_ROWS, read: 1, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'The Verge, Pinned', feedNames: 0, updated: 'Updated 5 min ago', manage: false },
+    'all-feed-light': { rows: 1, read: 0, empty: false, refreshing: false, theme: 'light', titleSize: 24, selected: 'Calm Notes', feedNames: 0, updated: 'Updated 5 min ago', manage: false },
+    'all-feed-empty': { rows: 0, read: 0, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'Daring Fireball', feedNames: 0, updated: 'Updated 5 min ago', manage: true },
+    'all-many-feeds': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All', feedNames: ROWS, updated: 'Updated 5 min ago', manage: false },
     'all-many-feeds-largest-font': {
       rows: ROWS,
       read: READ,
@@ -117,8 +123,10 @@ describe('All', () => {
       titleSize: 48,
       selected: 'All',
       feedNames: ROWS,
+      updated: 'Updated 5 min ago',
+      manage: false,
     },
-    'all-remove-animations': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All', feedNames: ROWS },
+    'all-remove-animations': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All', feedNames: ROWS, updated: 'Updated 5 min ago', manage: false },
   };
 
   test.each(ALL_WORLDS)('$label', async ({ id, spec }) => {
@@ -136,6 +144,9 @@ describe('All', () => {
     if (!shows.empty && shows.rows > 0) {
       expect(screen.getByTestId('all-list').props.refreshControl.props.refreshing).toBe(shows.refreshing);
     }
+    if (shows.updated) expect(screen.getByText(shows.updated)).toBeOnTheScreen();
+    else expect(screen.queryByText(/^Updat/)).not.toBeOnTheScreen();
+    expect(screen.queryAllByRole('button', { name: 'Manage this Feed' })).toHaveLength(shows.manage ? 1 : 0);
     if (shows.selected) expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName(shows.selected);
     expect(screen.queryAllByTestId('row-feed-name')).toHaveLength(shows.feedNames);
     expect(Uniwind.currentTheme).toBe(shows.theme);
@@ -530,6 +541,8 @@ describe('the Reading view', () => {
     byline: string | null;
     openButton: boolean;
     leadImage: boolean;
+    /** The Feed name, a link to that Feed (FEE-47); null when there's no Article. */
+    feed: string | null;
   };
   const ARTICLE = FIXTURE_ARTICLE.title;
   const CALM = FIXTURE_EXTRACTING_ARTICLE.title;
@@ -551,26 +564,27 @@ describe('the Reading view', () => {
     byline: null,
   } as const;
   const SHOWS: Record<ReadingWorldId, Shows> = {
-    'reading-dark': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'dark' },
-    'reading-light': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'light' },
-    'reading-no-lead-image': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'dark' },
-    'reading-long-feed-name': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'light' },
+    'reading-dark': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'dark', feed: 'The Verge' },
+    'reading-light': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'light', feed: 'The Verge' },
+    'reading-no-lead-image': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'dark', feed: 'The Verge' },
+    'reading-long-feed-name': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'light', feed: 'The Verge - Full RSS for subscribers | The Verge' },
     'reading-several-authors': {
       ...full,
       heading: ARTICLE,
       body: 'Talks resume next year.',
       byline: 'By Terrence O’Brien, Emma Roth and 2 others',
       theme: 'dark',
+      feed: 'The Verge',
     },
-    'reading-no-author': { ...full, heading: ARTICLE, body: 'Talks resume next year.', byline: null, theme: 'light' },
-    'reading-omitted': { ...full, heading: ARTICLE, body: 'And how the prices compare:', omittedLines: 2, theme: 'dark' },
-    'reading-missing': { ...full, heading: MISSING, body: null, titleSize: 24, openButton: false, byline: null, theme: 'dark' },
-    'reading-extracting': { ...full, heading: CALM, body: SUBTITLE, note: BRINGING, byline: null, theme: 'dark' },
-    'reading-unextracted': { ...fallback, theme: 'dark' },
-    'reading-unextracted-no-image': { ...fallback, leadImage: false, theme: 'dark' },
-    'reading-unextracted-light': { ...fallback, theme: 'light' },
-    'reading-unextracted-largest-font': { ...fallback, titleSize: 60, theme: 'dark' },
-    'reading-largest-font': { ...full, heading: ARTICLE, body: 'Talks resume next year.', titleSize: 60, theme: 'dark' },
+    'reading-no-author': { ...full, heading: ARTICLE, body: 'Talks resume next year.', byline: null, theme: 'light', feed: 'The Verge' },
+    'reading-omitted': { ...full, heading: ARTICLE, body: 'And how the prices compare:', omittedLines: 2, theme: 'dark', feed: 'The Verge' },
+    'reading-missing': { ...full, heading: MISSING, body: null, titleSize: 24, openButton: false, byline: null, theme: 'dark', feed: null },
+    'reading-extracting': { ...full, heading: CALM, body: SUBTITLE, note: BRINGING, byline: null, theme: 'dark', feed: 'Calm Notes' },
+    'reading-unextracted': { ...fallback, theme: 'dark', feed: 'Calm Notes' },
+    'reading-unextracted-no-image': { ...fallback, leadImage: false, theme: 'dark', feed: 'Calm Notes' },
+    'reading-unextracted-light': { ...fallback, theme: 'light', feed: 'Calm Notes' },
+    'reading-unextracted-largest-font': { ...fallback, titleSize: 60, theme: 'dark', feed: 'Calm Notes' },
+    'reading-largest-font': { ...full, heading: ARTICLE, body: 'Talks resume next year.', titleSize: 60, theme: 'dark', feed: 'The Verge' },
   };
 
   test.each(READING_WORLDS)('$label', async ({ id, spec }) => {
@@ -582,11 +596,21 @@ describe('the Reading view', () => {
     if (shows.note) expect(screen.getByText(shows.note)).toBeOnTheScreen();
     else expect(screen.queryByText(new RegExp(`${BRINGING}|${UNREAD}`))).not.toBeOnTheScreen();
     expect(screen.queryAllByRole('button', { name: 'Open original' })).toHaveLength(shows.openButton ? 1 : 0);
+    if (shows.feed) expect(screen.getByRole('link', { name: `${shows.feed}, open its Articles` })).toBeOnTheScreen();
+    else expect(screen.queryByRole('link', { name: /open its Articles$/ })).not.toBeOnTheScreen();
     if (shows.byline) expect(screen.getByText(shows.byline)).toBeOnTheScreen();
     else expect(screen.queryByText(/^By /)).not.toBeOnTheScreen();
     // The fallback draws only the lead image, when there is one.
     if (shows.note === UNREAD) expect(screen.queryAllByTestId('block-image')).toHaveLength(shows.leadImage ? 1 : 0);
     expect(Uniwind.currentTheme).toBe(shows.theme);
+  });
+
+  test("the Feed name opens Feeds with that Feed chosen (FEE-47)", async () => {
+    const user = userEvent.setup();
+    await open({ colorScheme: 'dark', feeds: 'some' }, `/article/${FIXTURE_ROWS[0].id}`);
+    await user.press(await screen.findByRole('link', { name: 'The Verge, open its Articles' }));
+    expect(await screen.findByRole('tab', { name: 'The Verge, Pinned', selected: true })).toBeOnTheScreen();
+    expect(screen.queryByRole('heading', { name: ARTICLE })).not.toBeOnTheScreen();
   });
 
   /** Every text on screen, in the order TalkBack reaches it. */
@@ -733,3 +757,10 @@ describe('links into Feeds screens (Q25)', () => {
 });
 
 const ARTICLE_TITLE = FIXTURE_ARTICLE.title;
+
+test('Manage this Feed opens Manage Feeds from a Feed with nothing new (FEE-47, Q34)', async () => {
+  const user = userEvent.setup();
+  await open({ colorScheme: 'dark', feeds: 'some', feed: 'f3' });
+  await user.press(await screen.findByRole('button', { name: 'Manage this Feed' }));
+  expect(await screen.findByRole('heading', { name: 'Manage Feeds' })).toBeOnTheScreen();
+});

@@ -6,6 +6,9 @@ const day = (d: number) => Date.UTC(2026, 10, d, 12);
 
 const VERGE = 'The Verge';
 
+/** When a world's Feeds were last fetched: five minutes before "now" (FEE-47). */
+export const FIXTURE_LAST_UPDATED_AGO = 5 * 60_000;
+
 /** Two hours after the newest fixture Article: the "now" fixture rows are seen from. */
 export const FIXTURE_NOW = Date.UTC(2026, 10, 21, 14);
 
@@ -53,6 +56,7 @@ export const FIXTURE_READ_ROWS: ArticleRow[] = FIXTURE_ROWS.map((row) => ({ ...r
 /** An Article with every kind of block the Reading view draws (T17). */
 export const FIXTURE_ARTICLE: ReadingArticle = {
   title: FIXTURE_ROWS[0].title,
+  feedId: 'f1',
   feedTitle: VERGE,
   publishedAt: day(21),
   link: 'https://www.theverge.com/tech/1039554/un-regulations-killer-robots',
@@ -124,6 +128,7 @@ const CALM_SUBTITLE = 'Why reading slowly is worth it, and how to start.';
 /** A summary-only Article whose page is still being read (FEE-25, T8). */
 export const FIXTURE_EXTRACTING_ARTICLE: ReadingArticle = {
   title: 'The Art of Slow Reading',
+  feedId: 'f2',
   feedTitle: 'Calm Notes',
   publishedAt: day(18),
   link: 'https://calmnotes.example/2026/slow-reading',

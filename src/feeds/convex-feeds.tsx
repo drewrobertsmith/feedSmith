@@ -15,6 +15,7 @@ import {
   type ManageView,
   type PinOutcome,
   type FeedsData,
+  type LastUpdatedView,
 } from '@/feeds/feeds-data';
 
 /**
@@ -136,6 +137,11 @@ function useManageActions(): ManageActions {
   };
 }
 
+function useLastUpdated(): LastUpdatedView {
+  const at = useSignedInQuery(api.feeds.lastUpdated, {});
+  return at === undefined ? { status: 'loading' } : { status: 'ready', at };
+}
+
 const convexFeeds: FeedsData = {
   useAll,
   useChips,
@@ -146,6 +152,7 @@ const convexFeeds: FeedsData = {
   useAddFeed,
   useRefresh,
   useMarkRead,
+  useLastUpdated,
 };
 
 /** The app's Feeds and Articles, from Convex. Sits inside `ConvexAuth`, which owns the client. */

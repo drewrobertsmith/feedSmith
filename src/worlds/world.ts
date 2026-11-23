@@ -9,6 +9,7 @@ import {
   FIXTURE_ARTICLE,
   FIXTURE_CHIPS,
   FIXTURE_CHOICES,
+  FIXTURE_LAST_UPDATED_AGO,
   FIXTURE_EXTRACTING_ARTICLE,
   FIXTURE_LONG_FEED_ARTICLE,
   FIXTURE_MANAGE,
@@ -185,6 +186,10 @@ export function worldFeeds(
     useMarkRead: () => (id) => {
       log.read.push(id);
     },
+    useLastUpdated: () =>
+      feeds === 'loading'
+        ? { status: 'loading' }
+        : { status: 'ready', at: feeds === 'none' ? null : FIXTURE_NOW - FIXTURE_LAST_UPDATED_AGO },
     useRefresh: () => ({
       refreshing: spec.refreshing ?? false,
       refresh: async () => {

@@ -26,6 +26,8 @@ export type ArticleRow = {
 /** One Article as the Reading view shows it. */
 export type ReadingArticle = {
   title: string;
+  /** Its Feed, which the Reading view's Feed name links to (FEE-47). */
+  feedId: string;
   feedTitle: string;
   publishedAt: number;
   /** The original page, when the Feed gave an https one. */
@@ -45,6 +47,8 @@ export type ReadingArticle = {
 };
 
 export type AllView = { status: 'loading' } | { status: 'ready'; articles: ArticleRow[] };
+/** When All was last brought up to date (FEE-47); `at` is null with no Feeds, or none fetched yet. */
+export type LastUpdatedView = { status: 'loading' } | { status: 'ready'; at: number | null };
 
 /** One Feed's chip (P5, P9). Never carries a feed URL (Q9). */
 export type FeedChip = { id: string; title: string; faviconUrl?: string; pinned: boolean };
@@ -100,6 +104,8 @@ export type FeedsData = {
   useAddFeed: () => { view: AddFeedView; add: (url: string) => Promise<AddOutcome> };
   /** Pulling down: fetches every Feed now, on the server (P15, Q21). */
   useRefresh: () => { refreshing: boolean; refresh: () => Promise<void> };
+  /** The newest fetch across the User's Feeds, for the line under the Feeds title (FEE-47). */
+  useLastUpdated: () => LastUpdatedView;
   /** Marks an Article Read (P7), for the Reading view to call when it opens one. */
   useMarkRead: () => (id: string) => void;
 };
@@ -166,5 +172,11 @@ export function useMarkRead(): ReturnType<FeedsData['useMarkRead']> {
 /** Pulling down to fetch every Feed now. */
 export function useRefresh(): ReturnType<FeedsData['useRefresh']> {
   const { useRefresh: read } = useFeedsData();
+  return read();
+}
+
+/** When All was last brought up to date. */
+export function useLastUpdated(): LastUpdatedView {
+  const { useLastUpdated: read } = useFeedsData();
   return read();
 }

@@ -9,8 +9,8 @@ import { AppText } from '@/components/app-text';
 import { ChipSwitch, SlideRow } from '@/components/chip-switch';
 import { FeedIcon } from '@/components/feed-icon';
 import { TopBar, TopBarIcon } from '@/components/top-bar';
-import { useEnvironment } from '@/environment';
-import { useAll, useChips, useRefresh, type ArticleRow } from '@/feeds/feeds-data';
+import { useEnvironment, useMinuteClock } from '@/environment';
+import { useAll, useChips, useLastUpdated, useRefresh, type ArticleRow } from '@/feeds/feeds-data';
 import { byline, publishedAgo } from '@/feeds/format';
 import { useShownRows } from '@/feeds/use-shown-rows';
 import { AccountButton } from '@/screens/account/account-sheet';
@@ -19,6 +19,19 @@ import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
 
 const addFeed = () => router.push('/add-feed');
+const manageFeeds = () => router.push('/manage-feeds');
+
+/**
+ * The line under the Feeds title (FEE-47): how fresh All is, so you know whether pulling down is
+ * worth it. Information, not a count (P7). Nothing until there's something to say.
+ */
+function useUpdatedLine(refreshing: boolean): string | undefined {
+  const lastUpdated = useLastUpdated();
+  const now = useMinuteClock();
+  if (refreshing) return 'Updating…';
+  if (lastUpdated.status !== 'ready' || lastUpdated.at === null) return undefined;
+  return `Updated ${publishedAgo(lastUpdated.at, now)}`;
+}
 
 /** A Read row's image fades back with its text (P7); text dims by colour, so contrast holds (Q14). */
 const READ_IMAGE_OPACITY = 0.55;
@@ -116,6 +129,7 @@ export function FeedsScreen({ feed, accountOpen }: { feed?: string; accountOpen?
   // What the list shows: the last ready rows while a newly chosen Feed's load (FEE-42).
   const shown = useShownRows(all, chipIndex);
   const { refreshing, refresh } = useRefresh();
+  const updated = useUpdatedLine(refreshing);
   const { colorScheme } = useEnvironment();
   const theme = themes[colorScheme];
   const noFeeds = chipsView.status === 'ready' && chips.length === 0;
@@ -127,15 +141,20 @@ export function FeedsScreen({ feed, accountOpen }: { feed?: string; accountOpen?
     <View className="gap-group pb-related" style={{ paddingTop: insets.top + spacing.section }}>
       <TopBar
         title="Feeds"
+        summary={updated}
         // Adding a Feed is always here, in the same place (Q31, D18); the empty state has its own button.
         action={chips.length > 0 ? <TopBarIcon label="Add a Feed" icon={{ ios: 'plus', android: 'add' }} onPress={addFeed} /> : undefined}
         trailing={<AccountButton initiallyOpen={accountOpen} />}
       />
       {chips.length > 0 ? <ChipRow chips={chips} selected={selectedChip?.id ?? null} onSelect={select} /> : null}
       {selectedChip && empty ? (
-        <AppText variant="reading" className="px-edge text-text-muted">
-          {`No Articles from ${selectedChip.title} in the last 30 days.`}
-        </AppText>
+        // Never a dead end (Q34): a quiet way to check the Feed, rename it or remove it.
+        <View className="gap-group px-edge">
+          <AppText variant="reading" className="text-text-muted">
+            {`No Articles from ${selectedChip.title} in the last 30 days.`}
+          </AppText>
+          <AppButton label="Manage this Feed" onPress={manageFeeds} />
+        </View>
       ) : null}
     </View>
   );

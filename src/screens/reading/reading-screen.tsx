@@ -62,7 +62,7 @@ const textOf = (block: Block | undefined) =>
 
 /** The Article's headline, Subtitle and meta: the deck is left out where the text already says it. */
 function ArticleHeader({ article }: { article: ReadingArticle }) {
-  const { title, subtitle, authors, feedTitle, publishedAt, page, blocks } = article;
+  const { title, subtitle, authors, feedId, feedTitle, publishedAt, page, blocks } = article;
   const credit = byline(authors);
   // A summary-only Article's text is its Subtitle; a Feed's text often opens with it too.
   const deck = subtitle && !page && textOf(blocks[0]) !== subtitle.trim() ? subtitle : undefined;
@@ -81,11 +81,21 @@ function ArticleHeader({ article }: { article: ReadingArticle }) {
         </AppText>
       ) : null}
       <View className="flex-row items-baseline gap-related pt-inside">
-        <View className="shrink">
-          <AppText variant="label" className="text-text-muted" numberOfLines={1}>
+        {/* A breadcrumb to the Feed (FEE-47): back to Feeds with its chip chosen. */}
+        <Pressable
+          role="link"
+          aria-label={`${feedTitle}, open its Articles`}
+          onPress={() => router.dismissTo({ pathname: '/', params: { feed: feedId } })}
+          hitSlop={spacing.related}
+          className="shrink flex-row items-baseline gap-inside"
+        >
+          <AppText variant="label" className="shrink text-text-muted" numberOfLines={1} accessible={false}>
             {feedTitle}
           </AppText>
-        </View>
+          <AppText variant="label" className="text-text-muted" accessible={false}>
+            ›
+          </AppText>
+        </Pressable>
         <AppText variant="label" className="text-text-muted">
           {publishedDate(publishedAt)}
         </AppText>
