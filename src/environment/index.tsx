@@ -36,31 +36,32 @@ export function useSizeScale(): number {
 
 const MINUTE = 60_000;
 
+/** Whether the app is in front. Its listener is removed on unmount (Q20). */
+function useAppActive(): boolean {
+  const [active, setActive] = useState(() => AppState.currentState !== 'background');
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => setActive(state === 'active'));
+    return () => subscription.remove();
+  }, []);
+  return active;
+}
+
 /**
  * The environment's clock, read again each minute while the app is in front, so "5 min ago"
  * keeps up (FEE-47). In the background it stops: nothing runs on the JS thread there (Q21), and
- * it reads the clock afresh on return. Its timer and listener are removed on unmount (Q20).
+ * it reads the clock afresh on return. Its timer is cleared whenever it stops or goes (Q20).
  */
 export function useMinuteClock(): number {
   const { now } = useEnvironment();
+  const active = useAppActive();
   const [time, setTime] = useState(now);
   useEffect(() => {
-    let timer: ReturnType<typeof setInterval> | undefined;
-    const start = () => {
-      setTime(now());
-      timer ??= setInterval(() => setTime(now()), MINUTE);
-    };
-    const stop = () => {
-      if (timer !== undefined) clearInterval(timer);
-      timer = undefined;
-    };
-    if (AppState.currentState !== 'background') start();
-    const subscription = AppState.addEventListener('change', (state) => (state === 'active' ? start() : stop()));
-    return () => {
-      stop();
-      subscription.remove();
-    };
-  }, [now]);
+    if (!active) return;
+    const tick = () => setTime(now());
+    tick();
+    const timer = setInterval(tick, MINUTE);
+    return () => clearInterval(timer);
+  }, [active, now]);
   return time;
 }
 
