@@ -1,5 +1,6 @@
 import type { Account } from '@/auth/auth-context';
 import type { ArticleRow, FeedChip, ManagedFeed, ReadingArticle } from '@/feeds/feeds-data';
+import { FARNAM_ICON, FIREBALL_ICON, FRAME_PHOTO, RUNWAY_PHOTO, VERGE_ICON } from '@/worlds/fixture-images';
 
 /** Midday UTC, so the date reads the same in every time zone a test runs in. */
 const day = (d: number) => Date.UTC(2026, 10, d, 12);
@@ -12,7 +13,7 @@ export const FIXTURE_LAST_UPDATED_AGO = 5 * 60_000;
 /** Two hours after the newest fixture Article: the "now" fixture rows are seen from. */
 export const FIXTURE_NOW = Date.UTC(2026, 10, 21, 14);
 
-const VERGE_FACE = { feedId: 'f1', feedTitle: VERGE, faviconUrl: 'https://www.theverge.com/favicon.ico' };
+const VERGE_FACE = { feedId: 'f1', feedTitle: VERGE, faviconUrl: VERGE_ICON };
 
 /**
  * All, as a few Feeds would fill it: newest first, with every kind of row (P12): image and
@@ -24,7 +25,7 @@ export const FIXTURE_ROWS: ArticleRow[] = [
     id: 'a1',
     title: 'The UN fails to agree on rules regulating ‘killer robots’',
     subtitle: 'Countries agree to ‘start discussing options’ for rules around autonomous weapons.',
-    imageUrl: 'https://platform.theverge.com/wp-content/uploads/sites/2/chorus/uploads/chorus_asset/file/13611631/503831564.jpg.jpg',
+    imageUrl: RUNWAY_PHOTO,
     authors: ['Terrence O’Brien'],
     ...VERGE_FACE,
     publishedAt: day(21),
@@ -44,7 +45,7 @@ export const FIXTURE_ROWS: ArticleRow[] = [
   {
     id: 'a3',
     title: 'Amazon’s first digital photo frame is up to 50 percent off for Black Friday, and it’s the cheapest it has ever been',
-    imageUrl: 'https://platform.theverge.com/wp-content/uploads/sites/2/2026/11/frame.jpg',
+    imageUrl: FRAME_PHOTO,
     ...VERGE_FACE,
     publishedAt: day(19),
     read: false,
@@ -86,12 +87,12 @@ export const FIXTURE_ARTICLE: ReadingArticle = {
   authors: ['Terrence O’Brien'],
   saved: false,
   // The Feed's lead image is also the first image in its text: the Reading view shows it once.
-  imageUrl: 'https://platform.theverge.com/wp-content/uploads/sites/2/chorus/uploads/chorus_asset/file/13611631/503831564.jpg.jpg',
+  imageUrl: RUNWAY_PHOTO,
   omitted: [],
   blocks: [
     {
       type: 'image',
-      src: 'https://platform.theverge.com/wp-content/uploads/sites/2/chorus/uploads/chorus_asset/file/13611631/503831564.jpg.jpg',
+      src: RUNWAY_PHOTO,
       alt: 'A military drone on a runway',
       caption: 'Photo by John Moore / Getty Images',
       width: 2040,
@@ -165,8 +166,8 @@ export const FIXTURE_EXTRACTING_ARTICLE: ReadingArticle = {
 /** A summary-only Article whose page couldn't be read: the fallback (Q6). */
 export const FIXTURE_UNEXTRACTED_ARTICLE: ReadingArticle = {
   ...FIXTURE_EXTRACTING_ARTICLE,
-  // A real image, so the gallery shows the fallback as a reader would see it.
-  imageUrl: 'https://platform.theverge.com/wp-content/uploads/sites/2/chorus/uploads/chorus_asset/file/13611631/503831564.jpg.jpg',
+  // An image, so the gallery shows the fallback as a reader would see it.
+  imageUrl: RUNWAY_PHOTO,
   page: 'unavailable',
 };
 
@@ -194,30 +195,30 @@ export const FIXTURE_CHOICES = [
  * lists The Verge's Articles and not Calm Notes', so it differs from All.
  */
 export const FIXTURE_TWO_PINS: FeedChip[] = [
-  { id: 'f1', title: VERGE, faviconUrl: 'https://www.theverge.com/favicon.ico', pinned: true },
-  { id: 'f3', title: 'Daring Fireball', faviconUrl: 'https://daringfireball.net/favicon.ico', pinned: true },
+  { id: 'f1', title: VERGE, faviconUrl: VERGE_ICON, pinned: true },
+  { id: 'f3', title: 'Daring Fireball', faviconUrl: FIREBALL_ICON, pinned: true },
   { id: 'f2', title: 'Calm Notes', pinned: false },
 ];
 
 /** Three Pinned Feeds, the most there can be (P9); Calm Notes has no icon, so it shows its initial (FEE-61). */
 export const FIXTURE_THREE_PINS: FeedChip[] = [
-  { id: 'f1', title: VERGE, faviconUrl: 'https://www.theverge.com/favicon.ico', pinned: true },
-  { id: 'f3', title: 'Daring Fireball', faviconUrl: 'https://daringfireball.net/favicon.ico', pinned: true },
+  { id: 'f1', title: VERGE, faviconUrl: VERGE_ICON, pinned: true },
+  { id: 'f3', title: 'Daring Fireball', faviconUrl: FIREBALL_ICON, pinned: true },
   { id: 'f2', title: 'Calm Notes', pinned: true },
 ];
 
 /** No Pinned Feeds: no Pinned chip, no group (FEE-60). */
 export const FIXTURE_NO_PINS: FeedChip[] = [
-  { id: 'f1', title: VERGE, faviconUrl: 'https://www.theverge.com/favicon.ico', pinned: false },
+  { id: 'f1', title: VERGE, faviconUrl: VERGE_ICON, pinned: false },
   { id: 'f2', title: 'Calm Notes', pinned: false },
-  { id: 'f3', title: 'Daring Fireball', faviconUrl: 'https://daringfireball.net/favicon.ico', pinned: false },
+  { id: 'f3', title: 'Daring Fireball', faviconUrl: FIREBALL_ICON, pinned: false },
 ];
 
 /** Two Pinned Feeds with nothing in the last 30 days: Pinned is empty (FEE-59). */
 export const FIXTURE_QUIET_PINS: FeedChip[] = [
-  { id: 'f3', title: 'Daring Fireball', faviconUrl: 'https://daringfireball.net/favicon.ico', pinned: true },
+  { id: 'f3', title: 'Daring Fireball', faviconUrl: FIREBALL_ICON, pinned: true },
   { id: 'f9', title: 'Kottke', pinned: true },
-  { id: 'f1', title: VERGE, faviconUrl: 'https://www.theverge.com/favicon.ico', pinned: false },
+  { id: 'f1', title: VERGE, faviconUrl: VERGE_ICON, pinned: false },
   { id: 'f2', title: 'Calm Notes', pinned: false },
 ];
 
@@ -226,16 +227,16 @@ export const FIXTURE_QUIET_PINS: FeedChip[] = [
  * icon; Daring Fireball has no Articles in the last 30 days.
  */
 export const FIXTURE_CHIPS: FeedChip[] = [
-  { id: 'f1', title: VERGE, faviconUrl: 'https://www.theverge.com/favicon.ico', pinned: true },
+  { id: 'f1', title: VERGE, faviconUrl: VERGE_ICON, pinned: true },
   { id: 'f2', title: 'Calm Notes', pinned: false },
-  { id: 'f3', title: 'Daring Fireball', faviconUrl: 'https://daringfireball.net/favicon.ico', pinned: false },
+  { id: 'f3', title: 'Daring Fireball', faviconUrl: FIREBALL_ICON, pinned: false },
 ];
 
 /** Someone following eight Feeds, one with a long name: the chip row runs off-screen (FEE-44). */
 export const FIXTURE_MANY_CHIPS: FeedChip[] = [
-  { id: 'f1', title: 'The Verge - Full RSS for subscribers | The Verge', faviconUrl: 'https://www.theverge.com/favicon.ico', pinned: true },
+  { id: 'f1', title: 'The Verge - Full RSS for subscribers | The Verge', faviconUrl: VERGE_ICON, pinned: true },
   { id: 'f2', title: 'Calm Notes', pinned: false },
-  { id: 'f3', title: 'Daring Fireball', faviconUrl: 'https://daringfireball.net/favicon.ico', pinned: false },
+  { id: 'f3', title: 'Daring Fireball', faviconUrl: FIREBALL_ICON, pinned: false },
   { id: 'f4', title: 'Farnam Street', pinned: false },
   { id: 'f5', title: 'Stratechery', pinned: false },
   { id: 'f6', title: 'Six Colors', pinned: false },
@@ -245,9 +246,9 @@ export const FIXTURE_MANY_CHIPS: FeedChip[] = [
 
 /** Manage Feeds (D13): one Pinned Feed, then the rest by name; Farnam Street has stopped working. */
 export const FIXTURE_MANAGE: ManagedFeed[] = [
-  { id: 'f1', title: VERGE, faviconUrl: 'https://www.theverge.com/favicon.ico', host: 'www.theverge.com', pinned: true, working: true },
+  { id: 'f1', title: VERGE, faviconUrl: VERGE_ICON, host: 'www.theverge.com', pinned: true, working: true },
   { id: 'f2', title: 'Calm Notes', host: 'calmnotes.example', pinned: false, working: true },
-  { id: 'f4', title: 'Farnam Street', faviconUrl: 'https://fs.blog/favicon.ico', host: 'fs.blog', pinned: false, working: false },
+  { id: 'f4', title: 'Farnam Street', faviconUrl: FARNAM_ICON, host: 'fs.blog', pinned: false, working: false },
 ];
 
 /** Three Pinned Feeds, so they can be ordered, and a fourth Pin is refused. */
