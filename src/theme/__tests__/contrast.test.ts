@@ -1,3 +1,4 @@
+import { DEPTH_LEVELS, depth } from '@/theme/depth';
 import { googleButton } from '@/theme/google';
 import { contrastRatio, palette, TEXT_ROLES, SURFACE_ROLES, themes } from '@/theme/tokens';
 
@@ -69,4 +70,27 @@ test.each(['dark', 'light'] as const)('Save on Gold reads at 4.5:1, and the Gold
   // The label on the Gold panel; at 4.5:1 the Gold mark on the background clears its 3:1 too.
   expect(contrastRatio(theme.background, theme.accent)).toBeGreaterThanOrEqual(4.5);
   expect(contrastRatio(theme.accent, theme.surface)).toBeGreaterThanOrEqual(3);
+});
+
+// Q14 (D26): a control is found by its label, which reads at 4.5:1 on its own face at every depth level
+// (FEE-74). Icons use the muted text colour, so they clear 3:1 too. Gold, the chosen label, on every face.
+describe.each(['dark', 'light'] as const)('depth in %s', (scheme) => {
+  const theme = themes[scheme];
+  test.each(DEPTH_LEVELS)('every label colour reads at 4.5:1 on the %s face', (level) => {
+    const face = depth[scheme][level].face;
+    for (const role of ['text', 'textMuted', 'accent'] as const) {
+      expect(contrastRatio(theme[role], face)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  test('the chosen chip stands one level above the others: a deeper, longer shadow', () => {
+    const { soft, raised } = depth[scheme];
+    expect(raised.shadow.blur).toBeGreaterThan(soft.shadow.blur);
+    expect(raised.shadow.y).toBeGreaterThan(soft.shadow.y);
+  });
+
+  test('pressed sinks: no shadow and no sheen', () => {
+    expect(depth[scheme].pressed.shadow.alpha).toBe(0);
+    expect(depth[scheme].pressed.sheen).toBe(0);
+  });
 });

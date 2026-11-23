@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { createContext, use, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Pressable,
@@ -16,6 +16,7 @@ import type { FeedChip } from '@/feeds/feeds-data';
 import { usePin } from '@/feeds/use-pin';
 import { PINNED } from '../../convex/lib/pinned';
 import { chipLabel, fadeRanges, hasPinnedView, revealOffset, transparent } from '@/screens/chip-row-layout';
+import { depthStyle } from '@/theme/depth';
 import { motion } from '@/theme/motion';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
@@ -53,7 +54,10 @@ const FADE = spacing.section;
 /** Something a chip offers TalkBack besides choosing it (Q15): Pin, Unpin, Expand, Collapse. */
 type ChipAction = { name: string; label: string; run: () => void };
 
-/** One chip: a tab in the row. Chosen, it's Gold on the indicator pill (D5) and springs into place (D7). */
+/** The face colour of the chip something sits on, so what's drawn on it can ring itself in that colour. */
+const ChipFace = createContext<string | undefined>(undefined);
+
+/** One chip: a tab in the row. Chosen, it's raised with a Gold label (D5, D27) and springs into place (D7). */
 function Chip({
   label,
   accessibleName,
@@ -79,7 +83,9 @@ function Chip({
   actions?: ChipAction[];
   onLayout?: (event: LayoutChangeEvent) => void;
 }) {
-  const { reduceMotion } = useEnvironment();
+  const { reduceMotion, colorScheme } = useEnvironment();
+  const [pressed, setPressed] = useState(false);
+  const face = depthStyle(colorScheme, pressed ? 'pressed' : selected ? 'raised' : 'soft');
   const [scale] = useState(() => new Animated.Value(1));
   const wasSelected = useRef(selected);
 
@@ -109,25 +115,21 @@ function Chip({
         aria-expanded={expanded}
         onPress={onPress}
         onLongPress={onLongPress}
+        onPressIn={() => setPressed(true)}
+        onPressOut={() => setPressed(false)}
         // Long-press for touch, a named action for TalkBack: every action reachable without the gesture (Q15).
         accessibilityActions={actions?.map(({ name, label: actionLabel }) => ({ name, label: actionLabel }))}
         onAccessibilityAction={(event) => {
           actions?.find((action) => action.name === event.nativeEvent.actionName)?.run();
         }}
-        // Chosen: Gold on the indicator pill (D5). Unchosen: quiet, a hairline and muted text (FEE-44), so the row
-        // never competes with the Articles; the hairline is the muted text colour, which keeps 3:1 (Q14).
-        // Every chip has the hairline (transparent when chosen), so choosing one never changes its size.
-        // Active (a Pinned Feed chosen): full-strength hairline and text, so the group reads as the one you're in.
-        className={
-          selected
-            ? 'flex-row items-center gap-inside rounded-full border-transparent bg-indicator px-group py-related'
-            : active
-              ? 'flex-row items-center gap-inside rounded-full border-text px-group py-related'
-              : 'flex-row items-center gap-inside rounded-full border-text-muted px-group py-related'
-        }
-        style={{ borderWidth: StyleSheet.hairlineWidth }}
+        // Every chip is an object, not an outline (FEE-74, D27): soft, the chosen one raised with its Gold label
+        // (D5), and one under the finger sinks to pressed. Unchosen labels stay muted so the row never competes with
+        // the Articles (FEE-44); the label is what identifies a chip, at 4.5:1 on every face (Q14, D26).
+        // Active (a Pinned Feed chosen): full-strength text, so the group reads as the one you're in.
+        className="flex-row items-center gap-inside rounded-full px-group py-related"
+        style={face}
       >
-        {icon}
+        <ChipFace value={face.backgroundColor as string}>{icon}</ChipFace>
         <AppText
           variant="label"
           className={selected ? 'text-accent' : active ? 'text-text' : 'text-text-muted'}
@@ -149,6 +151,8 @@ function Chip({
  * every icon beside text (Q16). TalkBack hears the chip's name, which lists the Feeds, not the icons.
  */
 function PinnedStack({ chips }: { chips: FeedChip[] }) {
+  // Ringed in the chip's own face, so on it each icon reads as a separate disc (D25, FEE-74).
+  const ring = use(ChipFace);
   return (
     <View className="flex-row items-center" importantForAccessibility="no-hide-descendants">
       {chips.map((chip, i) => (
@@ -158,9 +162,10 @@ function PinnedStack({ chips }: { chips: FeedChip[] }) {
           // A surface backdrop, so a transparent logo still reads as a disc; overlapping by one inside step keeps each glyph whole.
           className={
             i === 0
-              ? 'items-center justify-center overflow-hidden rounded-full border-2 border-background bg-surface'
-              : 'items-center justify-center overflow-hidden rounded-full border-2 border-background bg-surface -ml-inside'
+              ? 'items-center justify-center overflow-hidden rounded-full border-2 bg-surface'
+              : 'items-center justify-center overflow-hidden rounded-full border-2 bg-surface -ml-inside'
           }
+          style={{ borderColor: ring }}
         >
           <FeedIcon key={chip.faviconUrl} url={chip.faviconUrl} title={chip.title} size={ICON} testID={`pinned-stack-${chip.id}`} />
         </View>

@@ -5,6 +5,7 @@ import { EnvironmentProvider } from '@/environment';
 import { FeedsContext, type FeedChip } from '@/feeds/feeds-data';
 import { ChipRow } from '@/screens/chip-row';
 import { worldEnvironment, worldFeeds } from '@/worlds/world';
+import { depth } from '@/theme/depth';
 import { PINNED } from '../../../convex/lib/pinned';
 
 const spec = { colorScheme: 'dark', feeds: 'some' } as const;
@@ -61,5 +62,15 @@ describe('the Pinned group follows Pins as they change (FEE-60)', () => {
     expect(names()).toEqual(['All', 'Pinned: The Verge, Daring Fireball', 'Calm Notes']);
     expect(chosen()).toBe('Calm Notes');
     expect(screen.getByRole('tab', { name: /^Pinned:/ })).toBeCollapsed();
+  });
+});
+
+describe('the stacked icons ring in the Pinned chip\'s own face, so each stays a separate disc on it (FEE-74)', () => {
+  test.each([
+    ['chosen, the raised face', PINNED, depth.dark.raised.face],
+    ['not chosen, the soft face', null, depth.dark.soft.face],
+  ])('%s', async (_name, selected, face) => {
+    await render(<Row chips={row(['f1', 'f3'])} selected={selected} />);
+    for (const ring of screen.getAllByTestId('pinned-stack-ring', { includeHiddenElements: true })) expect(ring).toHaveStyle({ borderColor: face });
   });
 });
