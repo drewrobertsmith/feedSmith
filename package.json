@@ -97,5 +97,8 @@
       "/node_modules/@react-native/babel-preset/"
     ],
     "resolver": "<rootDir>/test/jest-resolver.js"
+  },
+  "overrides": {
+    "htmlparser2": "12.0.0"
   }
 }
