@@ -107,9 +107,11 @@ function matchOne(typed: string[], site: string[]): 0 | 1 | 2 | 3 {
   if (site.length === 0) return 0;
   const typedKeys = keys(typed);
   const siteKeys = keys(site);
-  if (typedKeys.some((key) => siteKeys.includes(key))) return 3;
+  const siteKeySet = new Set(siteKeys);
+  if (typedKeys.some((key) => siteKeySet.has(key))) return 3;
   const [small, big] = [content(typed), content(site)].sort((x, y) => x.length - y.length);
-  if (big.length - small.length <= 1 && small.every((word) => big.includes(word))) return 2;
+  const bigWords = new Set(big);
+  if (big.length - small.length <= 1 && small.every((word) => bigWords.has(word))) return 2;
   const [a, b] = [typedKeys.at(-1)!, siteKeys.at(-1)!];
   if (a.length >= 4 && distance(a, b) <= (a.length >= 10 ? 2 : 1)) return 1;
   return 0;

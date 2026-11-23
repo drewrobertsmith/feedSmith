@@ -44,9 +44,9 @@ test('a name searches, showing what the mockCatalog knows while guessing goes on
   });
   expect(mockFinds.map((find) => find.name)).toEqual(['the verge']);
   expect(mockAdded).toEqual([]);
-  expect(result.current.view).toEqual({ status: 'found', name: 'the verge', results: [VERGE], searching: true, failed: false });
+  expect(result.current.view).toEqual({ status: 'found', name: 'the verge', results: [VERGE], phase: 'searching' });
   await act(async () => mockFinds[0].resolve({ found: [] }));
-  expect(result.current.view).toMatchObject({ results: [VERGE], searching: false, failed: false });
+  expect(result.current.view).toMatchObject({ results: [VERGE], phase: 'done' });
 });
 
 test('an address is mockAdded as today, with no search', async () => {
@@ -64,7 +64,7 @@ test('a search that fails says so', async () => {
     await result.current.add('the verge');
   });
   await act(async () => mockFinds[0].reject(new Error('offline')));
-  expect(result.current.view).toMatchObject({ status: 'found', searching: false, failed: true, results: [] });
+  expect(result.current.view).toMatchObject({ status: 'found', phase: 'failed', results: [] });
 });
 
 test('an older search’s answer never changes a newer search (Q20)', async () => {
@@ -77,5 +77,5 @@ test('an older search’s answer never changes a newer search (Q20)', async () =
     await result.current.add('daring fireball');
   });
   await act(async () => mockFinds[0].reject(new Error('late')));
-  expect(result.current.view).toMatchObject({ name: 'daring fireball', searching: true, failed: false, results: [] });
+  expect(result.current.view).toMatchObject({ name: 'daring fireball', phase: 'searching', results: [] });
 });

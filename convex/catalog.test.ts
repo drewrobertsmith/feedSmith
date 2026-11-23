@@ -281,3 +281,13 @@ const ENTRY = {
   source: 'declared' as const,
   now: Date.now(),
 };
+
+describe('bounded (Q10)', () => {
+  test('a name matching many of your Feeds lists at most twenty results', async () => {
+    const { t, a, aId } = await setup();
+    await t.run(async (ctx) => {
+      for (let i = 0; i < 30; i++) await ctx.db.insert('feeds', { userId: aId, url: `https://news${i}.example.com/feed`, title: `News ${i}` });
+    });
+    expect(await a.query(api.catalog.search, { name: 'news' })).toHaveLength(20);
+  });
+});

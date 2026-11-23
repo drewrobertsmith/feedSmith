@@ -93,7 +93,7 @@ function FoundList({ view, onChoose }: { view: Extract<AddFeedView, { status: 'f
   return (
     <View className="gap-related">
       <AppText variant="label" className="text-text-muted" aria-live="polite">
-        {view.searching ? `Looking for “${view.name}”…` : `Feeds for “${view.name}”`}
+        {view.phase === 'searching' ? `Looking for “${view.name}”…` : `Feeds for “${view.name}”`}
       </AppText>
       {view.results.map((found) => (
         <Found key={found.kind === 'new' ? found.url : found.feedId} found={found} onChoose={onChoose} />
@@ -104,8 +104,8 @@ function FoundList({ view, onChoose }: { view: Extract<AddFeedView, { status: 'f
 
 /** Why a search for a name came to nothing, or null while there's something to show. */
 function findMessage(view: AddFeedView): string | null {
-  if (view.status !== 'found' || view.searching || view.results.length > 0) return null;
-  return view.failed ? `Couldn’t search just now. ${PASTE}` : `No feeds found for “${view.name}”. ${PASTE}`;
+  if (view.status !== 'found' || view.phase === 'searching' || view.results.length > 0) return null;
+  return view.phase === 'failed' ? `Couldn’t search just now. ${PASTE}` : `No feeds found for “${view.name}”. ${PASTE}`;
 }
 
 /** Back to Feeds with a followed Feed's chip chosen, and a quiet note naming it (T22). */
@@ -125,7 +125,7 @@ export function AddFeedScreen() {
   // A search shown on arrival (the state gallery) keeps the name it was for in the field.
   const [typed, setTyped] = useState(() => (view.status === 'found' ? view.name : ''));
   const adding = view.status === 'busy';
-  const searching = view.status === 'found' && view.searching;
+  const searching = view.status === 'found' && view.phase === 'searching';
   const byName = typed.trim() !== '' && !isAddress(typed);
   const field = typeScale.reading;
   const error = view.status === 'error' ? ERRORS[view.reason] : findMessage(view);

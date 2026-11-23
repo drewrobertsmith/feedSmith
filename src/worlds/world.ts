@@ -42,14 +42,14 @@ import { PINNED } from '../../convex/lib/pinned';
  */
 /** Searching for a site's name, as a world shows it (FEE-80). */
 type FindWorld = 'find-searching' | 'find-arriving' | 'find-known' | 'find-following' | 'find-nothing' | 'find-failed';
-const found = (results: FoundFeed[], searching: boolean, failed = false): AddFeedView => ({ status: 'found', name: 'the verge', results, searching, failed });
+const found = (results: FoundFeed[], phase: 'searching' | 'done' | 'failed'): AddFeedView => ({ status: 'found', name: 'the verge', results, phase });
 const FIND_VIEWS: Record<FindWorld, AddFeedView> = {
-  'find-searching': found([], true),
-  'find-arriving': found(FIXTURE_FOUND.slice(0, 1), true),
-  'find-known': found(FIXTURE_FOUND, false),
-  'find-following': found(FIXTURE_FOUND_FOLLOWING, false),
-  'find-nothing': found([], false),
-  'find-failed': found([], false, true),
+  'find-searching': found([], 'searching'),
+  'find-arriving': found(FIXTURE_FOUND.slice(0, 1), 'searching'),
+  'find-known': found(FIXTURE_FOUND, 'done'),
+  'find-following': found(FIXTURE_FOUND_FOLLOWING, 'done'),
+  'find-nothing': found([], 'done'),
+  'find-failed': found([], 'failed'),
 };
 
 export type WorldSpec = {

@@ -116,10 +116,11 @@ export type AddFeedView =
   | { status: 'error'; reason: AddFeedReason }
   | { status: 'choose'; choices: FeedChoice[] }
   /**
-   * Searching for a site's name (FEE-80): what's found so far, best first, while `searching`, and
-   * after. `failed`: the search itself didn't go through (offline, or the server).
+   * Searching for a site's name (FEE-80): what's found so far, best first, while the search is
+   * `searching` and once it's `done`; `failed` when the search itself didn't go through (offline,
+   * or the server).
    */
-  | { status: 'found'; name: string; results: FoundFeed[]; searching: boolean; failed: boolean };
+  | { status: 'found'; name: string; results: FoundFeed[]; phase: 'searching' | 'done' | 'failed' };
 
 /**
  * Everything the screens read and do with Feeds and Articles. Convex backs it in the app

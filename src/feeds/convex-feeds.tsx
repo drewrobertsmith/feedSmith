@@ -211,8 +211,7 @@ function useAddFeed() {
     name: search.name,
     results: shown ?? [],
     // Still searching until `find` answers and the first results are in, unless it failed.
-    searching: !search.failed && (search.searching || shown === null),
-    failed: search.failed,
+    phase: search.failed ? 'failed' : search.searching || shown === null ? 'searching' : 'done',
   };
   return { view: found, add };
 }

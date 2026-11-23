@@ -13,6 +13,8 @@ import { inBatches } from './refresh';
 
 /** Catalog entries one search reads from the search index, at most (Q10). */
 const SEARCH_LIMIT = 20;
+/** Results one search shows at most: a list to choose from, not a directory. */
+const MAX_RESULTS = 20;
 /** Feeds a User follows, at most (the chip row's own cap). */
 const FOLLOWED_LIMIT = 200;
 /** Proven results the app may ask for by address, the search index having missed them (a typo). */
@@ -66,12 +68,20 @@ export const search = query({
 
     const hits = await catalogHits(ctx, terms);
     const extra = (also ?? []).slice(0, MAX_ALSO).filter((url) => url.length <= MAX_URL);
-    for (const url of extra) {
-      const entry = await ctx.db
-        .query('feedCatalog')
-        .withIndex('by_url', (q) => q.eq('url', url))
-        .unique();
-      if (entry && !hits.some((hit) => hit._id === entry._id)) hits.push(entry);
+    const asked = await Promise.all(
+      extra.map((url) =>
+        ctx.db
+          .query('feedCatalog')
+          .withIndex('by_url', (q) => q.eq('url', url))
+          .unique(),
+      ),
+    );
+    const seen = new Set(hits.map((hit) => hit._id));
+    for (const entry of asked) {
+      if (entry && !seen.has(entry._id)) {
+        seen.add(entry._id);
+        hits.push(entry);
+      }
     }
 
     const feeds = await ctx.db
@@ -103,7 +113,7 @@ export const search = query({
       if (hit.iconUrl) found.iconUrl = hit.iconUrl;
       return found;
     });
-    return [...followed, ...fresh];
+    return [...followed, ...fresh].slice(0, MAX_RESULTS);
   },
 });
 
