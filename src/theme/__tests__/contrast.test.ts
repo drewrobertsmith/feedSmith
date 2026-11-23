@@ -51,3 +51,13 @@ test.each(['dark', 'light'] as const)('control boundaries reach 3:1 in %s', (sch
   expect(contrastRatio(theme.textMuted, theme.background)).toBeGreaterThanOrEqual(3);
   expect(contrastRatio(theme.textMuted, theme.surface)).toBeGreaterThanOrEqual(3);
 });
+
+// D19: one colour means "destroys data", in both themes, readable on every surface it can sit on.
+test.each(['dark', 'light'] as const)('the destructive colour reads at 4.5:1 on every %s surface (D19)', (scheme) => {
+  const theme = themes[scheme];
+  expect(theme.destructive).toBeDefined();
+  expect(theme.destructive).not.toBe(theme.accent);
+  for (const surface of SURFACE_ROLES) {
+    expect(contrastRatio(theme.destructive, theme[surface])).toBeGreaterThanOrEqual(4.5);
+  }
+});

@@ -14,9 +14,17 @@ export const palette = {
   creamMuted: '#B9B2A4',
   sand: '#E8DECA',
   slate: '#4A5468',
+  /** Destroys data (D19): readable on Navy and Midnight. */
+  brickLight: '#E8A08A',
+  /** Destroys data (D19), in light mode: readable on cream and sand. */
+  brickDeep: '#8E2F23',
 } as const;
 
-export const TEXT_ROLES = ['text', 'textMuted', 'accent'] as const;
+/**
+ * What each colour means (Q30). `accent` is Gold: active or yours (D5). `destructive` is brick:
+ * an action that destroys data, such as deleting an Account (D19). The rest are neutrals.
+ */
+export const TEXT_ROLES = ['text', 'textMuted', 'accent', 'destructive'] as const;
 export const SURFACE_ROLES = ['background', 'surface', 'indicator'] as const;
 
 type TextRole = (typeof TEXT_ROLES)[number];
@@ -35,6 +43,7 @@ export const themes: Record<ThemeName, Theme> = {
     text: palette.cream,
     textMuted: palette.creamMuted,
     accent: palette.gold,
+    destructive: palette.brickLight,
     decor: palette.sage,
   },
   light: {
@@ -44,6 +53,7 @@ export const themes: Record<ThemeName, Theme> = {
     text: palette.midnight,
     textMuted: palette.slate,
     accent: palette.goldDeep,
+    destructive: palette.brickDeep,
     decor: palette.sage,
   },
 };
