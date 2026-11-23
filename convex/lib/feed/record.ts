@@ -24,6 +24,7 @@ export async function storeNewArticles(
   now: number,
 ) {
   // One run reads a Feed's pages at a time: one already going picks up what's stored now (T24).
+  // Checked before storing, on purpose: the Articles about to be stored would otherwise count themselves.
   const reading = await Promise.all(
     (['pending', 'reading'] as const).map((state) =>
       ctx.db
