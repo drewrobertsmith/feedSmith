@@ -81,6 +81,7 @@ export const vStoredArticle = v.object({
   subtitle: v.optional(v.string()),
   publishedAt: v.number(),
   imageUrl: v.optional(v.string()),
+  authors: v.optional(v.array(v.string())),
   blocks: v.array(vBlock),
   omitted: v.array(vOmittedKind),
   /** Summary only, with a page to read it from (T8). */

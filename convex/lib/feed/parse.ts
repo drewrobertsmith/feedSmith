@@ -12,6 +12,10 @@ const MAX_TITLE = 300;
 const MAX_SUBTITLE = 500;
 const MAX_GUID = 500;
 export const MAX_IMAGE_URL = 2048;
+/** An Article credits at most this many authors, each at most this long (FEE-41). */
+const MAX_AUTHORS = 10;
+const MAX_AUTHOR = 100;
+const EMAIL = /\S+@\S+/g;
 
 export type ParsedArticle = {
   guid: string;
@@ -23,6 +27,8 @@ export type ParsedArticle = {
   imageUrl?: string;
   /** The Feed's full text for the Article, still HTML; `htmlToBlocks` cleans it. */
   html?: string;
+  /** Who wrote it, by name only: an email address is never kept (FEE-41). */
+  authors?: string[];
 };
 
 export type ParsedFeed = {
@@ -84,6 +90,34 @@ function children(el: Element, name: string): Element[] {
   return el.children.filter((c): c is Element => isTag(c) && c.name.toLowerCase() === name);
 }
 
+/**
+ * A name with any email address taken out: `jane@example.com (Jane Doe)` and
+ * `Jane Doe (jane@example.com)` both give "Jane Doe"; brackets that aren't around an email,
+ * like "Jane Doe (Editor)", stay as written.
+ */
+function withoutEmail(text: string): string {
+  if (!text.match(EMAIL)) return text;
+  const rest = squash(text.replace(EMAIL, '').replace(/\(\s*\)/g, ''));
+  const bracketed = rest.match(/^\((.*)\)$/);
+  // What separated the name from its email ("Jane Doe, jane@…") goes with it.
+  return squash(bracketed ? bracketed[1] : rest).replace(/^[\s,;:<>-]+|[\s,;:<>-]+$/g, '');
+}
+
+/**
+ * Authors by name, as plain text: emails are removed (RSS `<author>` is often
+ * `jane@example.com (Jane Doe)`, which keeps "Jane Doe"), duplicates dropped, and both the
+ * count and each name capped. Undefined when nobody is credited.
+ */
+function authorNames(values: string[]): string[] | undefined {
+  const names = new Set<string>();
+  for (const value of values) {
+    const name = withoutEmail(squash(plain(value)));
+    if (name) names.add(clip(name, MAX_AUTHOR));
+    if (names.size >= MAX_AUTHORS) break;
+  }
+  return names.size > 0 ? [...names] : undefined;
+}
+
 function date(value: string, now: number): number {
   const ms = Date.parse(value);
   return Number.isFinite(ms) ? ms : now;
@@ -97,6 +131,7 @@ function article(fields: Omit<ParsedArticle, 'guid'> & { guid: string }): Parsed
   if (fields.subtitle) out.subtitle = clip(fields.subtitle, MAX_SUBTITLE);
   if (fields.imageUrl) out.imageUrl = fields.imageUrl;
   if (fields.html) out.html = fields.html;
+  if (fields.authors) out.authors = fields.authors;
   return out;
 }
 
@@ -111,6 +146,7 @@ function rssArticle(item: Element, base: string, now: number): ParsedArticle | u
     publishedAt: date(text(child(item, 'pubdate') ?? child(item, 'dc:date')), now),
     imageUrl: leadImage(item, base),
     html: child(item, 'content:encoded') ? DomUtils.textContent(child(item, 'content:encoded')!) : undefined,
+    authors: authorNames([...children(item, 'dc:creator'), ...children(item, 'author')].map((el) => DomUtils.textContent(el))),
   });
 }
 
@@ -147,6 +183,7 @@ function atomArticle(entry: Element, base: string, now: number): ParsedArticle |
     publishedAt: date(text(child(entry, 'published') ?? child(entry, 'updated')), now),
     imageUrl: leadImage(entry, base),
     html: atomHtml(child(entry, 'content')),
+    authors: authorNames(children(entry, 'author').map((el) => DomUtils.textContent(child(el, 'name') ?? []))),
   });
 }
 

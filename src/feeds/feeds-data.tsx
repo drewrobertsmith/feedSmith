@@ -13,6 +13,8 @@ export type ArticleRow = {
   subtitle?: string;
   /** The lead image beside it, when there is one. */
   imageUrl?: string;
+  /** Who wrote it, by name (FEE-41). */
+  authors?: string[];
   feedTitle: string;
   /** From the Feed's site; absent when the Feed gave no site. */
   faviconUrl?: string;
@@ -29,6 +31,8 @@ export type ReadingArticle = {
   /** The original page, when the Feed gave an https one. */
   link?: string;
   subtitle?: string;
+  /** Who wrote it, by name (FEE-41). */
+  authors?: string[];
   /** The lead image (the Feed's, else its page's), for when the text couldn't be brought in. */
   imageUrl?: string;
   blocks: Block[];

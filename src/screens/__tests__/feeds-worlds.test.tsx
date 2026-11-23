@@ -245,8 +245,23 @@ describe('All', () => {
     await open({ colorScheme: 'dark', feeds: 'some' });
     const rows = await screen.findAllByRole('link');
     const [first, second] = FIXTURE_ROWS;
-    expect(rows[0]).toHaveAccessibleName(`${first.title}, The Verge, ${publishedAgo(first.publishedAt, FIXTURE_NOW)}`);
-    expect(rows[1]).toHaveAccessibleName(`${second.title}, The Verge, ${publishedAgo(second.publishedAt, FIXTURE_NOW)}, Read`);
+    expect(rows[0]).toHaveAccessibleName(`${first.title}, By Terrence O’Brien, The Verge, ${publishedAgo(first.publishedAt, FIXTURE_NOW)}`);
+    expect(rows[1]).toHaveAccessibleName(
+      `${second.title}, By Emma Roth and Jay Peters, The Verge, ${publishedAgo(second.publishedAt, FIXTURE_NOW)}, Read`,
+    );
+    const [, , third] = FIXTURE_ROWS;
+    expect(rows[2]).toHaveAccessibleName(`${third.title}, The Verge, ${publishedAgo(third.publishedAt, FIXTURE_NOW)}`);
+  });
+
+  test("a row credits its authors under the title, above the Subtitle; a row with none has no byline (FEE-41)", async () => {
+    await open({ colorScheme: 'dark', feeds: 'some' });
+    await screen.findAllByRole('link');
+    const [first] = FIXTURE_ROWS;
+    const order = screen.getAllByText(/.+/).map((node) => node.props.children).filter((text) => typeof text === 'string');
+    expect(order.indexOf(first.title)).toBeLessThan(order.indexOf('By Terrence O’Brien'));
+    expect(order.indexOf('By Terrence O’Brien')).toBeLessThan(order.indexOf(first.subtitle!));
+    expect(screen.getByText('By Emma Roth and Jay Peters')).toHaveProp('numberOfLines', 1);
+    expect(screen.getAllByText(/^By /)).toHaveLength(2);
   });
 
   test('a row shows its Subtitle and lead image when it has them, and leaves them out when not (P12)', async () => {
@@ -405,6 +420,8 @@ describe('the Reading view', () => {
     theme: 'dark' | 'light';
     /** The quiet line about the page, for a summary-only Article (FEE-25). */
     note: string | null;
+    /** Who wrote it, between the Subtitle and the meta (FEE-41). */
+    byline: string | null;
     openButton: boolean;
     leadImage: boolean;
   };
@@ -416,16 +433,33 @@ describe('the Reading view', () => {
   const UNREAD = 'This Article couldn’t be brought in from its page.';
   // An Article's headline is Literata 30 (D6); "not available" is the app speaking, in the interface's title.
   // Every Article with a link ends with Open original; the fallback offers it as its main action instead.
-  const full = { omittedLines: 0, titleSize: 30, note: null, openButton: true, leadImage: false } as const;
-  const fallback = { heading: CALM, body: SUBTITLE, omittedLines: 0, titleSize: 30, note: UNREAD, openButton: true, leadImage: true } as const;
+  const full = { omittedLines: 0, titleSize: 30, note: null, openButton: true, leadImage: false, byline: 'By Terrence O’Brien' } as const;
+  const fallback = {
+    heading: CALM,
+    body: SUBTITLE,
+    omittedLines: 0,
+    titleSize: 30,
+    note: UNREAD,
+    openButton: true,
+    leadImage: true,
+    byline: null,
+  } as const;
   const SHOWS: Record<ReadingWorldId, Shows> = {
     'reading-dark': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'dark' },
     'reading-light': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'light' },
     'reading-no-lead-image': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'dark' },
     'reading-long-feed-name': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'light' },
+    'reading-several-authors': {
+      ...full,
+      heading: ARTICLE,
+      body: 'Talks resume next year.',
+      byline: 'By Terrence O’Brien, Emma Roth and 2 others',
+      theme: 'dark',
+    },
+    'reading-no-author': { ...full, heading: ARTICLE, body: 'Talks resume next year.', byline: null, theme: 'light' },
     'reading-omitted': { ...full, heading: ARTICLE, body: 'And how the prices compare:', omittedLines: 2, theme: 'dark' },
-    'reading-missing': { ...full, heading: MISSING, body: null, titleSize: 24, openButton: false, theme: 'dark' },
-    'reading-extracting': { ...full, heading: CALM, body: SUBTITLE, note: BRINGING, theme: 'dark' },
+    'reading-missing': { ...full, heading: MISSING, body: null, titleSize: 24, openButton: false, byline: null, theme: 'dark' },
+    'reading-extracting': { ...full, heading: CALM, body: SUBTITLE, note: BRINGING, byline: null, theme: 'dark' },
     'reading-unextracted': { ...fallback, theme: 'dark' },
     'reading-unextracted-no-image': { ...fallback, leadImage: false, theme: 'dark' },
     'reading-unextracted-light': { ...fallback, theme: 'light' },
@@ -442,6 +476,8 @@ describe('the Reading view', () => {
     if (shows.note) expect(screen.getByText(shows.note)).toBeOnTheScreen();
     else expect(screen.queryByText(new RegExp(`${BRINGING}|${UNREAD}`))).not.toBeOnTheScreen();
     expect(screen.queryAllByRole('button', { name: 'Open original' })).toHaveLength(shows.openButton ? 1 : 0);
+    if (shows.byline) expect(screen.getByText(shows.byline)).toBeOnTheScreen();
+    else expect(screen.queryByText(/^By /)).not.toBeOnTheScreen();
     // The fallback draws only the lead image, when there is one.
     if (shows.note === UNREAD) expect(screen.queryAllByTestId('block-image')).toHaveLength(shows.leadImage ? 1 : 0);
     expect(Uniwind.currentTheme).toBe(shows.theme);
@@ -450,13 +486,14 @@ describe('the Reading view', () => {
   /** Every text on screen, in the order TalkBack reaches it. */
   const readingOrder = () => screen.getAllByText(/.+/).map((node) => node.props.children).filter((text) => typeof text === 'string');
 
-  test('reads in order: headline, Subtitle, Feed, date, then the text (P13, Q15)', async () => {
+  test('reads in order: headline, Subtitle, byline, Feed, date, then the text (P13, Q15, FEE-41)', async () => {
     await open({ colorScheme: 'dark', section: 'article' });
     await screen.findByRole('heading', { name: ARTICLE });
     const order = readingOrder();
     const at = (text: string) => order.indexOf(text);
     expect(at(ARTICLE)).toBeLessThan(at(FIXTURE_ARTICLE.subtitle!));
-    expect(at(FIXTURE_ARTICLE.subtitle!)).toBeLessThan(at(FIXTURE_ARTICLE.feedTitle));
+    expect(at(FIXTURE_ARTICLE.subtitle!)).toBeLessThan(at('By Terrence O’Brien'));
+    expect(at('By Terrence O’Brien')).toBeLessThan(at(FIXTURE_ARTICLE.feedTitle));
     expect(at(FIXTURE_ARTICLE.feedTitle)).toBeLessThan(at('Talks resume next year.'));
   });
 
@@ -466,6 +503,13 @@ describe('the Reading view', () => {
     expect(screen.getByText(FIXTURE_ARTICLE.subtitle!)).toHaveStyle({ fontFamily: 'Literata', fontSize: 20 });
     expect(screen.getByRole('heading', { name: 'What was on the table' })).toHaveStyle({ fontFamily: 'Literata', fontSize: 22 });
     expect(screen.getByText(FIXTURE_ARTICLE.feedTitle)).toHaveStyle({ fontFamily: 'InstrumentSans' });
+  });
+
+  test("the byline reads at full strength, so it's the credit; the Feed and date stay quieter (FEE-41)", async () => {
+    await open({ colorScheme: 'dark', section: 'article' });
+    expect(await screen.findByText('By Terrence O’Brien')).toHaveProp('className', expect.stringContaining('text-text'));
+    expect(screen.getByText('By Terrence O’Brien')).not.toHaveProp('className', expect.stringContaining('text-text-muted'));
+    expect(screen.getByText(FIXTURE_ARTICLE.feedTitle)).toHaveProp('className', expect.stringContaining('text-text-muted'));
   });
 
   test("the lead image shows once, even when it's also the first image in the text", async () => {

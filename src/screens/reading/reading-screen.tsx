@@ -7,7 +7,7 @@ import { AppButton } from '@/components/app-button';
 import { AppText } from '@/components/app-text';
 import { useSizeScale } from '@/environment';
 import { useArticle, useMarkRead, type Block, type ReadingArticle } from '@/feeds/feeds-data';
-import { publishedDate } from '@/feeds/format';
+import { byline, publishedDate } from '@/feeds/format';
 import { openLink } from '@/feeds/open-link';
 import { ArticleBlocks } from '@/screens/reading/article-blocks';
 import { spacing } from '@/theme/spacing';
@@ -62,7 +62,8 @@ const textOf = (block: Block | undefined) =>
 
 /** The Article's headline, Subtitle and meta: the deck is left out where the text already says it. */
 function ArticleHeader({ article }: { article: ReadingArticle }) {
-  const { title, subtitle, feedTitle, publishedAt, page, blocks } = article;
+  const { title, subtitle, authors, feedTitle, publishedAt, page, blocks } = article;
+  const credit = byline(authors);
   // A summary-only Article's text is its Subtitle; a Feed's text often opens with it too.
   const deck = subtitle && !page && textOf(blocks[0]) !== subtitle.trim() ? subtitle : undefined;
   return (
@@ -71,6 +72,12 @@ function ArticleHeader({ article }: { article: ReadingArticle }) {
       {deck ? (
         <AppText variant="deck" className="text-text-muted">
           {deck}
+        </AppText>
+      ) : null}
+      {/* The credit, at full strength; the Feed and date sit quieter beneath it (FEE-41). */}
+      {credit ? (
+        <AppText variant="label" className="text-text">
+          {credit}
         </AppText>
       ) : null}
       <View className="flex-row items-baseline gap-related pt-inside">

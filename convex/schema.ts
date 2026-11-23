@@ -44,6 +44,8 @@ export default defineSchema({
     publishedAt: v.number(),
     /** The lead image All shows beside it (https). */
     imageUrl: v.optional(v.string()),
+    /** Who wrote it, by name only; never an email (FEE-41). */
+    authors: v.optional(v.array(v.string())),
     /** When the User first opened it (P7). */
     readAt: v.optional(v.number()),
     /**

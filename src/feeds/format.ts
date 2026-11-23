@@ -25,3 +25,14 @@ export function publishedAgo(ms: number, now: number): string {
   if (elapsed < WEEK) return `${Math.floor(elapsed / DAY)} days ago`;
   return `${Math.floor(elapsed / WEEK)} wk ago`;
 }
+
+/**
+ * Who wrote an Article, as a byline (FEE-41): "By Emma Roth", "By A and B", "By A, B and C",
+ * and beyond three "By A, B and 2 others". Undefined when nobody is credited.
+ */
+export function byline(authors: readonly string[] | undefined): string | undefined {
+  if (!authors || authors.length === 0) return undefined;
+  if (authors.length === 1) return `By ${authors[0]}`;
+  if (authors.length <= 3) return `By ${authors.slice(0, -1).join(', ')} and ${authors[authors.length - 1]}`;
+  return `By ${authors.slice(0, 2).join(', ')} and ${authors.length - 2} others`;
+}
