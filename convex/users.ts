@@ -22,7 +22,7 @@ export const viewer = query({
     const user = await ctx.db.get(userId);
     if (user === null) return null;
     const name = user.name?.trim() || undefined;
-    return { ...(name ? { name } : {}), email: user.email, initial: accountInitial(user) };
+    return { ...(name ? { name } : {}), email: user.email, initial: accountInitial({ name, email: user.email }) };
   },
 });
 

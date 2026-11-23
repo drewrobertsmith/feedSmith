@@ -24,6 +24,7 @@ import {
   FIXTURE_UNEXTRACTED_ARTICLE,
 } from '@/worlds/fixtures';
 import type { ThemeName } from '@/theme/tokens';
+import { accountInitial } from '../../convex/lib/account';
 
 /**
  * One state the app can be in, as plain data (T13). Later tickets extend it with their
@@ -228,7 +229,7 @@ const SIGN_IN_VIEWS: Record<NonNullable<WorldSpec['auth']>, SignInView> = {
 export function worldAuth(spec: WorldSpec, log: SignInLog = emptySignInLog()): Auth {
   const state = spec.auth ?? 'signed-in';
   const signedIn = state === 'signed-in';
-  const account: Account = spec.account === 'no-name' ? { email: FIXTURE_ACCOUNT.email, initial: 'A' } : FIXTURE_ACCOUNT;
+  const account: Account = spec.account === 'no-name' ? { email: FIXTURE_ACCOUNT.email, initial: accountInitial({ email: FIXTURE_ACCOUNT.email }) } : FIXTURE_ACCOUNT;
   return {
     session: signedIn ? 'signed-in' : 'signed-out',
     account: signedIn ? account : null,
