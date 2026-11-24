@@ -892,6 +892,8 @@ describe("the Pinned chip's stacked icons (FEE-61)", () => {
     expect(within(chip).getByTestId('pinned-glyph', { includeHiddenElements: true })).toHaveStyle({ width: side, height: side });
     // TalkBack hears the Feeds by name, with its role and state, never the icons (Q15).
     expect(chip).toBeCollapsed();
+    // All is chosen, so the tray holds just the Pinned chip (FEE-85).
+    expectTray(spec.colorScheme, [shows.name]);
   });
 
   test('each circle is a ringed disc, and every one after the first overlaps the one before', async () => {

@@ -352,7 +352,7 @@ export function ChipRow({
               {trayChips.map((chip) => feedChip(chip, true))}
             </Reanimated.View>
           ) : null}
-          {/* Every chip stays mounted: the reveal needs each one measured, and a person's Feeds are tens of small pills. */}
+          {/* Every chip in the row stays mounted: the reveal needs each one measured, and a person's Feeds are tens of small pills. */}
           {/* react-doctor-disable-next-line react-doctor/rn-no-scrollview-mapped-list */}
           {rowChips.map((chip) => feedChip(chip, false))}
         </LayoutAnimationConfig>
