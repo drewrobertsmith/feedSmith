@@ -95,17 +95,43 @@ describe.each(['dark', 'light'] as const)('depth in %s', (scheme) => {
     expect(contrastRatio(depth[scheme][level].face, theme.background)).toBeGreaterThan(1.03);
   });
 
+  // FEE-83: inset is set into the page, not standing on it, so its face is darker than the page in both
+  // themes, and a soft chip inside a tray stands clear of it.
+  test('inset sits below the page: a darker face, distinct from a soft chip\'s', () => {
+    expect(DEPTH_LEVELS).toContain('inset');
+    const { inset, soft } = depth[scheme];
+    expect(contrastRatio(inset.face, palette.black)).toBeLessThan(contrastRatio(theme.background, palette.black));
+    expect(contrastRatio(inset.face, soft.face)).toBeGreaterThan(1.03);
+  });
+
   test('pressed sinks: no shadow', () => {
     expect(depth[scheme].pressed.shadow.alpha).toBe(0);
   });
 
   // D29: Android's terms. Material lights no surface from above, so there's no gradient or top-edge
   // sheen, only a tonal face and a soft shadow; and a press shows Android's ripple.
-  test.each(DEPTH_LEVELS)('the %s level is a face and a shadow only, in Material\'s terms', (level) => {
-    const style = depthStyle(scheme, level);
+  test.each(DEPTH_LEVELS.filter((level) => level !== 'inset'))(
+    'the %s level is a face and a shadow below only, in Material\'s terms',
+    (level) => {
+      const style = depthStyle(scheme, level);
+      expect(style).not.toHaveProperty('backgroundImage');
+      expect(style.boxShadow).toHaveLength(1);
+      expect(style.boxShadow).not.toEqual([expect.objectContaining({ inset: true })]);
+    },
+  );
+
+  // FEE-83: the shadow reversed. A soft inner shadow falls from the top edge, and nothing casts below.
+  test('the inset level is a face and a soft inner shadow along the top edge only, in Material\'s terms', () => {
+    const style = depthStyle(scheme, 'inset');
     expect(style).not.toHaveProperty('backgroundImage');
-    expect(style.boxShadow).toHaveLength(1);
-    expect(style.boxShadow).not.toEqual([expect.objectContaining({ inset: true })]);
+    expect(style.boxShadow).toEqual([
+      expect.objectContaining({ inset: true, offsetX: 0, offsetY: expect.any(Number), blurRadius: expect.any(Number) }),
+    ]);
+    // Falls from the top edge (down, not up), soft (blurred past its offset) and there to see.
+    const { shadow } = depth[scheme].inset;
+    expect(shadow.y).toBeGreaterThan(0);
+    expect(shadow.blur).toBeGreaterThan(shadow.y);
+    expect(shadow.alpha).toBeGreaterThan(0);
   });
 
   test('the ripple is the text colour at Material\'s pressed-state strength', () => {
