@@ -97,10 +97,14 @@ function distance(a: string, b: string): number {
   return previous[b.length];
 }
 
-/** A site's name as written, and its part before a tagline ("Blog – Notes on things" → "Blog"). */
+/**
+ * A site's name as written, its part before a tagline ("Blog – Notes on things" → "Blog"), and
+ * before a byline ("Stratechery by Ben Thompson" → "Stratechery").
+ */
 function nameForms(site: string): string[] {
   const head = site.split(/\s[-|–—:·]\s|:\s/)[0];
-  return head && head !== site ? [site, head] : [site];
+  const named = head.split(/\sby\s/i)[0];
+  return [...new Set([site, head, named].filter(Boolean))];
 }
 
 function matchOne(typed: string[], site: string[]): 0 | 1 | 2 | 3 {
@@ -112,6 +116,9 @@ function matchOne(typed: string[], site: string[]): 0 | 1 | 2 | 3 {
   const [small, big] = [content(typed), content(site)].sort((x, y) => x.length - y.length);
   const bigWords = new Set(big);
   if (big.length - small.length <= 1 && small.every((word) => bigWords.has(word))) return 2;
+  // The site's name starts with what was typed, then a byline or a description ("Stratechery by Ben Thompson").
+  const typedWords = content(typed);
+  if (typedWords.every((word, i) => content(site)[i] === word)) return 2;
   const [a, b] = [typedKeys.at(-1)!, siteKeys.at(-1)!];
   if (a.length >= 4 && distance(a, b) <= (a.length >= 10 ? 2 : 1)) return 1;
   return 0;
@@ -119,7 +126,8 @@ function matchOne(typed: string[], site: string[]): 0 | 1 | 2 | 3 {
 
 /**
  * How well a site's own name matches what was typed: 3, the same name ("the verge" and "The
- * Verge", or "theverge"); 2, the same words give or take one ("verge" and "The Verge"); 1, a small
+ * Verge", or "theverge"); 2, the same words give or take one ("verge" and "Verge Agency"), or the
+ * site's name starting with them ("Stratechery by Ben Thompson"); 1, a small
  * typo ("daring fireba11"); 0, not this site.
  */
 export function nameMatch(typed: string, site: string): 0 | 1 | 2 | 3 {
@@ -136,6 +144,12 @@ export function siteLabel(host: string): string {
   return label;
 }
 
+/** Whether a host is a site on a hosted-blog platform (`daring.substack.com`), not a domain of its own. */
+function onPlatform(host: string): boolean {
+  const label = parse(host, { allowPrivateDomains: true }).domainWithoutSuffix ?? '';
+  return PLATFORM_LABELS.has(label) && siteLabel(host) !== label;
+}
+
 /** Whether a site's host is the typed name squashed: `theverge.com` for "the verge". */
 export function hostMatch(typed: string, host: string): boolean {
   const list = nameWords(typed);
@@ -147,10 +161,12 @@ export function hostMatch(typed: string, host: string): boolean {
 /**
  * The same name, on the site whose host is that name (what was typed, or the site's own: "verge"
  * and theverge.com's "The Verge"): guessing stops here. A look-alike naming itself so on another
- * host never is.
+ * host never is, nor a hosted-blog subdomain (it may be an old blog, or someone else's): the site's
+ * own domain is still guessed.
  */
 export function isStrong(typed: string, found: { name: string; host: string }): boolean {
-  return nameMatch(typed, found.name) === 3 && (hostMatch(typed, found.host) || hostMatch(found.name, found.host));
+  if (onPlatform(found.host) || nameMatch(typed, found.name) !== 3) return false;
+  return hostMatch(typed, found.host) || nameForms(found.name).some((form) => hostMatch(form, found.host));
 }
 
 /** Domain parking and sale services: a page served from one of these is never a site. */
@@ -233,7 +249,8 @@ export function rank<T extends Ranked>(typed: string, found: T[]): T[] {
     entry,
     key: [
       -nameMatch(typed, entry.name),
-      hostMatch(typed, entry.host) ? 0 : 1,
+      // The site of that name on its own domain, then on a hosted-blog platform, then elsewhere.
+      hostMatch(typed, entry.host) ? (onPlatform(entry.host) ? 1 : 0) : 2,
       -(entry.finds ?? 0),
       entry.source === 'declared' ? 0 : 1,
       entry.host.endsWith('.com') ? 0 : 1,

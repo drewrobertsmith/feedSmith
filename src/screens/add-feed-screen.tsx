@@ -74,15 +74,11 @@ function Found({ found, onChoose }: { found: FoundFeed; onChoose: (found: FoundF
           <AppText variant="reading" className="text-text" accessible={false}>
             {found.title}
           </AppText>
+          {/* Following joins the site's line, so the name keeps the row's width at every font size (Q16). */}
           <AppText variant="label" className="text-text-muted" accessible={false}>
-            {found.host}
+            {following ? `${found.host} · Following` : found.host}
           </AppText>
         </View>
-        {following ? (
-          <AppText variant="label" className="text-text-muted" accessible={false}>
-            Following
-          </AppText>
-        ) : null}
       </Pressable>
     </Animated.View>
   );
@@ -162,7 +158,7 @@ export function AddFeedScreen() {
             onChangeText={setTyped}
             onSubmitEditing={submit}
             editable={!adding}
-            placeholder="theverge.com or The Verge"
+            placeholder="theverge.com"
             placeholderTextColor={themes[colorScheme].textMuted}
             inputMode="url"
             keyboardType="url"
@@ -170,8 +166,10 @@ export function AddFeedScreen() {
             autoCorrect={false}
             autoComplete="url"
             returnKeyType="go"
-            className="rounded-lg border border-text-muted px-group py-related text-text"
-            style={{ fontFamily: field.fontFamily, fontSize: field.fontSize * fontScale, minHeight: 48 * fontScale }}
+            className="rounded-lg border border-text-muted px-group py-related"
+            // Its colour is a style, not a class: the class reaches Android's field a second or two late,
+            // and a field opened holding text (a search shown on arrival) drew none until then.
+            style={{ color: themes[colorScheme].text, fontFamily: field.fontFamily, fontSize: field.fontSize * fontScale, minHeight: 48 * fontScale }}
           />
         </View>
         {error ? (

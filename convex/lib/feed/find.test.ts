@@ -77,6 +77,8 @@ describe('matching a site’s own name', () => {
     ['daring fireball', 'Daring Fireball', 3],
     ['daring fireball', 'Daring Fireball – by John Gruber', 3],
     ['verge', 'Verge Agency', 2],
+    ['stratechery', 'Stratechery by Ben Thompson – On the business, strategy, and impact of technology.', 3],
+    ['daring fireball', 'Daring Fireball Linked List and Other Things', 2],
     ['daring fireboll', 'Daring Fireball', 1],
     ['the verge', 'Acme Plumbing Supplies', 0],
     ['the verge', 'Vergence Labs International Holdings', 0],
@@ -95,6 +97,9 @@ describe('matching a site’s own name', () => {
   test('strong: the same name on the site of that name, not a look-alike elsewhere', () => {
     expect(isStrong('the verge', { name: 'The Verge', host: 'theverge.com' })).toBe(true);
     expect(isStrong('the verge', { name: 'The Verge', host: 'evil.example' })).toBe(false);
+    // A hosted-blog subdomain may be an old or someone else's blog: the site's own domain is still guessed.
+    expect(isStrong('stratechery', { name: 'Stratechery', host: 'stratechery.wordpress.com' })).toBe(false);
+    expect(isStrong('stratechery', { name: 'Stratechery by Ben Thompson', host: 'stratechery.com' })).toBe(true);
   });
 });
 
@@ -132,6 +137,14 @@ describe('ranking', () => {
     source: 'declared' as const,
     finds: 1,
     ...extra,
+  });
+
+  test('a site’s own domain ranks above a hosted-blog subdomain of the same name', () => {
+    const ranked = rank('stratechery', [
+      { name: 'Stratechery', host: 'stratechery.wordpress.com', source: 'declared' as const, finds: 1 },
+      { name: 'Stratechery by Ben Thompson', host: 'stratechery.com', source: 'common-path' as const, finds: 1 },
+    ]);
+    expect(ranked.map((found) => found.host)).toEqual(['stratechery.com', 'stratechery.wordpress.com']);
   });
 
   test('stronger name, then the host of that name, then known, then declared, then .com and shorter', () => {
