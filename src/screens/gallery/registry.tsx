@@ -42,7 +42,11 @@ export const GALLERY: readonly GalleryEntry[] = [
   },
   { screen: 'All', worlds: ALL_WORLDS, render: (spec) => <FeedsScreen feed={spec.feed} /> },
   { screen: 'Pinned', worlds: PINNED_WORLDS, render: (spec) => <FeedsScreen feed={spec.feed} /> },
-  { screen: 'Pinned group', worlds: PINNED_GROUP_WORLDS, render: (spec) => <FeedsScreen feed={spec.feed} /> },
+  {
+    screen: 'Pinned group',
+    worlds: PINNED_GROUP_WORLDS,
+    render: (spec) => <FeedsScreen feed={spec.feed} groupHidden={spec.pinnedGroup === 'hidden'} />,
+  },
   { screen: 'Pinned stack', worlds: PINNED_STACK_WORLDS, render: (spec) => <FeedsScreen feed={spec.feed} /> },
   { screen: 'Saved', worlds: SAVED_WORLDS, render: () => <SavedScreen /> },
   // The add sheet over Feeds, open (FEE-45).

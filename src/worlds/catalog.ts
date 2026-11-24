@@ -287,6 +287,12 @@ export const PINNED_GROUP_WORLDS = [
     label: 'Group open, Remove animations',
     spec: { colorScheme: 'dark', feeds: 'some', pins: 'two', feed: 'pinned', reduceMotion: true },
   },
+  // Tapping the chosen Pinned chip hides its group while you keep reading Pinned (FEE-84).
+  {
+    id: 'group-hidden',
+    label: 'Pinned chosen, group hidden',
+    spec: { colorScheme: 'dark', feeds: 'some', pins: 'two', feed: 'pinned', pinnedGroup: 'hidden' },
+  },
 ] as const satisfies readonly CatalogWorld[];
 
 export type PinnedGroupWorldId = (typeof PINNED_GROUP_WORLDS)[number]['id'];

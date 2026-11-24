@@ -48,9 +48,19 @@ const ESTIMATED_ROW = 112;
  * row (P9). The chosen chip lives in the route (`?feed=`), so it can be restored and linked to;
  * a link's value is untrusted, so anything but one of the User's chips means All (Q25).
  * Adding a Feed is a sheet over it (FEE-45). `accountOpen` and `addOpen` open the Account sheet or
- * the add sheet at once, for the state gallery.
+ * the add sheet at once, and `groupHidden` starts the chosen Pinned chip's group hidden (FEE-84), for the state gallery.
  */
-export function FeedsScreen({ feed, accountOpen, addOpen = false }: { feed?: string; accountOpen?: boolean; addOpen?: boolean }) {
+export function FeedsScreen({
+  feed,
+  accountOpen,
+  addOpen = false,
+  groupHidden,
+}: {
+  feed?: string;
+  accountOpen?: boolean;
+  addOpen?: boolean;
+  groupHidden?: boolean;
+}) {
   const insets = useSafeAreaInsets();
   const chipsView = useChips();
   const chips = chipsView.status === 'ready' ? chipsView.chips : [];
@@ -94,7 +104,7 @@ export function FeedsScreen({ feed, accountOpen, addOpen = false }: { feed?: str
         action={chips.length > 0 ? <TopBarIcon label="Add a Feed" icon={{ ios: 'plus', android: 'add' }} onPress={addFeed} /> : undefined}
         trailing={<AccountButton initiallyOpen={accountOpen} />}
       />
-      {chips.length > 0 ? <ChipRow chips={chips} selected={selection} onSelect={select} /> : null}
+      {chips.length > 0 ? <ChipRow chips={chips} selected={selection} onSelect={select} initiallyHidden={groupHidden} /> : null}
       {selection === PINNED && empty ? (
         // Never a dead end (Q34): the Pinned Feeds are chosen in Manage Feeds.
         <View className="gap-group px-edge">
