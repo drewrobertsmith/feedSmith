@@ -9,6 +9,7 @@ import SavedRoute from '@/app/(tabs)/saved';
 import AddFeedRoute from '@/app/add-feed';
 import ArticleRoute from '@/app/article/[id]';
 import ManageFeedsRoute from '@/app/manage-feeds';
+import { NativeSheet } from '@/components/native-sheet';
 import { AppRoot } from '@/navigation/app-root';
 import { MANAGE_WORLDS, type ManageWorldId } from '@/worlds/catalog';
 import { FIXTURE_MANAGE, FIXTURE_MANAGE_PINNED } from '@/worlds/fixtures';
@@ -32,20 +33,62 @@ async function open(spec: WorldSpec) {
   );
   return w;
 }
+// The sheet's calls would otherwise carry over from the test before (the Account sheet's).
+beforeEach(() => jest.mocked(NativeSheet).mockClear());
 afterEach(() => {
   world?.dispose();
   world = undefined;
 });
 
 describe('Manage Feeds worlds', () => {
-  type Shows = { feeds: number; pinned: number; handles: number; empty: boolean; theme: 'dark' | 'light'; titleSize: number };
+  /** `rename`: the rename sheet's title size, and what tapping Save leaves (`null`: saved and closed). */
+  type Rename = { titleSize: number; problem: string | null };
+  type Shows = {
+    feeds: number;
+    pinned: number;
+    handles: number;
+    empty: boolean;
+    theme: 'dark' | 'light';
+    titleSize: number;
+    rename: Rename | null;
+  };
+  const SAVED: Rename = { titleSize: 24, problem: null };
   const SHOWS: Record<ManageWorldId, Shows> = {
-    'manage-dark': { feeds: 3, pinned: 1, handles: 1, empty: false, theme: 'dark', titleSize: 24 },
-    'manage-light': { feeds: 3, pinned: 1, handles: 1, empty: false, theme: 'light', titleSize: 24 },
-    'manage-pinned': { feeds: 4, pinned: 3, handles: 3, empty: false, theme: 'dark', titleSize: 24 },
-    'manage-empty': { feeds: 0, pinned: 0, handles: 0, empty: true, theme: 'dark', titleSize: 24 },
-    'manage-loading': { feeds: 0, pinned: 0, handles: 0, empty: false, theme: 'dark', titleSize: 24 },
-    'manage-largest-font': { feeds: 4, pinned: 3, handles: 3, empty: false, theme: 'dark', titleSize: 48 },
+    'manage-dark': { feeds: 3, pinned: 1, handles: 1, empty: false, theme: 'dark', titleSize: 24, rename: null },
+    'manage-light': { feeds: 3, pinned: 1, handles: 1, empty: false, theme: 'light', titleSize: 24, rename: null },
+    'manage-pinned': { feeds: 4, pinned: 3, handles: 3, empty: false, theme: 'dark', titleSize: 24, rename: null },
+    'manage-empty': { feeds: 0, pinned: 0, handles: 0, empty: true, theme: 'dark', titleSize: 24, rename: null },
+    'manage-loading': { feeds: 0, pinned: 0, handles: 0, empty: false, theme: 'dark', titleSize: 24, rename: null },
+    'manage-largest-font': { feeds: 4, pinned: 3, handles: 3, empty: false, theme: 'dark', titleSize: 48, rename: null },
+    'manage-rename': { feeds: 3, pinned: 1, handles: 1, empty: false, theme: 'dark', titleSize: 24, rename: SAVED },
+    'manage-rename-light': { feeds: 3, pinned: 1, handles: 1, empty: false, theme: 'light', titleSize: 24, rename: SAVED },
+    'manage-rename-largest-font': {
+      feeds: 3,
+      pinned: 1,
+      handles: 1,
+      empty: false,
+      theme: 'dark',
+      titleSize: 48,
+      rename: { titleSize: 48, problem: null },
+    },
+    'manage-rename-invalid': {
+      feeds: 3,
+      pinned: 1,
+      handles: 1,
+      empty: false,
+      theme: 'dark',
+      titleSize: 24,
+      rename: { titleSize: 24, problem: 'Give the Feed a name of up to 100 characters.' },
+    },
+    'manage-rename-failed': {
+      feeds: 3,
+      pinned: 1,
+      handles: 1,
+      empty: false,
+      theme: 'light',
+      titleSize: 24,
+      rename: { titleSize: 24, problem: "Couldn't save the name. Check your connection and try again." },
+    },
   };
 
   test.each(MANAGE_WORLDS)('$label', async ({ id, spec }) => {
@@ -57,6 +100,22 @@ describe('Manage Feeds worlds', () => {
     expect(screen.queryAllByRole('adjustable', { name: /^Reorder / })).toHaveLength(shows.handles);
     if (shows.empty) expect(screen.getByText('No Feeds yet. Add one from the + on Feeds.')).toBeOnTheScreen();
     expect(Uniwind.currentTheme).toBe(shows.theme);
+
+    if (!shows.rename) return;
+    const user = userEvent.setup();
+    await user.press(screen.getByRole('button', { name: 'Rename Calm Notes' }));
+    const sheet = screen.getByTestId('rename-sheet');
+    expect(within(sheet).getByRole('heading', { name: 'Rename Calm Notes' })).toHaveStyle({ fontSize: shows.rename.titleSize });
+    await user.type(within(sheet).getByLabelText('New name for Calm Notes'), ' Daily');
+    await user.press(within(sheet).getByRole('button', { name: 'Save name' }));
+    if (shows.rename.problem === null) {
+      expect(jest.mocked(NativeSheet)).toHaveBeenLastCalledWith(expect.objectContaining({ open: false }), undefined);
+      return;
+    }
+    // Refused or failed: the sheet stays open, says why, and keeps the name to try again (Q5).
+    expect(await within(sheet).findByRole('alert')).toHaveTextContent(shows.rename.problem);
+    expect(jest.mocked(NativeSheet)).toHaveBeenLastCalledWith(expect.objectContaining({ open: true }), undefined);
+    expect(within(sheet).getByLabelText('New name for Calm Notes')).toHaveDisplayValue('Calm Notes Daily');
   });
 });
 
@@ -85,7 +144,20 @@ describe('Manage Feeds', () => {
     expect(screen.queryByText(/Not working/)).not.toBeOnTheScreen();
   });
 
-  test('renaming a Feed saves the new name', async () => {
+  test('Rename opens a sheet over the list, titled with the Feed (Q32)', async () => {
+    const user = userEvent.setup();
+    await open({ colorScheme: 'dark', section: 'manage' });
+    await user.press(await screen.findByRole('button', { name: 'Rename Calm Notes' }));
+    expect(jest.mocked(NativeSheet)).toHaveBeenLastCalledWith(expect.objectContaining({ open: true }), undefined);
+    const sheet = screen.getByTestId('rename-sheet');
+    expect(within(sheet).getByRole('heading', { name: 'Rename Calm Notes' })).toBeOnTheScreen();
+    expect(within(sheet).getByLabelText('New name for Calm Notes')).toHaveDisplayValue('Calm Notes');
+    // The list stays where it was, behind the sheet.
+    expect(screen.getByRole('heading', { name: 'Manage Feeds' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Rename The Verge' })).toBeOnTheScreen();
+  });
+
+  test('renaming a Feed saves the new name, and closes the sheet', async () => {
     const user = userEvent.setup();
     const w = await open({ colorScheme: 'dark', section: 'manage' });
     await user.press(await screen.findByRole('button', { name: 'Rename Calm Notes' }));
@@ -94,6 +166,23 @@ describe('Manage Feeds', () => {
     await user.type(field, 'Calm');
     await user.press(screen.getByRole('button', { name: 'Save name' }));
     expect(w.feedsLog.renames).toEqual([{ id: 'f2', title: 'Calm' }]);
+    expect(jest.mocked(NativeSheet)).toHaveBeenLastCalledWith(expect.objectContaining({ open: false }), undefined);
+  });
+
+  test('Cancel and closing the sheet (swipe, tap outside, back) rename nothing', async () => {
+    const user = userEvent.setup();
+    const w = await open({ colorScheme: 'dark', section: 'manage' });
+    await user.press(await screen.findByRole('button', { name: 'Rename Calm Notes' }));
+    await user.type(screen.getByLabelText('New name for Calm Notes'), ' Daily');
+    await user.press(screen.getByRole('button', { name: 'Cancel renaming' }));
+    expect(jest.mocked(NativeSheet)).toHaveBeenLastCalledWith(expect.objectContaining({ open: false }), undefined);
+
+    // Reopened, it starts from the Feed's name again; the native sheet reports every dismissal as onClose.
+    await user.press(screen.getByRole('button', { name: 'Rename Calm Notes' }));
+    expect(screen.getByLabelText('New name for Calm Notes')).toHaveDisplayValue('Calm Notes');
+    await act(async () => jest.mocked(NativeSheet).mock.lastCall![0].onClose());
+    expect(jest.mocked(NativeSheet)).toHaveBeenLastCalledWith(expect.objectContaining({ open: false }), undefined);
+    expect(w.feedsLog.renames).toEqual([]);
   });
 
   test('removing a Feed asks first, saying Saved Articles stay (T23), then removes it', async () => {
@@ -151,6 +240,35 @@ describe('Manage Feeds', () => {
     expect(w.feedsLog.pinOrders).toEqual([[second.id, first.id, third.id]]);
     const top = screen.getByRole('adjustable', { name: `Reorder ${first.title}` });
     expect(top.props.accessibilityActions).toEqual([{ name: 'decrement', label: 'Move down' }]);
+  });
+
+  test("a save that finishes after its sheet was closed doesn't close the next Feed's sheet", async () => {
+    const user = userEvent.setup();
+    const w = await open({ colorScheme: 'dark', section: 'manage' });
+    // Calm Notes' rename is still reaching the server (offline, say) when the User moves on.
+    let finish: (outcome: 'ok') => void = () => {};
+    const actions = w.feeds.useManageActions;
+    w.feeds.useManageActions = () => ({ ...actions(), rename: () => new Promise((resolve) => (finish = resolve)) });
+    await user.press(await screen.findByRole('button', { name: 'Rename Calm Notes' }));
+    await user.press(screen.getByRole('button', { name: 'Save name' }));
+    await act(async () => jest.mocked(NativeSheet).mock.lastCall![0].onClose());
+    await user.press(screen.getByRole('button', { name: 'Rename The Verge' }));
+
+    await act(async () => finish('ok'));
+
+    expect(jest.mocked(NativeSheet)).toHaveBeenLastCalledWith(expect.objectContaining({ open: true }), undefined);
+    expect(within(screen.getByTestId('rename-sheet')).getByRole('heading', { name: 'Rename The Verge' })).toBeOnTheScreen();
+  });
+
+  test("a row's actions are Rename, Pin, then Remove last (Q32)", async () => {
+    await open({ colorScheme: 'dark', section: 'manage' });
+    await screen.findByText('Calm Notes');
+    // TalkBack meets them in this order, by these names (Q15). Remove's brick and its divider are
+    // in the visual check's pictures: class names don't resolve to styles under Jest.
+    const actions = screen
+      .getAllByRole('button', { name: /^(Rename|Pin|Unpin|Remove) Calm Notes$/ })
+      .map((button) => button.props.accessibilityLabel);
+    expect(actions).toEqual(['Rename Calm Notes', 'Pin Calm Notes', 'Remove Calm Notes']);
   });
 
   test("a row's actions each stay reachable on their own, not folded into the row (Q15)", async () => {

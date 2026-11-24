@@ -7,11 +7,14 @@ import { DepthPressable } from '@/components/depth-pressable';
  */
 export function AppButton({
   label,
+  accessibleName = label,
   onPress,
   disabled = false,
   busy = false,
 }: {
   label: string;
+  /** What TalkBack hears, when the label alone is too short out of context (Q15). Starts with the label. */
+  accessibleName?: string;
   onPress: () => void;
   disabled?: boolean;
   busy?: boolean;
@@ -21,7 +24,7 @@ export function AppButton({
     <DepthPressable
       level="soft"
       role="button"
-      aria-label={label}
+      aria-label={accessibleName}
       aria-disabled={off}
       aria-busy={busy}
       disabled={off}

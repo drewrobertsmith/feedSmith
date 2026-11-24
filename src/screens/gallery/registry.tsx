@@ -19,7 +19,7 @@ import {
   SHELL_WORLDS,
   SIGN_IN_WORLDS,
 } from '@/worlds/catalog';
-import { FIXTURE_ROWS } from '@/worlds/fixtures';
+import { FIXTURE_MANAGE, FIXTURE_ROWS } from '@/worlds/fixtures';
 import type { CatalogWorld, WorldSpec } from '@/worlds/world';
 
 export type GalleryEntry = {
@@ -47,7 +47,12 @@ export const GALLERY: readonly GalleryEntry[] = [
   { screen: 'Pinned stack', worlds: PINNED_STACK_WORLDS, render: (spec) => <FeedsScreen feed={spec.feed} /> },
   { screen: 'Saved', worlds: SAVED_WORLDS, render: () => <SavedScreen /> },
   { screen: 'Add a Feed', worlds: ADD_FEED_WORLDS, render: () => <AddFeedScreen /> },
-  { screen: 'Manage Feeds', worlds: MANAGE_WORLDS, render: () => <ManageFeedsScreen /> },
+  {
+    screen: 'Manage Feeds',
+    worlds: MANAGE_WORLDS,
+    // The rename worlds open Calm Notes' sheet.
+    render: (spec) => <ManageFeedsScreen renaming={spec.renameSheet === 'open' ? FIXTURE_MANAGE[1].id : undefined} />,
+  },
   { screen: 'Reading view', worlds: READING_WORLDS, render: () => <ReadingScreen id={FIXTURE_ROWS[0].id} /> },
   {
     screen: 'Account',

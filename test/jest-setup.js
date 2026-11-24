@@ -44,3 +44,20 @@ jest.mock('@/components/drag-row', () => {
 jest.mock('@/components/native-sheet', () => ({
   NativeSheet: jest.fn(({ open, children }) => (open ? children : null)),
 }));
+
+// Android's own text field is Compose too (FEE-43): its adapter here is React Native's field, with
+// the same uncontrolled interface: a starting value, each change reported, Done submits.
+jest.mock('@/components/native-text-field', () => {
+  const { TextInput } = jest.requireActual('react-native');
+  return {
+    NativeTextField: ({ label, defaultValue, onChangeText, onSubmitEditing, maxLength }) => (
+      <TextInput
+        aria-label={label}
+        defaultValue={defaultValue}
+        onChangeText={onChangeText}
+        onSubmitEditing={onSubmitEditing}
+        maxLength={maxLength}
+      />
+    ),
+  };
+});
