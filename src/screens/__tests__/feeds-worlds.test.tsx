@@ -195,6 +195,22 @@ describe('All', () => {
     scrollTo.mockRestore();
   });
 
+  // FEE-85: a chip in the Pinned group's tray is measured from the tray, so its place in the row is the tray's plus its own.
+  test('a Pinned Feed chosen by a link, in the tray past the edge of the row, scrolls into view', async () => {
+    await open({ colorScheme: 'dark', feeds: 'some', pins: 'two' }, '/?feed=f3');
+    await screen.findAllByRole('tab');
+    const row = screen.getByTestId('chip-row');
+    const scrollTo = jest.spyOn(ScrollView.prototype, 'scrollTo');
+    const layout = (width: number, x = 0) => ({ nativeEvent: { layout: { x, y: 0, width, height: 48 } } });
+    // The tray starts at 80; Daring Fireball sits 300 into it, so at 380 of a 700-wide row that shows 360.
+    await fireEvent(screen.getByTestId('pinned-tray'), 'layout', layout(420, 80));
+    await fireEvent(screen.getByRole('tab', { name: 'Daring Fireball, Pinned' }).parent!, 'layout', layout(110, 300));
+    await fireEvent(row, 'layout', layout(360));
+    await fireEvent(row, 'contentSizeChange', 700, 48);
+    expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ x: 380 - spacing.edge }));
+    scrollTo.mockRestore();
+  });
+
   // FEE-74: chips are objects with depth, not outlines (D27). Each is checked as its level from the theme.
   test.each(['dark', 'light'] as const)('in %s, the chosen chip is raised, the rest soft, and none has an outline', async (colorScheme) => {
     await open({ colorScheme, feeds: 'some' });
@@ -565,6 +581,23 @@ describe('All', () => {
   });
 });
 
+/**
+ * The Pinned group's recessed tray (FEE-85): an inset face holding exactly these chips, by TalkBack name, in order; or
+ * no tray at all. It isn't a control: TalkBack passes over it to the chips, and taps go through to them.
+ */
+function expectTray(scheme: 'dark' | 'light', holds: string[] | null) {
+  const tray = screen.queryByTestId('pinned-tray');
+  if (holds === null) {
+    expect(tray).not.toBeOnTheScreen();
+    return;
+  }
+  expect(faceOf(tray!)).toMatchObject(depthStyle(scheme, 'inset'));
+  expect(within(tray!).getAllByRole('tab').map((tab) => tab.props.accessibilityLabel)).toEqual(holds);
+  expect(tray!.props.accessible).toBeFalsy();
+  expect(tray!.props.accessibilityLabel ?? tray!.props['aria-label']).toBeUndefined();
+  expect(tray).toHaveProp('pointerEvents', 'box-none');
+}
+
 describe('the Pinned view (FEE-59)', () => {
   type Shows = {
     /** The chips in order, by TalkBack name. */
@@ -574,6 +607,8 @@ describe('the Pinned view (FEE-59)', () => {
     /** The rows' Feeds, in order. */
     rows: string[];
     empty: boolean;
+    /** What the Pinned group's tray holds (FEE-85), or null with no Pinned chip. */
+    tray: string[] | null;
   };
   const PINNED_CHIP = 'Pinned: The Verge, Daring Fireball';
   const TWO_PIN_CHIPS = ['All', PINNED_CHIP, 'The Verge, Pinned', 'Daring Fireball, Pinned', 'Calm Notes'];
@@ -582,20 +617,21 @@ describe('the Pinned view (FEE-59)', () => {
   // The Verge's Articles, and not Calm Notes': Pinned is narrower than All.
   const PINNED_ROWS = FIXTURE_ROWS.filter((row) => row.feedId === 'f1').map((row) => row.feedTitle);
   const SHOWS: Record<PinnedWorldId, Shows> = {
-    'pinned-dark': { chips: TWO_PIN_CHIPS, selected: PINNED_CHIP, rows: PINNED_ROWS, empty: false },
-    'pinned-light': { chips: TWO_PIN_CHIPS, selected: PINNED_CHIP, rows: PINNED_ROWS, empty: false },
+    'pinned-dark': { chips: TWO_PIN_CHIPS, selected: PINNED_CHIP, rows: PINNED_ROWS, empty: false, tray: TWO_PIN_CHIPS.slice(1, 4) },
+    'pinned-light': { chips: TWO_PIN_CHIPS, selected: PINNED_CHIP, rows: PINNED_ROWS, empty: false, tray: TWO_PIN_CHIPS.slice(1, 4) },
     'pinned-empty': {
       chips: ['All', 'Pinned: Daring Fireball, Kottke', 'Daring Fireball, Pinned', 'Kottke, Pinned', 'The Verge', 'Calm Notes'],
       selected: 'Pinned: Daring Fireball, Kottke',
       rows: [],
       empty: true,
+      tray: ['Pinned: Daring Fireball, Kottke', 'Daring Fireball, Pinned', 'Kottke, Pinned'],
     },
     // All chosen: the group folds into the Pinned chip (FEE-60).
-    'pinned-all': { chips: FOLDED_CHIPS, selected: 'All', rows: ALL_ROWS, empty: false },
+    'pinned-all': { chips: FOLDED_CHIPS, selected: 'All', rows: ALL_ROWS, empty: false, tray: [PINNED_CHIP] },
     // One Pin makes no Pinned chip, so a link to Pinned lands on All (Q25).
-    'pinned-one-pin': { chips: ['All', 'The Verge, Pinned', 'Calm Notes', 'Daring Fireball'], selected: 'All', rows: ALL_ROWS, empty: false },
-    'pinned-hostile-link': { chips: FOLDED_CHIPS, selected: 'All', rows: ALL_ROWS, empty: false },
-    'pinned-largest-font': { chips: TWO_PIN_CHIPS, selected: PINNED_CHIP, rows: PINNED_ROWS, empty: false },
+    'pinned-one-pin': { chips: ['All', 'The Verge, Pinned', 'Calm Notes', 'Daring Fireball'], selected: 'All', rows: ALL_ROWS, empty: false, tray: null },
+    'pinned-hostile-link': { chips: FOLDED_CHIPS, selected: 'All', rows: ALL_ROWS, empty: false, tray: [PINNED_CHIP] },
+    'pinned-largest-font': { chips: TWO_PIN_CHIPS, selected: PINNED_CHIP, rows: PINNED_ROWS, empty: false, tray: TWO_PIN_CHIPS.slice(1, 4) },
   };
 
   test.each(PINNED_WORLDS)('$label', async ({ id, spec }) => {
@@ -608,6 +644,7 @@ describe('the Pinned view (FEE-59)', () => {
     expect(rows).toHaveLength(shows.rows.length);
     expect(screen.queryAllByText('No Articles from your Pinned Feeds in the last 30 days.')).toHaveLength(shows.empty ? 1 : 0);
     expect(screen.queryAllByRole('button', { name: 'Manage Feeds' })).toHaveLength(shows.empty ? 1 : 0);
+    expectTray(spec.colorScheme, shows.tray);
   });
 
   test('tapping the Pinned chip chooses Pinned, in the link, and All chooses everything again', async () => {
@@ -648,18 +685,21 @@ describe('the Pinned group (FEE-60)', () => {
   const FOLDED = ['All', PINNED_CHIP, 'Calm Notes'];
   /** The Pinned chip's push-pin glyph (FEE-84): muted, full-strength while a Pinned Feed is chosen, Gold when Pinned is. */
   type Glyph = 'textMuted' | 'text' | 'accent';
-  type Shows = { chips: string[]; selected: string; expanded: boolean | null; glyph: Glyph | null };
+  type Shows = { chips: string[]; selected: string; expanded: boolean | null; glyph: Glyph | null; tray: string[] | null };
+  // The tray holds the Pinned chip, and its Feeds' chips while the group is open (FEE-85).
+  const TRAY_OPEN = [PINNED_CHIP, 'The Verge, Pinned', 'Daring Fireball, Pinned'];
+  const TRAY_FOLDED = [PINNED_CHIP];
   const SHOWS: Record<PinnedGroupWorldId, Shows> = {
-    'group-open': { chips: OPEN, selected: 'The Verge, Pinned', expanded: true, glyph: 'text' },
-    'group-folded-all': { chips: FOLDED, selected: 'All', expanded: false, glyph: 'textMuted' },
-    'group-folded-other': { chips: FOLDED, selected: 'Calm Notes', expanded: false, glyph: 'textMuted' },
-    // With fewer than two Pins there's no group: the row is as it was before Pinned.
-    'group-one-pin': { chips: ['All', 'The Verge, Pinned', 'Calm Notes', 'Daring Fireball'], selected: 'All', expanded: null, glyph: null },
-    'group-no-pins': { chips: ['All', 'The Verge', 'Calm Notes', 'Daring Fireball'], selected: 'All', expanded: null, glyph: null },
-    'group-link': { chips: OPEN, selected: 'Daring Fireball, Pinned', expanded: true, glyph: 'text' },
-    'group-remove-animations': { chips: OPEN, selected: PINNED_CHIP, expanded: true, glyph: 'accent' },
-    // Hidden while you keep reading Pinned (FEE-84): folded, and still chosen.
-    'group-hidden': { chips: FOLDED, selected: PINNED_CHIP, expanded: false, glyph: 'accent' },
+    'group-open': { chips: OPEN, selected: 'The Verge, Pinned', expanded: true, glyph: 'text', tray: TRAY_OPEN },
+    'group-folded-all': { chips: FOLDED, selected: 'All', expanded: false, glyph: 'textMuted', tray: TRAY_FOLDED },
+    'group-folded-other': { chips: FOLDED, selected: 'Calm Notes', expanded: false, glyph: 'textMuted', tray: TRAY_FOLDED },
+    // With fewer than two Pins there's no group: the row is as it was before Pinned, with no tray.
+    'group-one-pin': { chips: ['All', 'The Verge, Pinned', 'Calm Notes', 'Daring Fireball'], selected: 'All', expanded: null, glyph: null, tray: null },
+    'group-no-pins': { chips: ['All', 'The Verge', 'Calm Notes', 'Daring Fireball'], selected: 'All', expanded: null, glyph: null, tray: null },
+    'group-link': { chips: OPEN, selected: 'Daring Fireball, Pinned', expanded: true, glyph: 'text', tray: TRAY_OPEN },
+    'group-remove-animations': { chips: OPEN, selected: PINNED_CHIP, expanded: true, glyph: 'accent', tray: TRAY_OPEN },
+    // Hidden while you keep reading Pinned (FEE-84): folded, and still chosen; the tray holds just the Pinned chip.
+    'group-hidden': { chips: FOLDED, selected: PINNED_CHIP, expanded: false, glyph: 'accent', tray: TRAY_FOLDED },
   };
 
   test.each(PINNED_GROUP_WORLDS)('$label', async ({ id, spec }) => {
@@ -680,6 +720,7 @@ describe('the Pinned group (FEE-60)', () => {
       expect(glyph).toHaveProp('tintColor', themes[spec.colorScheme][shows.glyph]);
       expect(within(pinned).queryByText('Pinned', { includeHiddenElements: true })).not.toBeOnTheScreen();
     }
+    expectTray(spec.colorScheme, shows.tray);
   });
 
   test('choosing Pinned opens the group; moving among its Feeds keeps it open; All folds it', async () => {
