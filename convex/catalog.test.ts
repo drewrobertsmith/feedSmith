@@ -4,7 +4,9 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { api, internal } from './_generated/api';
 import verge from './lib/feed/fixtures/verge.xml?raw';
+import rateLimiterTest from '@convex-dev/rate-limiter/test';
 import schema from './schema';
+import { GUESSES_PER_HOUR } from './rateLimits';
 
 vi.mock('@convex-dev/auth/server', async (original) => ({
   ...(await original<typeof import('@convex-dev/auth/server')>()),
@@ -27,6 +29,7 @@ const fetched = () => network.mock.calls.map(([url]) => url);
 
 async function setup() {
   const t = convexTest(schema, modules);
+  rateLimiterTest.register(t);
   const [a, b] = await t.run(async (ctx) => [
     await ctx.db.insert('users', { email: 'a@example.com' }),
     await ctx.db.insert('users', { email: 'b@example.com' }),
@@ -314,5 +317,51 @@ describe('bounded (Q10)', () => {
       for (let i = 0; i < 30; i++) await ctx.db.insert('feeds', { userId: aId, url: `https://news${i}.example.com/feed`, title: `News ${i}` });
     });
     expect(await a.query(api.catalog.search, { name: 'news' })).toHaveLength(20);
+  });
+});
+
+describe('limiting guessing searches (FEE-88)', () => {
+  /** A guessing search that finds nothing: every guess is a 404. */
+  const guess = (as: Awaited<ReturnType<typeof setup>>['a'], name = 'the verge') => as.action(api.catalog.find, { name });
+
+  test('past the allowance, a guessing search is refused before any fetch', async () => {
+    const { a } = await setup();
+    for (let i = 0; i < GUESSES_PER_HOUR; i++) expect(await guess(a)).toEqual({ found: [] });
+    network.mockClear();
+    expect(await guess(a)).toEqual({ found: [], limited: true });
+    expect(fetched()).toEqual([]);
+  });
+
+  test('one User’s searches never use up another’s allowance', async () => {
+    const { a, b } = await setup();
+    for (let i = 0; i <= GUESSES_PER_HOUR; i++) await guess(a);
+    expect(await guess(b)).toEqual({ found: [] });
+  });
+
+  test('searches answered without guessing are never charged', async () => {
+    const { t, a, aId } = await setup();
+    await t.run((ctx) => ctx.db.insert('feeds', { userId: aId, url: SECRET, title: 'Daring Fireball', siteUrl: 'https://daringfireball.net' }));
+    await t.mutation(internal.catalog.remember, ENTRY);
+    for (let i = 0; i < GUESSES_PER_HOUR * 2; i++) {
+      await guess(a, 'daring fireball'); // a Feed you follow
+      await guess(a, 'the verge'); // a strong catalog match
+      await guess(a, '!!!'); // nothing to guess
+    }
+    network.mockClear();
+    expect(await guess(a, 'kottke')).toEqual({ found: [] });
+    expect(fetched().length).toBeGreaterThan(0);
+  });
+
+  test('the allowance comes back with time', async () => {
+    vi.useFakeTimers();
+    try {
+      const { a } = await setup();
+      for (let i = 0; i <= GUESSES_PER_HOUR; i++) await guess(a);
+      expect(await guess(a)).toEqual({ found: [], limited: true });
+      vi.advanceTimersByTime(60 * 60_000);
+      expect(await guess(a)).toEqual({ found: [] });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

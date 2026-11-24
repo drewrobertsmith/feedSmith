@@ -9,6 +9,7 @@ import { fetchFeed } from './lib/feed/fetch';
 import { candidates, hostMatch, isStrong, nameMatch, rank, searchTerms, siteLabel } from './lib/feed/find';
 import { safeUrl } from './lib/feed/http';
 import { Budget, proveSite } from './lib/feed/prove';
+import { rateLimiter } from './rateLimits';
 import { inBatches } from './refresh';
 
 /** Catalog entries one search reads from the search index, at most (Q10). */
@@ -139,16 +140,21 @@ export const known = internalQuery({
  * Finds Feeds for a site's name by guessing its address and proving it (FEE-80, T35): a few sites
  * at a time, under one fetch budget and deadline, stopping once the site of that very name is
  * proven. Each proven Feed joins the catalog at once, so `search` shows it as it's found. Nothing
- * is guessed when feedSmith already knows the Feed (`known`). Returns the proven Feeds' addresses.
+ * is guessed when feedSmith already knows the Feed (`known`), and a User past their allowance of
+ * guessing searches is answered `limited` without fetching (FEE-88). Returns the proven Feeds' addresses.
  */
 export const find = action({
   args: { name: v.string() },
-  returns: v.object({ found: v.array(v.string()) }),
+  // `limited`: the User has used up their guessing searches for now (FEE-88); nothing was fetched.
+  returns: v.object({ found: v.array(v.string()), limited: v.optional(v.literal(true)) }),
   handler: async (ctx, { name }) => {
     const userId = await ctx.runQuery(internal.feeds.viewer, {});
     const hosts = candidates(name);
     if (hosts.length === 0) return { found: [] };
     if (await ctx.runQuery(internal.catalog.known, { userId, name })) return { found: [] };
+    // Only a search that will guess is counted, and before any fetch (T36).
+    const { ok } = await rateLimiter.limit(ctx, 'guessingSearch', { key: userId });
+    if (!ok) return { found: [], limited: true as const };
 
     const budget = new Budget(MAX_FETCHES, Date.now() + DEADLINE_MS);
     const tried = new Set<string>();

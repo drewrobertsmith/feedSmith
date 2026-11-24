@@ -6,6 +6,7 @@ import { AUTH_ERRORS } from './lib/authErrors';
 import { requireUserId } from './lib/currentUser';
 import { DELETE_BATCH } from './lib/feed/blocks';
 import { deleteArticles as deleteArticleRows } from './lib/deleteArticles';
+import { rateLimiter } from './rateLimits';
 
 /**
  * Deletes the signed-in User's Account for good (P18): the User, their Feeds, every session and
@@ -13,7 +14,7 @@ import { deleteArticles as deleteArticleRows } from './lib/deleteArticles';
  * time. It takes no arguments, so it can only ever delete the caller's own Account (Q10).
  *
  * Convex Auth keeps sessions and the Google link in its own components, so they're deleted
- * through those components' functions (T25). The core's `createdUserIds` row has none yet and
+ * through those components' functions (T25), and so is their guessing-search counter (FEE-88). The core's `createdUserIds` row has none yet and
  * stays; it holds only the old id (convex/convex-auth#935).
  */
 export const deleteAccount = mutation({
@@ -43,6 +44,8 @@ export const deleteAccount = mutation({
     await ctx.runMutation(components.auth.public.revokeSessions, {
       sessionIds: sessions.map((session) => session.sessionId),
     });
+    // Their guessing-search counter is keyed by their id: it goes too (FEE-88, Q28).
+    await rateLimiter.reset(ctx, 'guessingSearch', { key: userId });
 
     await ctx.db.delete(userId);
     await ctx.scheduler.runAfter(0, internal.account.deleteArticles, { userId });
