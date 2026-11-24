@@ -126,7 +126,8 @@ export const add = action({
       ...outcome.validators,
     });
     if (stored === null) {
-      // The Account was deleted while this add was fetching: nothing was stored, and no one is left to tell.
+      // The Account was deleted while this add was fetching: nothing was stored, and no one is left
+      // to tell, so the reason is a placeholder no one sees.
       return { ok: false, reason: 'unreachable' };
     }
     return stored.added ? { ok: true, feedId: stored.feedId } : { ok: false, reason: 'already-added', title: stored.title, feedId: stored.feedId };
@@ -201,8 +202,9 @@ export const toRefresh = internalQuery({
 });
 
 /**
- * Saves a newly fetched Feed and its Articles, unless the User already follows it: then it
- * returns that Feed's name (checked again here, in case two adds raced). Null when stored.
+ * Saves a newly fetched Feed and its Articles, unless the User already follows it (checked again
+ * here, in case two adds raced). Returns the Feed followed at this URL, by name and id, with `added`
+ * true when this call created it; null when the Account was deleted mid-add, and nothing was stored.
  */
 export const store = internalMutation({
   args: {

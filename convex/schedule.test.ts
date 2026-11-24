@@ -212,7 +212,7 @@ test("an add that finishes after its Account was deleted stores nothing (P18)", 
   const userId = await t.run((ctx) => ctx.db.insert('users', { email: 'a@example.com' }));
   await t.run((ctx) => ctx.db.delete(userId));
 
-  await t.mutation(internal.feeds.store, { userId, url: 'https://late.example.com/feed', title: 'Late', articles: [], now: START });
+  expect(await t.mutation(internal.feeds.store, { userId, url: 'https://late.example.com/feed', title: 'Late', articles: [], now: START })).toBeNull();
 
   expect(await t.run((ctx) => ctx.db.query('feeds').collect())).toEqual([]);
   expect(await t.run((ctx) => ctx.db.query('feedSchedules').collect())).toEqual([]);

@@ -155,6 +155,8 @@ describe('each User reads only their own Articles (Q10)', () => {
     const [userA, userB] = users.map((user) => user._id);
 
     const added = await a.action(api.feeds.add, { url: FEED_URL });
+    // Exactly the id: never the Feed's URL (Q9).
+    expect(added).toEqual({ ok: true, feedId: expect.any(String) });
     if (!added.ok) throw new Error('not added');
     expect(await owner(added.feedId)).toBe(userA);
 
