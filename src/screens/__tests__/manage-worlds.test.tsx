@@ -242,6 +242,24 @@ describe('Manage Feeds', () => {
     expect(top.props.accessibilityActions).toEqual([{ name: 'decrement', label: 'Move down' }]);
   });
 
+  test("a save that finishes after its sheet was closed doesn't close the next Feed's sheet", async () => {
+    const user = userEvent.setup();
+    const w = await open({ colorScheme: 'dark', section: 'manage' });
+    // Calm Notes' rename is still reaching the server (offline, say) when the User moves on.
+    let finish: (outcome: 'ok') => void = () => {};
+    const actions = w.feeds.useManageActions;
+    w.feeds.useManageActions = () => ({ ...actions(), rename: () => new Promise((resolve) => (finish = resolve)) });
+    await user.press(await screen.findByRole('button', { name: 'Rename Calm Notes' }));
+    await user.press(screen.getByRole('button', { name: 'Save name' }));
+    await act(async () => jest.mocked(NativeSheet).mock.lastCall![0].onClose());
+    await user.press(screen.getByRole('button', { name: 'Rename The Verge' }));
+
+    await act(async () => finish('ok'));
+
+    expect(jest.mocked(NativeSheet)).toHaveBeenLastCalledWith(expect.objectContaining({ open: true }), undefined);
+    expect(within(screen.getByTestId('rename-sheet')).getByRole('heading', { name: 'Rename The Verge' })).toBeOnTheScreen();
+  });
+
   test("a row's actions are Rename, Pin, then Remove last (Q32)", async () => {
     await open({ colorScheme: 'dark', section: 'manage' });
     await screen.findByText('Calm Notes');

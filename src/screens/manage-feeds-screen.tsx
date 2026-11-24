@@ -42,11 +42,7 @@ function RowAction({
       aria-label={accessibleName}
       onPress={onPress}
       hitSlop={spacing.inside}
-      className={
-        destructive
-          ? 'rounded-full border border-transparent px-group py-related'
-          : 'rounded-full border border-text-muted px-group py-related'
-      }
+      className={`rounded-full border px-group py-related ${destructive ? 'border-transparent' : 'border-text-muted'}`}
     >
       <AppText variant="label" className={destructive ? 'text-destructive' : 'text-text'} accessible={false}>
         {label}
@@ -171,9 +167,10 @@ function FeedRow({ feed, onRename }: { feed: ManagedFeed; onRename: () => void }
 
 /**
  * The Feed in the rename sheet. It stays after the sheet closes, so the sheet's words don't vanish
- * while it slides away; `opening` counts each open, so every rename starts from the Feed's name.
+ * while it slides away. `openCount` numbers each opening: every rename starts from the Feed's name,
+ * and only the opening still shown can be closed.
  */
-type Renaming = { feed: ManagedFeed; open: boolean; opening: number };
+type Renaming = { feed: ManagedFeed; open: boolean; openCount: number };
 
 /**
  * Manage Feeds (D13): rename, remove, Pin and order Feeds, and see which have stopped working (P15).
@@ -188,13 +185,18 @@ export function ManageFeedsScreen({ renaming: initiallyRenaming }: { renaming?: 
   const pinned = feeds.filter((feed) => feed.pinned);
   const others = feeds.filter((feed) => !feed.pinned);
 
-  const [renamingState, setRenaming] = useState<Renaming | null>(null);
-  const initialFeed = renamingState === null ? feeds.find((feed) => feed.id === initiallyRenaming) : undefined;
-  const renaming = renamingState ?? (initialFeed ? { feed: initialFeed, open: true, opening: 0 } : null);
-  const startRenaming = (feed: ManagedFeed) => setRenaming({ feed, open: true, opening: (renaming?.opening ?? 0) + 1 });
-  const stopRenaming = () => {
-    if (renaming) setRenaming({ ...renaming, open: false });
-  };
+  // `tapped` is null until the User taps Rename; till then the gallery's Feed, if any, is shown.
+  const [tapped, setTapped] = useState<Renaming | null>(null);
+  const galleryFeed = tapped === null ? feeds.find((feed) => feed.id === initiallyRenaming) : undefined;
+  const renaming = tapped ?? (galleryFeed ? { feed: galleryFeed, open: true, openCount: 0 } : null);
+  const startRenaming = (feed: ManagedFeed) =>
+    setTapped({ feed, open: true, openCount: (renaming?.openCount ?? 0) + 1 });
+  // A save that finishes after its sheet was closed and another opened doesn't close the new one.
+  const stopRenaming = (openCount: number) =>
+    setTapped((current) => {
+      const shown = current ?? renaming;
+      return shown?.openCount === openCount ? { ...shown, open: false } : current;
+    });
 
   const move = (from: number, to: number) => {
     const ids = pinned.map((feed) => feed.id);
@@ -268,8 +270,12 @@ export function ManageFeedsScreen({ renaming: initiallyRenaming }: { renaming?: 
       </ScrollView>
       {/* Renaming is a quick task, so it's a sheet over the list, not a place of its own (Q32). */}
       {renaming ? (
-        <NativeSheet open={renaming.open} onClose={stopRenaming}>
-          <RenameForm key={renaming.opening} feed={renaming.feed} onDone={stopRenaming} />
+        <NativeSheet open={renaming.open} onClose={() => stopRenaming(renaming.openCount)}>
+          <RenameForm
+            key={renaming.openCount}
+            feed={renaming.feed}
+            onDone={() => stopRenaming(renaming.openCount)}
+          />
         </NativeSheet>
       ) : null}
       {/* Pin and Unpin's Undo, above the gesture bar (Q35). */}
