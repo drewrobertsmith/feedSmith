@@ -8,7 +8,7 @@ import type { Id } from './_generated/dataModel';
 import { action, internalMutation, internalQuery, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireUserId } from './lib/currentUser';
 import { findFeedLinks, siteMeta, type FeedLink, type SiteMeta } from './lib/feed/discover';
-import { faviconOf, hostOf } from './lib/feed/face';
+import { faviconOf, hostOf, siteHost } from './lib/feed/face';
 import { fetchFeed, type FetchOutcome } from './lib/feed/fetch';
 import { safeUrl } from './lib/feed/http';
 import { markWorking, scheduleOf, storeNewArticles } from './lib/feed/record';
@@ -42,6 +42,12 @@ function withScheme(typed: string): string {
   return /^[a-z][a-z0-9+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed}`;
 }
 
+/** A site's bare address: no path beyond `/`, no query. What it declares is public (T35). */
+function isHomepage(url: string): boolean {
+  const parsed = new URL(url);
+  return parsed.pathname === '/' && parsed.search === '' && parsed.hash === '';
+}
+
 /** What a Feed's site says about itself, read from its homepage; nothing when it can't be read. */
 async function homepageMeta(siteUrl: string | undefined): Promise<SiteMeta> {
   if (!siteUrl) return {};
@@ -69,12 +75,23 @@ export const add = action({
     let feedUrl = typed;
     let outcome: FetchOutcome = await fetchFeed(typed);
     let meta: SiteMeta | undefined;
+    /** The homepage that declared the Feed, when it was a homepage: only then does it join the catalog (T35). */
+    let declaredBy: string | undefined;
     if (outcome._tag === 'Page') {
       // A web page: its feed links are its feeds, followed one level only (T21).
       const links = findFeedLinks(outcome.body, outcome.url);
       if (links.length === 0) return { ok: false, reason: 'no-feed-found' };
-      if (links.length > 1) return { ok: false, reason: 'choose', choices: links };
       meta = siteMeta(outcome.body, outcome.url);
+      // A bare site address is its public homepage; a page with a path or query may be personal.
+      const homepage = isHomepage(typed) ? new URL(outcome.url).origin : undefined;
+      if (links.length > 1) {
+        if (homepage) {
+          const first = { url: links[0].url, name: meta.name ?? links[0].title, siteUrl: homepage, iconUrl: meta.iconUrl };
+          await ctx.scheduler.runAfter(0, internal.catalog.rememberDeclared, first);
+        }
+        return { ok: false, reason: 'choose', choices: links };
+      }
+      declaredBy = homepage;
       feedUrl = links[0].url;
       const followingLink = await ctx.runQuery(internal.feeds.followed, { userId, url: feedUrl });
       if (followingLink !== null) return { ok: false, reason: 'already-added', ...followingLink };
@@ -86,11 +103,21 @@ export const add = action({
     // Without validators of ours, a "not modified" answer is no answer at all.
     if (outcome._tag === 'NotModified') return { ok: false, reason: 'unreachable' };
     meta ??= await homepageMeta(outcome.siteUrl);
+    const title = meta.name ?? outcome.title;
+
+    // A homepage's declared Feed joins the catalog; any other is only refreshed if already there (T35).
+    const now = Date.now();
+    if (declaredBy) {
+      const host = siteHost(declaredBy);
+      await ctx.runMutation(internal.catalog.remember, { url: feedUrl, name: title, host, siteUrl: declaredBy, iconUrl: meta.iconUrl, source: 'declared', now });
+    } else {
+      await ctx.runMutation(internal.catalog.touch, { url: feedUrl, name: title, iconUrl: meta.iconUrl, now });
+    }
 
     const stored = await ctx.runMutation(internal.feeds.store, {
       userId,
       url: feedUrl,
-      title: meta.name ?? outcome.title,
+      title,
       siteUrl: outcome.siteUrl,
       iconUrl: meta.iconUrl,
       articles: outcome.articles,

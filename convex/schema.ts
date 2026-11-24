@@ -59,6 +59,31 @@ export default defineSchema({
   fetchTimer: defineTable({
     scheduledId: v.id('_scheduled_functions'),
   }),
+  /**
+   * The catalog of known Feeds (FEE-80, T35): public Feeds feedSmith has found before, shared by
+   * every User's search by name. Only a Feed a site's homepage declares, or one proven at a common
+   * address on a guessed site, ever enters it: never a URL someone typed, and never a User id, so
+   * nobody's list shows and deleting an Account leaves nothing of it here (Q28).
+   */
+  feedCatalog: defineTable({
+    url: v.string(),
+    /** What the site calls itself (T21), else the feed's own title. */
+    name: v.string(),
+    host: v.string(),
+    siteUrl: v.string(),
+    iconUrl: v.optional(v.string()),
+    /** The name's words and the site's own label ("the verge theverge"), for the search index. */
+    searchText: v.string(),
+    /** Declared by the site's homepage, or proven at a common address. */
+    source: v.union(v.literal('declared'), v.literal('common-path')),
+    /** How many times it's been found; known Feeds rank above newly found ones. */
+    finds: v.number(),
+    /** When it was last found or fetched; entries unseen for a year are dropped. */
+    seenAt: v.number(),
+  })
+    .index('by_url', ['url'])
+    .index('by_seen', ['seenAt'])
+    .searchIndex('search_text', { searchField: 'searchText' }),
   /** A User's Articles: what All lists. Their content lives in `articleBodies`. */
   articles: defineTable({
     userId: v.id('users'),

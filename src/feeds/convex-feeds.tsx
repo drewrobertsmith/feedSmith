@@ -1,13 +1,15 @@
 import { useAction, useConvexAuth, useMutation, useQuery } from 'convex/react';
 import type { OptimisticLocalStore } from 'convex/browser';
 import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex/server';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { api } from '../../convex/_generated/api';
 import { useAuth } from '@/auth/auth-context';
 import {
   FeedsContext,
+  isAddress,
   type AddFeedView,
+  type FoundFeed,
   type AddOutcome,
   type AllView,
   type ArticleView,
@@ -29,7 +31,7 @@ import {
  * (FEE-36). A query still subscribed then would throw; skipped, it just stops, and comes back if
  * the delete fails.
  */
-function useSignedInQuery<Query extends FunctionReference<'query'>>(query: Query, args: FunctionArgs<Query>) {
+function useSignedInQuery<Query extends FunctionReference<'query'>>(query: Query, args: FunctionArgs<Query> | 'skip') {
   const { isAuthenticated } = useConvexAuth();
   const { deletion } = useAuth();
   const live = isAuthenticated && deletion !== 'deleting';
@@ -147,33 +149,83 @@ function useArticle(id: string): ArticleView {
   return article === null ? { status: 'missing' } : { status: 'ready', article };
 }
 
+/** A search for a site's name under way or done (FEE-80); `id` tells a newer search from an older one's answer. */
+type Search = { id: number; name: string; also: string[]; searching: boolean; failed: boolean };
+
 function useAddFeed() {
   const addFeed = useAction(api.feeds.add);
+  const findFeeds = useAction(api.catalog.find);
   const [view, setView] = useState<AddFeedView>({ status: 'idle' });
+  const [search, setSearch] = useState<Search | null>(null);
+  const searches = useRef(0);
+  // Leaving the screen retires any search still running, so its answer changes nothing (Q20).
+  useEffect(
+    () => () => {
+      searches.current++;
+    },
+    [],
+  );
+  // Feeds feedSmith knows show at once; each one `find` proves joins the catalog and arrives here.
+  const results = useSignedInQuery(api.catalog.search, search ? { name: search.name, also: search.also } : 'skip');
+  // The last results for this name stay shown while the query re-runs, so nothing flashes away.
+  const [kept, setKept] = useState<{ name: string; results: FoundFeed[] } | null>(null);
+  if (search && results !== undefined && kept?.results !== results) setKept({ name: search.name, results });
 
-  const add = async (url: string): Promise<AddOutcome> => {
+  const find = (name: string) => {
+    const id = ++searches.current;
+    setView({ status: 'idle' });
+    setSearch({ id, name, also: [], searching: true, failed: false });
+    // An answer for an older search, or one retired by leaving the screen, changes nothing (Q20).
+    const settle = (change: Partial<Search>) => setSearch((now) => (now?.id === id ? { ...now, searching: false, ...change } : now));
+    findFeeds({ name }).then(
+      // Proven Feeds the search index missed (a typo) are asked for by address.
+      ({ found }) => settle({ also: found }),
+      () => settle({ failed: true }),
+    );
+  };
+
+  const add = async (typed: string): Promise<AddOutcome> => {
+    const text = typed.trim();
+    if (!isAddress(text)) {
+      find(text);
+      return { kind: 'stay' };
+    }
+    // A search started while this add runs is newer: this add's answer then changes nothing.
+    const started = searches.current;
+    const settle = (next: AddFeedView) => {
+      if (searches.current === started) setView(next);
+    };
     setView({ status: 'busy' });
     try {
-      const result = await addFeed({ url: url.trim() });
+      const result = await addFeed({ url: text });
       if (result.ok) {
-        setView({ status: 'idle' });
+        settle({ status: 'idle' });
         return { kind: 'added' };
       }
       if (result.reason === 'already-added') {
-        setView({ status: 'idle' });
+        settle({ status: 'idle' });
         return { kind: 'already', title: result.title, feedId: result.feedId };
       }
-      if (result.reason === 'choose') setView({ status: 'choose', choices: result.choices });
-      else setView({ status: 'error', reason: result.reason });
+      if (result.reason === 'choose') settle({ status: 'choose', choices: result.choices });
+      else settle({ status: 'error', reason: result.reason });
       return { kind: 'stay' };
     } catch {
       // The call itself failed (no connection, or the server is down).
-      setView({ status: 'error', reason: 'unreachable' });
+      settle({ status: 'error', reason: 'unreachable' });
       return { kind: 'stay' };
     }
   };
 
-  return { view, add };
+  if (!search || view.status !== 'idle') return { view, add };
+  const shown = kept?.name === search.name ? kept.results : null;
+  const found: AddFeedView = {
+    status: 'found',
+    name: search.name,
+    results: shown ?? [],
+    // Still searching until `find` answers and the first results are in, unless it failed.
+    phase: search.failed ? 'failed' : search.searching || shown === null ? 'searching' : 'done',
+  };
+  return { view: found, add };
 }
 
 function useRefresh() {
