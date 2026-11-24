@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/app-button';
@@ -8,13 +8,13 @@ import { AppText } from '@/components/app-text';
 import { DragList, DragRow } from '@/components/drag-row';
 import { FeedIcon } from '@/components/feed-icon';
 import { NativeSheet } from '@/components/native-sheet';
+import { NativeTextField } from '@/components/native-text-field';
 import { UndoToastHost, useUndo } from '@/components/undo-toast';
 import { useEnvironment } from '@/environment';
 import { useManage, useManageActions, type ManagedFeed } from '@/feeds/feeds-data';
 import { usePin } from '@/feeds/use-pin';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
-import { typeScale } from '@/theme/type';
 import { MAX_FEED_NAME } from '../../convex/lib/feedName';
 
 const ICON = 20;
@@ -57,7 +57,6 @@ function RowAction({
 
 /** The rename sheet's content: its title, the name field, any problem, then Cancel and Save. */
 function RenameForm({ feed, onDone }: { feed: ManagedFeed; onDone: () => void }) {
-  const { colorScheme, fontScale } = useEnvironment();
   const { rename } = useManageActions();
   const [name, setName] = useState(feed.title);
   const [problem, setProblem] = useState<string | null>(null);
@@ -78,20 +77,12 @@ function RenameForm({ feed, onDone }: { feed: ManagedFeed; onDone: () => void })
         {`Rename ${feed.title}`}
       </AppText>
       <View className="gap-related">
-        <TextInput
-          aria-label={`New name for ${feed.title}`}
-          value={name}
+        <NativeTextField
+          label={`New name for ${feed.title}`}
+          defaultValue={feed.title}
           onChangeText={setName}
-          onSubmitEditing={save}
-          autoFocus
+          onSubmitEditing={() => void save()}
           maxLength={MAX_FEED_NAME}
-          returnKeyType="done"
-          placeholderTextColor={themes[colorScheme].textMuted}
-          className="rounded-lg border border-text-muted px-group py-related text-text"
-          style={{
-            fontFamily: typeScale.reading.fontFamily,
-            fontSize: typeScale.reading.fontSize * fontScale,
-          }}
         />
         {problem ? (
           <AppText variant="label" role="alert" className="text-text">
