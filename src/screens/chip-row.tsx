@@ -144,7 +144,6 @@ function PinnedGlyph({ tone }: { tone: ChipTone }) {
       size={ICON}
       tintColor={themes[colorScheme][tone]}
       importantForAccessibility="no-hide-descendants"
-      accessibilityElementsHidden
     />
   );
 }

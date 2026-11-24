@@ -54,7 +54,7 @@ export function FeedsScreen({
   feed,
   accountOpen,
   addOpen = false,
-  groupHidden = false,
+  groupHidden,
 }: {
   feed?: string;
   accountOpen?: boolean;

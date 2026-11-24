@@ -870,6 +870,9 @@ describe("the Pinned chip's stacked icons (FEE-61)", () => {
     expect(within(chip).getAllByTestId('pinned-stack-ring', { includeHiddenElements: true })).toHaveLength(3);
     // Hidden from accessibility: the default query, which skips hidden elements, finds none of them.
     expect(within(chip).queryAllByTestId('pinned-stack-ring')).toHaveLength(0);
+    // Nor the push-pin (FEE-84): the chip's name says Pinned.
+    expect(within(chip).getByTestId('pinned-glyph', { includeHiddenElements: true })).toBeOnTheScreen();
+    expect(within(chip).queryByTestId('pinned-glyph')).not.toBeOnTheScreen();
   });
 });
 
