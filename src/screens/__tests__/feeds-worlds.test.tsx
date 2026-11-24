@@ -786,6 +786,7 @@ describe('Add a Feed', () => {
     'no-feed-found': 'No feed found at that address. Try the site’s feed URL.',
     'find-nothing': 'No feeds found for “the verge”. Paste the site’s address instead, like theverge.com.',
     'find-failed': 'Couldn’t search just now. Paste the site’s address instead, like theverge.com.',
+    'find-limited': 'Try again in a few minutes. You can still paste the site’s address.',
   };
   const LOOKING = 'Looking for “the verge”…';
   const FOUND_FOR = 'Feeds for “the verge”';
@@ -816,6 +817,7 @@ describe('Add a Feed', () => {
     'add-find-following': { ...base, button: 'Find Feeds', status: FOUND_FOR, found: [FOLLOWING, NEW[1]], theme: 'light' },
     'add-find-nothing': { ...base, button: 'Find Feeds', error: ERRORS['find-nothing'], theme: 'dark' },
     'add-find-failed': { ...base, button: 'Find Feeds', error: ERRORS['find-failed'], theme: 'light' },
+    'add-find-limited': { ...base, button: 'Find Feeds', error: ERRORS['find-limited'], status: FOUND_FOR, found: NEW.slice(0, 1), theme: 'dark' },
     'add-find-largest-font': { ...base, button: 'Find Feeds', status: FOUND_FOR, found: [FOLLOWING, NEW[1]], titleSize: 48, theme: 'dark' },
   };
 

@@ -10,6 +10,7 @@ import {
   isAddress,
   type AddFeedView,
   type FoundFeed,
+  type FoundPhase,
   type AddOutcome,
   type AllView,
   type ArticleView,
@@ -150,7 +151,19 @@ function useArticle(id: string): ArticleView {
 }
 
 /** A search for a site's name under way or done (FEE-80); `id` tells a newer search from an older one's answer. */
-type Search = { id: number; name: string; also: string[]; searching: boolean; failed: boolean };
+type Search = {
+  id: number;
+  name: string;
+  also: string[];
+  /** What `find` answered: nothing yet, done, didn't go through, or the User's guessing searches are used up. */
+  answer: 'pending' | 'done' | 'failed' | 'limited';
+};
+
+/** The search's phase: still searching until `find` answers and the first results are in, unless it failed or was limited. */
+function phaseOf(answer: Search['answer'], resultsIn: boolean): FoundPhase {
+  if (answer === 'failed' || answer === 'limited') return answer;
+  return answer === 'done' && resultsIn ? 'done' : 'searching';
+}
 
 function useAddFeed() {
   const addFeed = useAction(api.feeds.add);
@@ -174,13 +187,13 @@ function useAddFeed() {
   const find = (name: string) => {
     const id = ++searches.current;
     setView({ status: 'idle' });
-    setSearch({ id, name, also: [], searching: true, failed: false });
+    setSearch({ id, name, also: [], answer: 'pending' });
     // An answer for an older search, or one retired by leaving the screen, changes nothing (Q20).
-    const settle = (change: Partial<Search>) => setSearch((now) => (now?.id === id ? { ...now, searching: false, ...change } : now));
+    const settle = (change: Partial<Search>) => setSearch((now) => (now?.id === id ? { ...now, ...change } : now));
     findFeeds({ name }).then(
       // Proven Feeds the search index missed (a typo) are asked for by address.
-      ({ found }) => settle({ also: found }),
-      () => settle({ failed: true }),
+      ({ found, limited }) => settle({ also: found, answer: limited ? 'limited' : 'done' }),
+      () => settle({ answer: 'failed' }),
     );
   };
 
@@ -222,8 +235,7 @@ function useAddFeed() {
     status: 'found',
     name: search.name,
     results: shown ?? [],
-    // Still searching until `find` answers and the first results are in, unless it failed.
-    phase: search.failed ? 'failed' : search.searching || shown === null ? 'searching' : 'done',
+    phase: phaseOf(search.answer, shown !== null),
   };
   return { view: found, add };
 }

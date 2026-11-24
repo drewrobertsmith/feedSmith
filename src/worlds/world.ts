@@ -4,7 +4,7 @@ import { Uniwind } from 'uniwind';
 import type { Account, Auth } from '@/auth/auth-context';
 import type { SignInView } from '@/auth/sign-in-outcome';
 import type { Environment } from '@/environment';
-import { isAddress, type AddFeedReason, type AddFeedView, type ArticleRow, type ArticleView, type FeedsData, type FoundFeed, type SavedBefore } from '@/feeds/feeds-data';
+import { isAddress, type AddFeedReason, type AddFeedView, type ArticleRow, type ArticleView, type FeedsData, type FoundFeed, type FoundPhase, type SavedBefore } from '@/feeds/feeds-data';
 import {
   FIXTURE_ACCOUNT,
   FIXTURE_ARTICLE,
@@ -37,8 +37,8 @@ import { accountInitial } from '../../convex/lib/account';
 import { PINNED } from '../../convex/lib/pinned';
 
 /** Searching for a site's name, as a world shows it (FEE-80). */
-type FindWorld = 'find-searching' | 'find-arriving' | 'find-known' | 'find-following' | 'find-nothing' | 'find-failed';
-const found = (results: FoundFeed[], phase: 'searching' | 'done' | 'failed'): AddFeedView => ({ status: 'found', name: 'the verge', results, phase });
+type FindWorld = 'find-searching' | 'find-arriving' | 'find-known' | 'find-following' | 'find-nothing' | 'find-failed' | 'find-limited';
+const found = (results: FoundFeed[], phase: FoundPhase): AddFeedView => ({ status: 'found', name: 'the verge', results, phase });
 const FIND_VIEWS: Record<FindWorld, AddFeedView> = {
   'find-searching': found([], 'searching'),
   'find-arriving': found(FIXTURE_FOUND.slice(0, 1), 'searching'),
@@ -46,6 +46,7 @@ const FIND_VIEWS: Record<FindWorld, AddFeedView> = {
   'find-following': found(FIXTURE_FOUND_FOLLOWING, 'done'),
   'find-nothing': found([], 'done'),
   'find-failed': found([], 'failed'),
+  'find-limited': found(FIXTURE_FOUND.slice(0, 1), 'limited'),
 };
 
 /**
@@ -77,7 +78,7 @@ export type WorldSpec = {
    * Where adding a Feed is up to. Defaults to idle, where adding succeeds. `choose`: a site with
    * several feeds. `already`: adding finds The Verge, already followed. `find-…`: searching for
    * "the verge" by name (FEE-80): still searching with nothing yet, results arriving, found, found
-   * one you follow, nothing found, or the search failed.
+   * one you follow, nothing found, the search failed, or the User's guessing searches are used up.
    */
   addFeed?: 'idle' | 'busy' | 'choose' | 'already' | AddFeedReason | FindWorld;
   /** Whether a pull-down refresh is under way. */

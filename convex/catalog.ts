@@ -2,13 +2,14 @@ import { v, type Infer } from 'convex/values';
 
 import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
-import { action, internalAction, internalMutation, internalQuery, query, type QueryCtx } from './_generated/server';
+import { action, internalAction, internalMutation, query, type QueryCtx } from './_generated/server';
 import { requireUserId } from './lib/currentUser';
 import { faviconOf, hostOf, siteHost } from './lib/feed/face';
 import { fetchFeed } from './lib/feed/fetch';
 import { candidates, hostMatch, isStrong, nameMatch, rank, searchTerms, siteLabel } from './lib/feed/find';
 import { safeUrl } from './lib/feed/http';
 import { Budget, proveSite } from './lib/feed/prove';
+import { rateLimiter } from './rateLimits';
 import { inBatches } from './refresh';
 
 /** Catalog entries one search reads from the search index, at most (Q10). */
@@ -120,18 +121,31 @@ export const search = query({
  * one of that name or on the site of that name ("You already follow…", T22), or the catalog holds
  * it on the site of that name.
  */
-export const known = internalQuery({
+async function known(ctx: QueryCtx, userId: Id<'users'>, name: string): Promise<boolean> {
+  const terms = searchTerms(name);
+  if (!terms) return false;
+  const feeds = await ctx.db
+    .query('feeds')
+    .withIndex('by_user_url', (q) => q.eq('userId', userId))
+    .take(FOLLOWED_LIMIT);
+  if (feeds.some((feed) => nameMatch(name, feed.title) === 3 || hostMatch(name, hostOf(feed)))) return true;
+  return (await catalogHits(ctx, terms)).some((hit) => isStrong(name, hit));
+}
+
+/**
+ * Whether a search may guess (T36), decided in one transaction with the User still there: `known`
+ * when feedSmith already has the Feed (free), `limited` past the User's allowance, else `guess`,
+ * charging one search. Done together, a search racing an Account's deletion can't leave a counter
+ * behind for the deleted User (Q28).
+ */
+export const startGuessing = internalMutation({
   args: { userId: v.id('users'), name: v.string() },
-  returns: v.boolean(),
+  returns: v.union(v.literal('known'), v.literal('limited'), v.literal('guess')),
   handler: async (ctx, { userId, name }) => {
-    const terms = searchTerms(name);
-    if (!terms) return false;
-    const feeds = await ctx.db
-      .query('feeds')
-      .withIndex('by_user_url', (q) => q.eq('userId', userId))
-      .take(FOLLOWED_LIMIT);
-    if (feeds.some((feed) => nameMatch(name, feed.title) === 3 || hostMatch(name, hostOf(feed)))) return true;
-    return (await catalogHits(ctx, terms)).some((hit) => isStrong(name, hit));
+    if ((await ctx.db.get(userId)) === null) return 'known';
+    if (await known(ctx, userId, name)) return 'known';
+    const { ok } = await rateLimiter.limit(ctx, 'guessingSearch', { key: userId });
+    return ok ? 'guess' : 'limited';
   },
 });
 
@@ -139,16 +153,21 @@ export const known = internalQuery({
  * Finds Feeds for a site's name by guessing its address and proving it (FEE-80, T35): a few sites
  * at a time, under one fetch budget and deadline, stopping once the site of that very name is
  * proven. Each proven Feed joins the catalog at once, so `search` shows it as it's found. Nothing
- * is guessed when feedSmith already knows the Feed (`known`). Returns the proven Feeds' addresses.
+ * is guessed when feedSmith already knows the Feed (`known`), and a User past their allowance of
+ * guessing searches is answered `limited` without fetching (FEE-88). Returns the proven Feeds' addresses.
  */
 export const find = action({
   args: { name: v.string() },
-  returns: v.object({ found: v.array(v.string()) }),
+  // `limited`: the User has used up their guessing searches for now (FEE-88); nothing was fetched.
+  returns: v.object({ found: v.array(v.string()), limited: v.optional(v.literal(true)) }),
   handler: async (ctx, { name }) => {
     const userId = await ctx.runQuery(internal.feeds.viewer, {});
     const hosts = candidates(name);
     if (hosts.length === 0) return { found: [] };
-    if (await ctx.runQuery(internal.catalog.known, { userId, name })) return { found: [] };
+    // Only a search that will guess is counted, and before any fetch (T36).
+    const start = await ctx.runMutation(internal.catalog.startGuessing, { userId, name });
+    if (start === 'known') return { found: [] };
+    if (start === 'limited') return { found: [], limited: true as const };
 
     const budget = new Budget(MAX_FETCHES, Date.now() + DEADLINE_MS);
     const tried = new Set<string>();

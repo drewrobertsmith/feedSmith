@@ -43,6 +43,7 @@ import type * as lib_feedName from "../lib/feedName.js";
 import type * as lib_pinned from "../lib/pinned.js";
 import type * as lib_signUp from "../lib/signUp.js";
 import type * as migrations from "../migrations.js";
+import type * as rateLimits from "../rateLimits.js";
 import type * as refresh from "../refresh.js";
 import type * as users from "../users.js";
 
@@ -88,6 +89,7 @@ declare const fullApi: ApiFromModules<{
   "lib/pinned": typeof lib_pinned;
   "lib/signUp": typeof lib_signUp;
   migrations: typeof migrations;
+  rateLimits: typeof rateLimits;
   refresh: typeof refresh;
   users: typeof users;
 }>;
@@ -121,4 +123,5 @@ export declare const internal: FilterApi<
 export declare const components: {
   auth: import("@convex-dev/auth/_generated/component.js").ComponentApi<"auth">;
   authGoogle: import("@convex-dev/auth/components/google/_generated/component.js").ComponentApi<"authGoogle">;
+  rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
 };

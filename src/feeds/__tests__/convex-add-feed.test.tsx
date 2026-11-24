@@ -91,3 +91,13 @@ test('leaving the screen retires a search still running (Q20)', async () => {
   expect(answered).not.toHaveBeenCalled();
   answered.mockRestore();
 });
+
+test('a search past the allowance says so, keeping what the catalog knows (FEE-88)', async () => {
+  mockCatalog = { 'the verge': [VERGE] };
+  const { result } = await renderHook(() => useAddFeed(), { wrapper });
+  await act(async () => {
+    await result.current.add('the verge');
+  });
+  await act(async () => mockFinds[0].resolve({ found: [], limited: true } as never));
+  expect(result.current.view).toMatchObject({ status: 'found', phase: 'limited', results: [VERGE] });
+});

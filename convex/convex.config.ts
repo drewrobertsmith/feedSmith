@@ -2,6 +2,7 @@ import { defineApp } from 'convex/server';
 import { v } from 'convex/values';
 import auth from '@convex-dev/auth/convex.config';
 import authGoogle from '@convex-dev/auth/components/google/convex.config';
+import rateLimiter from '@convex-dev/rate-limiter/convex.config';
 
 const app = defineApp({
   env: {
@@ -17,4 +18,6 @@ app.use(authGoogle, {
     CLIENT_SECRET: app.env.AUTH_GOOGLE_CLIENT_SECRET,
   },
 });
+// Guessing searches by name, per User (FEE-88, T36).
+app.use(rateLimiter);
 export default app;

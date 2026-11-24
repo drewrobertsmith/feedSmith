@@ -118,9 +118,13 @@ export type AddFeedView =
   /**
    * Searching for a site's name (FEE-80): what's found so far, best first, while the search is
    * `searching` and once it's `done`; `failed` when the search itself didn't go through (offline,
-   * or the server).
+   * or the server); `limited` when the User has used up their guessing searches for now (FEE-88),
+   * with what the catalog already knew still listed.
    */
-  | { status: 'found'; name: string; results: FoundFeed[]; phase: 'searching' | 'done' | 'failed' };
+  | { status: 'found'; name: string; results: FoundFeed[]; phase: FoundPhase };
+
+/** Where a search for a name is up to (FEE-80, FEE-88). */
+export type FoundPhase = 'searching' | 'done' | 'failed' | 'limited';
 
 /**
  * Everything the screens read and do with Feeds and Articles. Convex backs it in the app
