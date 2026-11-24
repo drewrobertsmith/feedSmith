@@ -4,7 +4,6 @@ import { renderRouter, screen } from 'expo-router/testing-library';
 import TabsLayout from '@/app/(tabs)/_layout';
 import FeedsRoute from '@/app/(tabs)/index';
 import SavedRoute from '@/app/(tabs)/saved';
-import AddFeedRoute from '@/app/add-feed';
 import ArticleRoute from '@/app/article/[id]';
 import AuthReturnRoute from '@/app/auth';
 import GalleryRoute from '@/app/gallery';
@@ -21,7 +20,6 @@ export function renderWorld(world: World, initialUrl: string = world.initialUrl)
       '(tabs)/_layout': TabsLayout,
       '(tabs)/index': FeedsRoute,
       '(tabs)/saved': SavedRoute,
-      'add-feed': AddFeedRoute,
       'article/[id]': ArticleRoute,
       'manage-feeds': ManageFeedsRoute,
       'sign-in': SignInRoute,

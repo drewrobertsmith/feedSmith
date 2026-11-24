@@ -1,18 +1,14 @@
-import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, TextInput, ToastAndroid, View } from 'react-native';
+import { Pressable, ScrollView, ToastAndroid, useWindowDimensions, View } from 'react-native';
 import Animated, { Easing, Keyframe, LinearTransition, ReduceMotion } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/app-button';
 import { AppText } from '@/components/app-text';
 import { FeedIcon } from '@/components/feed-icon';
-import { useEnvironment } from '@/environment';
+import { NativeSheet } from '@/components/native-sheet';
+import { NativeTextField } from '@/components/native-text-field';
 import { isAddress, useAddFeed, type AddFeedReason, type AddFeedView, type FeedChoice, type FoundFeed } from '@/feeds/feeds-data';
 import { motion } from '@/theme/motion';
-import { spacing } from '@/theme/spacing';
-import { themes } from '@/theme/tokens';
-import { typeScale } from '@/theme/type';
 
 /** What went wrong, and what to do next. */
 const ERRORS: Record<AddFeedReason, string> = {
@@ -119,98 +115,96 @@ function listedSearch(view: AddFeedView, message: string | null) {
   return view.phase === 'limited' && view.results.length > 0 ? view : null;
 }
 
-/** Back to Feeds with a followed Feed's chip chosen, and a quiet note naming it (T22). */
-function showFollowed(title: string, feedId: string) {
-  ToastAndroid.show(`You already follow ${title}.`, ToastAndroid.SHORT);
-  router.dismissTo({ pathname: '/', params: { feed: feedId } });
-}
+/** At most this much of the screen's height: a long list of feeds scrolls inside the sheet (Q16). */
+const SHEET_MAX = 0.85;
 
 /**
- * Adding a Feed from a website or feed URL, or finding one by its site's name (FEE-80). One action:
- * Add Feed for an address, Find Feeds for a name.
+ * Adding a Feed, in a sheet over Feeds (FEE-45, Q32): from a website or feed URL, or by finding one
+ * by its site's name (FEE-80). One action: Add Feed for an address, Find Feeds for a name. What's
+ * typed stays while the sheet is closed, for the next time it opens; a Feed added, or one already
+ * followed, closes it on that Feed's chip (`onFeed`), a followed one with a quiet note naming it (T22).
  */
-export function AddFeedScreen() {
-  const insets = useSafeAreaInsets();
-  const { colorScheme, fontScale } = useEnvironment();
+export function AddFeedSheet({ open, onClose, onFeed }: { open: boolean; onClose: () => void; onFeed: (feedId: string) => void }) {
   const { view, add } = useAddFeed();
   // A search shown on arrival (the state gallery) keeps the name it was for in the field.
   const [typed, setTyped] = useState(() => (view.status === 'found' ? view.name : ''));
+  // The field keeps its own text natively; after an add it starts afresh, empty.
+  const [adds, setAdds] = useState(0);
+  const { height } = useWindowDimensions();
   const adding = view.status === 'busy';
   const searching = view.status === 'found' && view.phase === 'searching';
   const byName = typed.trim() !== '' && !isAddress(typed);
-  const field = typeScale.reading;
   const error = view.status === 'error' ? ERRORS[view.reason] : findMessage(view);
   const listed = listedSearch(view, error);
 
+  const followed = (title: string, feedId: string) => {
+    ToastAndroid.show(`You already follow ${title}.`, ToastAndroid.SHORT);
+    onFeed(feedId);
+  };
   const addFrom = async (address: string) => {
     if (!address.trim() || adding || searching) return;
     const outcome = await add(address);
-    if (outcome.kind === 'already') showFollowed(outcome.title, outcome.feedId);
-    else if (outcome.kind === 'added') router.back();
+    if (outcome.kind === 'already') followed(outcome.title, outcome.feedId);
+    else if (outcome.kind === 'added') {
+      setTyped('');
+      setAdds((count) => count + 1);
+      // Even if the sheet was swiped shut while adding: the Feed was added, so its chip opens.
+      onFeed(outcome.feedId);
+    }
   };
   const choose = (found: FoundFeed) => {
-    if (found.kind === 'following') showFollowed(found.title, found.feedId);
+    if (found.kind === 'following') followed(found.title, found.feedId);
     else void addFrom(found.url);
   };
   const submit = () => addFrom(typed);
 
   return (
-    // Scrolls: a site can offer up to ten feeds, a search finds several, and the largest font size needs the room (Q16).
-    <ScrollView
-      className="flex-1 bg-background"
-      contentContainerClassName="gap-section px-edge"
-      contentContainerStyle={{ paddingTop: insets.top + spacing.section, paddingBottom: insets.bottom + spacing.section }}
-      keyboardShouldPersistTaps="handled"
-    >
-      <AppText variant="title">Add a Feed</AppText>
-      <View className="gap-group">
-        <View className="gap-related">
-          <AppText variant="label" className="text-text-muted" accessible={false}>
-            Website, feed URL or name
+    <NativeSheet open={open} onClose={onClose}>
+      {/* Scrolls past most of the screen: a site can offer up to ten feeds, and the largest font needs room (Q16). */}
+      <ScrollView testID="add-feed-sheet" style={{ maxHeight: height * SHEET_MAX }} keyboardShouldPersistTaps="handled">
+        <View className="gap-group px-edge pb-section">
+          <AppText variant="title" className="text-text">
+            Add a Feed
           </AppText>
-          <TextInput
-            aria-label="Website, feed URL or name"
-            value={typed}
-            onChangeText={setTyped}
-            onSubmitEditing={submit}
-            editable={!adding}
-            placeholder="theverge.com"
-            placeholderTextColor={themes[colorScheme].textMuted}
-            inputMode="url"
-            keyboardType="url"
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="url"
-            returnKeyType="go"
-            className="rounded-lg border border-text-muted px-group py-related"
-            // Its colour is a style, not a class: the class reaches Android's field a second or two late,
-            // and a field opened holding text (a search shown on arrival) drew none until then.
-            style={{ color: themes[colorScheme].text, fontFamily: field.fontFamily, fontSize: field.fontSize * fontScale, minHeight: 48 * fontScale }}
+          <View className="gap-related">
+            <AppText variant="label" className="text-text-muted" accessible={false}>
+              Website, feed URL or name
+            </AppText>
+            <NativeTextField
+              key={adds}
+              purpose="address"
+              label="Website, feed URL or name"
+              placeholder="theverge.com"
+              defaultValue={typed}
+              onChangeText={setTyped}
+              onSubmitEditing={() => void submit()}
+              editable={!adding}
+            />
+          </View>
+          {error ? (
+            <AppText variant="label" role="alert" className="text-text">
+              {error}
+            </AppText>
+          ) : null}
+          {view.status === 'choose' ? (
+            <View className="gap-related">
+              <AppText variant="label" className="text-text-muted">
+                This site has more than one feed. Choose one.
+              </AppText>
+              {view.choices.map((choice) => (
+                <Choice key={choice.url} choice={choice} onChoose={addFrom} />
+              ))}
+            </View>
+          ) : null}
+          {listed ? <FoundList view={listed} onChoose={choose} /> : null}
+          <AppButton
+            label={adding ? 'Adding…' : searching ? 'Finding…' : byName ? 'Find Feeds' : 'Add Feed'}
+            onPress={() => void submit()}
+            busy={adding || searching}
+            disabled={!typed.trim()}
           />
         </View>
-        {error ? (
-          <AppText variant="label" role="alert" className="text-text">
-            {error}
-          </AppText>
-        ) : null}
-        {view.status === 'choose' ? (
-          <View className="gap-related">
-            <AppText variant="label" className="text-text-muted">
-              This site has more than one feed. Choose one.
-            </AppText>
-            {view.choices.map((choice) => (
-              <Choice key={choice.url} choice={choice} onChoose={addFrom} />
-            ))}
-          </View>
-        ) : null}
-        {listed ? <FoundList view={listed} onChoose={choose} /> : null}
-        <AppButton
-          label={adding ? 'Adding…' : searching ? 'Finding…' : byName ? 'Find Feeds' : 'Add Feed'}
-          onPress={submit}
-          busy={adding || searching}
-          disabled={!typed.trim()}
-        />
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </NativeSheet>
   );
 }

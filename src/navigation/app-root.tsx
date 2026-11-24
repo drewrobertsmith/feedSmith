@@ -40,7 +40,6 @@ function ThemedStack() {
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Protected guard={session === 'signed-in'}>
             <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="add-feed" />
             <Stack.Screen name="article/[id]" />
             <Stack.Screen name="manage-feeds" />
           </Stack.Protected>

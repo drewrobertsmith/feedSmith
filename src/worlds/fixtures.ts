@@ -244,6 +244,9 @@ export const FIXTURE_CHIPS: FeedChip[] = [
   { id: 'f3', title: 'Daring Fireball', faviconUrl: FIREBALL_ICON, pinned: false },
 ];
 
+/** The Feed a world's Add a Feed adds: it joins the chips once added (FEE-45). */
+export const FIXTURE_ADDED_CHIP: FeedChip = { id: 'f9', title: 'Kottke', pinned: false };
+
 /** Someone following eight Feeds, one with a long name: the chip row runs off-screen (FEE-44). */
 export const FIXTURE_MANY_CHIPS: FeedChip[] = [
   { id: 'f1', title: 'The Verge - Full RSS for subscribers | The Verge', faviconUrl: VERGE_ICON, pinned: true },

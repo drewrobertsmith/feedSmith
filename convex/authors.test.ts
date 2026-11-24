@@ -40,7 +40,7 @@ async function follow(creators: string[]) {
   const userId = await t.run((ctx) => ctx.db.insert('users', { email: 'a@example.com' }));
   const owner = t.withIdentity({ subject: userId });
   body = rss(creators);
-  expect(await owner.action(api.feeds.add, { url: FEED })).toEqual({ ok: true });
+  expect(await owner.action(api.feeds.add, { url: FEED })).toMatchObject({ ok: true });
   const feedId = await t.run(async (ctx) => (await ctx.db.query('feeds').first())!._id);
   const articleId = await t.run(async (ctx) => (await ctx.db.query('articles').first())!._id);
   return { t, owner, feedId, articleId };

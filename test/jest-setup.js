@@ -50,12 +50,14 @@ jest.mock('@/components/native-sheet', () => ({
 jest.mock('@/components/native-text-field', () => {
   const { TextInput } = jest.requireActual('react-native');
   return {
-    NativeTextField: ({ label, defaultValue, onChangeText, onSubmitEditing, maxLength }) => (
+    NativeTextField: ({ label, placeholder, defaultValue, onChangeText, onSubmitEditing, editable, maxLength }) => (
       <TextInput
         aria-label={label}
+        placeholder={placeholder}
         defaultValue={defaultValue}
         onChangeText={onChangeText}
         onSubmitEditing={onSubmitEditing}
+        editable={editable}
         maxLength={maxLength}
       />
     ),

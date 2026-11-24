@@ -1,5 +1,6 @@
 import { LegendList } from '@legendapp/list/react-native';
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -19,12 +20,12 @@ import { publishedAgo } from '@/feeds/format';
 import { useSaveAndDone } from '@/feeds/use-save-and-done';
 import { useShownRows } from '@/feeds/use-shown-rows';
 import { AccountButton } from '@/screens/account/account-sheet';
+import { AddFeedSheet } from '@/screens/add-feed-sheet';
 import { ChipRow } from '@/screens/chip-row';
 import { hasPinnedView } from '@/screens/chip-row-layout';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
 
-const addFeed = () => router.push('/add-feed');
 const manageFeeds = () => router.push('/manage-feeds');
 
 /**
@@ -46,9 +47,10 @@ const ESTIMATED_ROW = 112;
  * The Feeds section: All, or one Feed's Articles, newest first (Q1, P5, P12), under the chip
  * row (P9). The chosen chip lives in the route (`?feed=`), so it can be restored and linked to;
  * a link's value is untrusted, so anything but one of the User's chips means All (Q25).
- * `accountOpen` opens the Account sheet at once, for the state gallery.
+ * Adding a Feed is a sheet over it (FEE-45). `accountOpen` and `addOpen` open the Account sheet or
+ * the add sheet at once, for the state gallery.
  */
-export function FeedsScreen({ feed, accountOpen }: { feed?: string; accountOpen?: boolean }) {
+export function FeedsScreen({ feed, accountOpen, addOpen = false }: { feed?: string; accountOpen?: boolean; addOpen?: boolean }) {
   const insets = useSafeAreaInsets();
   const chipsView = useChips();
   const chips = chipsView.status === 'ready' ? chipsView.chips : [];
@@ -74,6 +76,14 @@ export function FeedsScreen({ feed, accountOpen }: { feed?: string; accountOpen?
   const empty = all.status === 'ready' && all.articles.length === 0;
 
   const select = (feedId: string | null) => router.setParams({ feed: feedId ?? undefined });
+  const [adding, setAdding] = useState(addOpen);
+  const addFeed = () => setAdding(true);
+  // A Feed added, or one already followed: the sheet closes on its chip (FEE-45, T22).
+  const showFeed = (feedId: string) => {
+    setAdding(false);
+    select(feedId);
+  };
+  const addSheet = <AddFeedSheet open={adding} onClose={() => setAdding(false)} onFeed={showFeed} />;
 
   const header = (
     <View className="gap-group pb-related" style={{ paddingTop: insets.top + spacing.section }}>
@@ -116,6 +126,7 @@ export function FeedsScreen({ feed, accountOpen }: { feed?: string; accountOpen?
           </AppText>
           <AppButton label="Add a Feed" onPress={addFeed} />
         </View>
+        {addSheet}
       </View>
     );
   }
@@ -160,6 +171,7 @@ export function FeedsScreen({ feed, accountOpen }: { feed?: string; accountOpen?
         />
       </ChipSwitch>
       <UndoToastHost />
+      {addSheet}
       </View>
     </SharedTitleScreen>
   );

@@ -18,7 +18,7 @@ jest.mock('convex/react', () => ({
       return ({ name }: { name: string }) => new Promise((resolve, reject) => mockFinds.push({ name, resolve, reject }));
     return async ({ url }: { url: string }) => {
       mockAdded.push(url);
-      return { ok: true };
+      return { ok: true, feedId: 'feed-new' };
     };
   },
 }));
@@ -49,10 +49,10 @@ test('a name searches, showing what the mockCatalog knows while guessing goes on
   expect(result.current.view).toMatchObject({ results: [VERGE], phase: 'done' });
 });
 
-test('an address is mockAdded as today, with no search', async () => {
+test('an address is added as today, with no search, naming the new Feed so its chip can open (FEE-45)', async () => {
   const { result } = await renderHook(() => useAddFeed(), { wrapper });
   await act(async () => {
-    expect(await result.current.add('theverge.com')).toEqual({ kind: 'added' });
+    expect(await result.current.add('theverge.com')).toEqual({ kind: 'added', feedId: 'feed-new' });
   });
   expect(mockAdded).toEqual(['theverge.com']);
   expect(mockFinds).toEqual([]);

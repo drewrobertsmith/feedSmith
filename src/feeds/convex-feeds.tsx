@@ -213,7 +213,7 @@ function useAddFeed() {
       const result = await addFeed({ url: text });
       if (result.ok) {
         settle({ status: 'idle' });
-        return { kind: 'added' };
+        return { kind: 'added', feedId: result.feedId };
       }
       if (result.reason === 'already-added') {
         settle({ status: 'idle' });

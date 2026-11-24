@@ -74,6 +74,7 @@ function RenameForm({ feed, onDone }: { feed: ManagedFeed; onDone: () => void })
       </AppText>
       <View className="gap-related">
         <NativeTextField
+          purpose="name"
           label={`New name for ${feed.title}`}
           defaultValue={feed.title}
           onChangeText={setName}

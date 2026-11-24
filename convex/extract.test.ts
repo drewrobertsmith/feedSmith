@@ -64,7 +64,7 @@ async function follow(items: Item[]) {
   ]);
   const owner = t.withIdentity({ subject: a });
   pages[FEED] = rss(items);
-  expect(await owner.action(api.feeds.add, { url: FEED })).toEqual({ ok: true });
+  expect(await owner.action(api.feeds.add, { url: FEED })).toMatchObject({ ok: true });
   const feedId = await t.run(async (ctx) => (await ctx.db.query('feeds').first())!._id);
   const idOf = (guid: string) =>
     t.run(async (ctx) => (await ctx.db.query('articles').withIndex('by_feed_guid', (q) => q.eq('feedId', feedId).eq('guid', guid)).first())?._id as Id<'articles'>);

@@ -1,6 +1,5 @@
 import type { ReactElement } from 'react';
 
-import { AddFeedScreen } from '@/screens/add-feed-screen';
 import { FeedsScreen } from '@/screens/feeds-screen';
 import { ManageFeedsScreen } from '@/screens/manage-feeds-screen';
 import { ReadingScreen } from '@/screens/reading/reading-screen';
@@ -46,7 +45,8 @@ export const GALLERY: readonly GalleryEntry[] = [
   { screen: 'Pinned group', worlds: PINNED_GROUP_WORLDS, render: (spec) => <FeedsScreen feed={spec.feed} /> },
   { screen: 'Pinned stack', worlds: PINNED_STACK_WORLDS, render: (spec) => <FeedsScreen feed={spec.feed} /> },
   { screen: 'Saved', worlds: SAVED_WORLDS, render: () => <SavedScreen /> },
-  { screen: 'Add a Feed', worlds: ADD_FEED_WORLDS, render: () => <AddFeedScreen /> },
+  // The add sheet over Feeds, open (FEE-45).
+  { screen: 'Add a Feed', worlds: ADD_FEED_WORLDS, render: (spec) => <FeedsScreen feed={spec.feed} addOpen /> },
   {
     screen: 'Manage Feeds',
     worlds: MANAGE_WORLDS,
