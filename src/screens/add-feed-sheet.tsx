@@ -147,7 +147,8 @@ export function AddFeedSheet({ open, onClose, onFeed }: { open: boolean; onClose
     if (outcome.kind === 'already') followed(outcome.title, outcome.feedId);
     else if (outcome.kind === 'added') {
       setTyped('');
-      setAdds(adds + 1);
+      setAdds((count) => count + 1);
+      // Even if the sheet was swiped shut while adding: the Feed was added, so its chip opens.
       onFeed(outcome.feedId);
     }
   };
