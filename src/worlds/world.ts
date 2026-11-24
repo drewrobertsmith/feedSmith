@@ -4,10 +4,11 @@ import { Uniwind } from 'uniwind';
 import type { Account, Auth } from '@/auth/auth-context';
 import type { SignInView } from '@/auth/sign-in-outcome';
 import type { Environment } from '@/environment';
-import { isAddress, type AddFeedReason, type AddFeedView, type ArticleRow, type ArticleView, type FeedsData, type FoundFeed, type FoundPhase, type SavedBefore } from '@/feeds/feeds-data';
+import { isAddress, type AddFeedReason, type AddFeedView, type ArticleRow, type ArticleView, type FeedChip, type FeedsData, type FoundFeed, type FoundPhase, type SavedBefore } from '@/feeds/feeds-data';
 import {
   FIXTURE_ACCOUNT,
   FIXTURE_ARTICLE,
+  FIXTURE_ADDED_CHIP,
   FIXTURE_CHIPS,
   FIXTURE_CHOICES,
   FIXTURE_FOUND,
@@ -255,6 +256,17 @@ export function worldFeeds(
     universe.filter((row) => feeds === 'read' || row.read).map((row) => row.id),
   );
   const useStore = () => useSyncExternalStore(store.subscribe, store.get);
+  // A Feed added in this world joins the chips, as Convex's live query would (FEE-45).
+  let addedChips: FeedChip[] = [];
+  const chipListeners = new Set<() => void>();
+  const subscribeChips = (listener: () => void) => {
+    chipListeners.add(listener);
+    return () => void chipListeners.delete(listener);
+  };
+  const addChip = (chip: FeedChip) => {
+    addedChips = [...addedChips, chip];
+    chipListeners.forEach((listener) => listener());
+  };
   // Each view is built once per state, as a query's result stays the same object until it changes.
   const views = new WeakMap<object, Map<string, unknown>>();
   const viewOf = <T,>(state: object, key: string, build: () => T): T => {
@@ -321,7 +333,11 @@ export function worldFeeds(
         await writes(() => log.restores.push({ id, before }), () => store.restore(id, before));
       },
     }),
-    useChips: () => (feeds === 'loading' ? { status: 'loading' } : { status: 'ready', chips: feeds === 'none' ? [] : someChips }),
+    useChips: () => {
+      const added = useSyncExternalStore(subscribeChips, () => addedChips);
+      if (feeds === 'loading') return { status: 'loading' };
+      return { status: 'ready', chips: [...(feeds === 'none' ? [] : someChips), ...added] };
+    },
     useManage: () =>
       manage === 'loading'
         ? { status: 'loading' }
@@ -366,7 +382,10 @@ export function worldFeeds(
         if (addFeed === 'busy') return new Promise(() => {});
         // A name is searched for, not added: the view shows what's found.
         if (!isAddress(url)) return Promise.resolve({ kind: 'stay' });
-        if (addFeed === 'idle') return Promise.resolve({ kind: 'added' });
+        if (addFeed === 'idle') {
+          addChip(FIXTURE_ADDED_CHIP);
+          return Promise.resolve({ kind: 'added', feedId: FIXTURE_ADDED_CHIP.id });
+        }
         if (addFeed === 'already') return Promise.resolve({ kind: 'already', title: 'The Verge', feedId: 'f1' });
         return Promise.resolve({ kind: 'stay' });
       },

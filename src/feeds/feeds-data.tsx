@@ -94,10 +94,14 @@ export type PinResult = { outcome: PinOutcome; place?: number };
  */
 export type ArticleView = { status: 'loading'; title?: string } | { status: 'missing' } | { status: 'ready'; article: ReadingArticle };
 /**
- * What adding a Feed came to: added; already followed at that URL (by its name), which takes
- * the User back to it; or stay, with the view saying why (an error, or feeds to choose from).
+ * What adding a Feed came to: added, by the new Feed's id, so its chip can open (FEE-45); already
+ * followed at that URL (by its name), which takes the User back to it; or stay, with the view saying
+ * why (an error, or feeds to choose from).
  */
-export type AddOutcome = { kind: 'added' } | { kind: 'already'; title: string; feedId: string } | { kind: 'stay' };
+export type AddOutcome =
+  | { kind: 'added'; feedId: string }
+  | { kind: 'already'; title: string; feedId: string }
+  | { kind: 'stay' };
 
 /** A feed a site advertises, to choose from (T21). */
 export type FeedChoice = { url: string; title: string };
