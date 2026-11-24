@@ -65,6 +65,37 @@ describe('the Pinned group follows Pins as they change (FEE-60)', () => {
   });
 });
 
+// FEE-85: the tray follows the Pins at once, with no state of its own.
+describe('the Pinned group\'s tray follows Pins as they change (FEE-85)', () => {
+  const trayHolds = () =>
+    screen.queryByTestId('pinned-tray') &&
+    screen.getAllByRole('tab').filter((tab) => {
+      for (let node = tab.parent; node; node = node.parent) if (node.props.testID === 'pinned-tray') return true;
+      return false;
+    }).map((tab) => tab.props.accessibilityLabel);
+
+  test('a new Pin joins the open tray at once, and an Unpin leaves it', async () => {
+    const { rerender } = await render(<Row chips={row(['f1', 'f3'])} selected={PINNED} />);
+    expect(trayHolds()).toEqual(['Pinned: The Verge, Daring Fireball', 'The Verge, Pinned', 'Daring Fireball, Pinned']);
+    await rerender(<Row chips={row(['f1', 'f3', 'f2'])} selected={PINNED} />);
+    expect(trayHolds()).toEqual([
+      'Pinned: The Verge, Daring Fireball, Calm Notes',
+      'The Verge, Pinned',
+      'Daring Fireball, Pinned',
+      'Calm Notes, Pinned',
+    ]);
+    await rerender(<Row chips={row(['f1', 'f2'])} selected={PINNED} />);
+    expect(trayHolds()).toEqual(['Pinned: The Verge, Calm Notes', 'The Verge, Pinned', 'Calm Notes, Pinned']);
+  });
+
+  test('down to one Pin, the tray goes', async () => {
+    const { rerender } = await render(<Row chips={row(['f1', 'f3'])} selected="f1" />);
+    expect(screen.getByTestId('pinned-tray')).toBeOnTheScreen();
+    await rerender(<Row chips={row(['f1'])} selected="f1" />);
+    expect(screen.queryByTestId('pinned-tray')).not.toBeOnTheScreen();
+  });
+});
+
 describe('the stacked icons ring in the Pinned chip\'s own face, so each stays a separate disc on it (FEE-74)', () => {
   test.each([
     ['chosen, the raised face', PINNED, depth.dark.raised.face],
@@ -120,6 +151,25 @@ describe('with Remove animations on, the Pinned group opens and folds with no an
     await user.press(screen.getByRole('tab', { name: /^Pinned:/ }));
     expect(names()).toEqual(['All', 'Pinned: The Verge, Daring Fireball', 'The Verge, Pinned', 'Daring Fireball, Pinned', 'Calm Notes']);
     for (const tab of screen.getAllByRole('tab').slice(2)) expect(animationsOf(tab).filter(Boolean)).toEqual([]);
+  });
+
+  // FEE-85: the tray widens and narrows on the chips' own transition, and with Remove animations not at all.
+  test('the tray takes no layout animation', async () => {
+    const user = userEvent.setup();
+    await render(<Still selected={PINNED} />);
+    expect(screen.getByTestId('pinned-tray').props.layout).toBeUndefined();
+    await user.press(screen.getByRole('tab', { name: /^Pinned:/ }));
+    expect(screen.getByTestId('pinned-tray').props.layout).toBeUndefined();
+  });
+
+  test('with motion on, the tray moves on the same transition as the chips after it', async () => {
+    const user = userEvent.setup();
+    await render(<Row chips={row(['f1', 'f3'])} selected={PINNED} />);
+    const after = () => animationsOf(screen.getByRole('tab', { name: 'Calm Notes' }))[2];
+    expect(screen.getByTestId('pinned-tray').props.layout).toBe(after());
+    await user.press(screen.getByRole('tab', { name: /^Pinned:/ }));
+    expect(screen.getByTestId('pinned-tray').props.layout).toBe(after());
+    expect(after()).toBeDefined();
   });
 
   test('with motion on, hiding the group does animate (so the check above can fail)', async () => {

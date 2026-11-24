@@ -16,6 +16,7 @@ import type { FeedChip } from '@/feeds/feeds-data';
 import { usePin } from '@/feeds/use-pin';
 import { PINNED } from '../../convex/lib/pinned';
 import { chipLabel, chipTone, fadeRanges, hasPinnedView, revealOffset, transparent, type ChipTone } from '@/screens/chip-row-layout';
+import { depthStyle } from '@/theme/depth';
 import { motion } from '@/theme/motion';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
@@ -212,12 +213,18 @@ export function ChipRow({
   // The Pinned group (FEE-60): open while Pinned (unless hidden) or one of its Feeds is chosen, folded otherwise.
   const grouped = hasPinnedView(chips);
   const groupOpen = grouped && ((onPinned && !hidden) || pinned.some((chip) => chip.id === selected));
-  const shownChips = grouped && !groupOpen ? chips.filter((chip) => !chip.pinned) : chips;
+  // The Pinned Feeds' chips sit in the tray while the group is open (FEE-85); the rest follow it, in order.
+  const trayChips = groupOpen ? pinned : [];
+  const rowChips = grouped ? chips.filter((chip) => !chip.pinned) : chips;
   const { colorScheme, reduceMotion } = useEnvironment();
   const background = themes[colorScheme].background;
   const scroller = useRef<ScrollViewInstance>(null);
-  /** Each chip's place in the row, by Feed id (All is ''), measured as it lays out. */
-  const chipAt = useRef(new Map<string, { x: number; width: number }>());
+  /** Each chip's place, by Feed id (All is ''), measured as it lays out: in the row, or in the tray (FEE-85). */
+  const chipAt = useRef(new Map<string, { x: number; width: number; inTray: boolean }>());
+  /** Where the tray starts in the row, since a chip inside it is measured from the tray. */
+  const trayX = useRef(0);
+  const place = (event: LayoutChangeEvent, id: string, inTray = false) =>
+    chipAt.current.set(id, { x: event.nativeEvent.layout.x, width: event.nativeEvent.layout.width, inTray });
   const [row, setRow] = useState({ width: 0, content: 0 });
   /** Where the row is scrolled to: native for the fades, a ref for the reveal (no React state on a scroll). */
   const [scroll] = useState(() => new Animated.Value(0));
@@ -233,7 +240,8 @@ export function ChipRow({
   // half under a fade. It never runs again for the same choice, so nothing (a scroll, a Feed added) pulls the row back.
   useEffect(() => {
     if (revealed.current === selected) return;
-    const chip = chipAt.current.get(selected ?? '');
+    const at = chipAt.current.get(selected ?? '');
+    const chip = at && { x: at.inTray ? trayX.current + at.x : at.x, width: at.width };
     if (!chip || row.width === 0) return;
     revealed.current = selected;
     const to = revealOffset(chip, { scrollX: scrollX.current, width: row.width, fade: FADE, edge: spacing.edge });
@@ -243,6 +251,34 @@ export function ChipRow({
   }, [selected, reduceMotion, row.width, row.content]);
 
   const togglePin = (chip: FeedChip) => void pin(chip);
+
+  /**
+   * A Feed's chip, in the row or in the tray. The group's chips fade in from the Pinned chip, and the rest move over with
+   * them. Remove animations (Q17) takes the animations away entirely, read from the environment like all motion here:
+   * Reanimated's own reduced-motion skip left a revealed chip's gradient face invisible on Android (FEE-74). Measured
+   * here, on the chip's place, so a chosen chip scrolls into view (D18).
+   */
+  const feedChip = (chip: FeedChip, inTray: boolean) => (
+    <Reanimated.View
+      key={chip.id}
+      entering={reduceMotion ? undefined : REVEAL}
+      exiting={reduceMotion ? undefined : FOLD}
+      // Chosen as the row changes: open makes room at once, folding closes up after the fade.
+      layout={reduceMotion ? undefined : groupOpen ? MAKE_ROOM : CLOSE_UP}
+      onLayout={(event) => place(event, chip.id, inTray)}
+    >
+      <Chip
+        accessibleName={chip.pinned ? `${chip.title}, Pinned` : chip.title}
+        selected={selected === chip.id}
+        onPress={() => onSelect(chip.id)}
+        onLongPress={() => void togglePin(chip)}
+        actions={[{ name: 'pin', label: chip.pinned ? 'Unpin' : 'Pin', run: () => void togglePin(chip) }]}
+      >
+        <FeedIcon key={chip.faviconUrl} url={chip.faviconUrl} title={chip.title} size={ICON} fallback="none" />
+        <ChipLabel label={chipLabel(chip.title)} tone={chipTone({ selected: selected === chip.id })} />
+      </Chip>
+    </Reanimated.View>
+  );
 
   return (
     <View>
@@ -273,61 +309,52 @@ export function ChipRow({
             accessibleName="All"
             selected={selected === null}
             onPress={() => onSelect(null)}
-            onLayout={(event) => chipAt.current.set('', event.nativeEvent.layout)}
+            onLayout={(event) => place(event, '')}
           >
             <ChipLabel label="All" tone={chipTone({ selected: selected === null })} />
           </Chip>
-          {/* Two or more Pinned Feeds read together, right after All (FEE-59). It names them for TalkBack. */}
+          {/* Two or more Pinned Feeds read together, right after All (FEE-59), set apart in one recessed tray (FEE-85):
+              the Pinned chip, and its Feeds' chips while the group is open. The tray is a face, not a control: TalkBack
+              passes over it to the chips and taps go through to them. It widens and narrows on the same transition as
+              the chips after it, so its edge moves with them. */}
           {grouped ? (
-            <Chip
-              accessibleName={`Pinned: ${pinned.map((chip) => chip.title).join(', ')}`}
-              selected={onPinned}
-              expanded={groupOpen}
-              // Chosen already, a tap hides or shows the group and you keep reading Pinned; otherwise it chooses Pinned,
-              // which always opens the group (FEE-84).
-              onPress={() => (onPinned ? setHidden((now) => !now) : onSelect(PINNED))}
-              // TalkBack's actions follow the tap's rules: on chosen Pinned they hide and show; elsewhere Expand
-              // chooses Pinned and Collapse (a Pinned Feed chosen) chooses All, as before (FEE-60).
-              actions={[
-                groupOpen
-                  ? { name: 'collapse', label: 'Collapse', run: () => (onPinned ? setHidden(true) : onSelect(null)) }
-                  : { name: 'expand', label: 'Expand', run: () => (onPinned ? setHidden(false) : onSelect(PINNED)) },
-              ]}
-              onLayout={(event) => chipAt.current.set(PINNED, event.nativeEvent.layout)}
-            >
-              {/* No word (FEE-84): a push-pin sets it apart from a Feed's chip without relying on colour, then its
-                  Feeds' icons. Active while one of its Feeds is chosen (FEE-60). */}
-              <PinnedGlyph tone={chipTone({ selected: onPinned, active: groupOpen && !onPinned })} />
-              <PinnedStack chips={pinned} />
-            </Chip>
-          ) : null}
-          {/* Every chip stays mounted: the reveal needs each one measured, and a person's Feeds are tens of small pills. */}
-          {/* react-doctor-disable-next-line react-doctor/rn-no-scrollview-mapped-list */}
-          {shownChips.map((chip) => (
-            // The group's chips fade in from the Pinned chip, and the rest move over with them. Remove animations (Q17)
-            // takes the animations away entirely, read from the environment like all motion here: Reanimated's own
-            // reduced-motion skip left a revealed chip's gradient face invisible on Android (FEE-74).
-            // Measured here, on the chip's place in the row, so a chosen chip scrolls into view (D18).
             <Reanimated.View
-              key={chip.id}
-              entering={reduceMotion ? undefined : REVEAL}
-              exiting={reduceMotion ? undefined : FOLD}
-              // Chosen as the row changes: open makes room at once, folding closes up after the fade.
+              testID="pinned-tray"
+              pointerEvents="box-none"
               layout={reduceMotion ? undefined : groupOpen ? MAKE_ROOM : CLOSE_UP}
-              onLayout={(event) => chipAt.current.set(chip.id, event.nativeEvent.layout)}
+              onLayout={(event) => {
+                trayX.current = event.nativeEvent.layout.x;
+              }}
+              className="flex-row items-center gap-related rounded-full p-inside"
+              style={depthStyle(colorScheme, 'inset')}
             >
               <Chip
-                accessibleName={chip.pinned ? `${chip.title}, Pinned` : chip.title}
-                selected={selected === chip.id}
-                onPress={() => onSelect(chip.id)}
-                onLongPress={() => void togglePin(chip)}
-                actions={[{ name: 'pin', label: chip.pinned ? 'Unpin' : 'Pin', run: () => void togglePin(chip) }]}
+                accessibleName={`Pinned: ${pinned.map((chip) => chip.title).join(', ')}`}
+                selected={onPinned}
+                expanded={groupOpen}
+                // Chosen already, a tap hides or shows the group and you keep reading Pinned; otherwise it chooses Pinned,
+                // which always opens the group (FEE-84).
+                onPress={() => (onPinned ? setHidden((now) => !now) : onSelect(PINNED))}
+                // TalkBack's actions follow the tap's rules: on chosen Pinned they hide and show; elsewhere Expand
+                // chooses Pinned and Collapse (a Pinned Feed chosen) chooses All, as before (FEE-60).
+                actions={[
+                  groupOpen
+                    ? { name: 'collapse', label: 'Collapse', run: () => (onPinned ? setHidden(true) : onSelect(null)) }
+                    : { name: 'expand', label: 'Expand', run: () => (onPinned ? setHidden(false) : onSelect(PINNED)) },
+                ]}
+                onLayout={(event) => place(event, PINNED, true)}
               >
-                <FeedIcon key={chip.faviconUrl} url={chip.faviconUrl} title={chip.title} size={ICON} fallback="none" />
-                <ChipLabel label={chipLabel(chip.title)} tone={chipTone({ selected: selected === chip.id })} />
+                {/* No word (FEE-84): a push-pin sets it apart from a Feed's chip without relying on colour, then its
+                    Feeds' icons. Active while one of its Feeds is chosen (FEE-60). */}
+                <PinnedGlyph tone={chipTone({ selected: onPinned, active: groupOpen && !onPinned })} />
+                <PinnedStack chips={pinned} />
               </Chip>
+              {trayChips.map((chip) => feedChip(chip, true))}
             </Reanimated.View>
-          ))}
+          ) : null}
+          {/* Every chip in the row stays mounted: the reveal needs each one measured, and a person's Feeds are tens of small pills. */}
+          {/* react-doctor-disable-next-line react-doctor/rn-no-scrollview-mapped-list */}
+          {rowChips.map((chip) => feedChip(chip, false))}
         </LayoutAnimationConfig>
       </Animated.ScrollView>
       {/* More chips lie past a faded edge; the fade is the page's own colour, so it never greys. */}
