@@ -155,6 +155,29 @@ export const MANAGE_WORLDS = [
     label: 'Manage Feeds, largest font size',
     spec: { colorScheme: 'dark', section: 'manage', manage: 'pinned', fontScale: 2 },
   },
+  // Renaming in a sheet over the list (FEE-43, Q32). The refused and failed worlds show their
+  // message once Save is tapped: the tests tap it, and so does the device walk.
+  { id: 'manage-rename', label: 'Renaming a Feed', spec: { colorScheme: 'dark', section: 'manage', renameSheet: 'open' } },
+  {
+    id: 'manage-rename-light',
+    label: 'Renaming a Feed, light',
+    spec: { colorScheme: 'light', section: 'manage', renameSheet: 'open' },
+  },
+  {
+    id: 'manage-rename-largest-font',
+    label: 'Renaming a Feed, largest font size',
+    spec: { colorScheme: 'dark', section: 'manage', renameSheet: 'open', fontScale: 2 },
+  },
+  {
+    id: 'manage-rename-invalid',
+    label: 'Renaming a Feed, name refused',
+    spec: { colorScheme: 'dark', section: 'manage', renameSheet: 'open', manageWrites: 'invalid' },
+  },
+  {
+    id: 'manage-rename-failed',
+    label: "Renaming a Feed, can't reach the server",
+    spec: { colorScheme: 'light', section: 'manage', renameSheet: 'open', manageWrites: 'fail' },
+  },
 ] as const satisfies readonly CatalogWorld[];
 
 export type ManageWorldId = (typeof MANAGE_WORLDS)[number]['id'];

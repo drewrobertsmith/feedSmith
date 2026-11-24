@@ -1,1 +1,5 @@
-export { ManageFeedsScreen as default } from '@/screens/manage-feeds-screen';
+import { ManageFeedsScreen } from '@/screens/manage-feeds-screen';
+
+export default function ManageFeedsRoute() {
+  return <ManageFeedsScreen />;
+}

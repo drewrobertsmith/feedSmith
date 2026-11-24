@@ -99,6 +99,8 @@ export type WorldSpec = {
   pins?: 'full' | 'two' | 'three' | 'quiet' | 'none';
   /** What Manage Feeds lists. Defaults to `some`: one Pinned Feed, one not working. */
   manage?: 'some' | 'pinned' | 'none' | 'loading';
+  /** Calm Notes' rename sheet starts open over Manage Feeds (the state gallery; tests tap Rename). */
+  renameSheet?: 'open';
   /** Manage Feeds' writes don't reach the server, or the server refuses the name. */
   manageWrites?: 'fail' | 'invalid';
   /** The Article the Reading view opens. Defaults to one with every kind of block. */
