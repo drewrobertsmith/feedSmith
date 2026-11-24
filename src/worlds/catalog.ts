@@ -80,6 +80,8 @@ export const ADD_FEED_WORLDS = [
   { id: 'add-find-following', label: 'Found one you follow', spec: { colorScheme: 'light', section: 'add-feed', addFeed: 'find-following' } },
   { id: 'add-find-nothing', label: 'Nothing found', spec: { colorScheme: 'dark', section: 'add-feed', addFeed: 'find-nothing' } },
   { id: 'add-find-failed', label: 'Search failed', spec: { colorScheme: 'light', section: 'add-feed', addFeed: 'find-failed' } },
+  // Guessing searches used up for now (FEE-88), with what the catalog already knew still listed.
+  { id: 'add-find-limited', label: 'Searches used up', spec: { colorScheme: 'dark', section: 'add-feed', addFeed: 'find-limited' } },
   {
     id: 'add-find-largest-font',
     label: 'Found, largest font size',

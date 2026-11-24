@@ -150,7 +150,7 @@ function useArticle(id: string): ArticleView {
 }
 
 /** A search for a site's name under way or done (FEE-80); `id` tells a newer search from an older one's answer. */
-type Search = { id: number; name: string; also: string[]; searching: boolean; failed: boolean };
+type Search = { id: number; name: string; also: string[]; searching: boolean; failed: boolean; limited: boolean };
 
 function useAddFeed() {
   const addFeed = useAction(api.feeds.add);
@@ -174,12 +174,12 @@ function useAddFeed() {
   const find = (name: string) => {
     const id = ++searches.current;
     setView({ status: 'idle' });
-    setSearch({ id, name, also: [], searching: true, failed: false });
+    setSearch({ id, name, also: [], searching: true, failed: false, limited: false });
     // An answer for an older search, or one retired by leaving the screen, changes nothing (Q20).
     const settle = (change: Partial<Search>) => setSearch((now) => (now?.id === id ? { ...now, searching: false, ...change } : now));
     findFeeds({ name }).then(
       // Proven Feeds the search index missed (a typo) are asked for by address.
-      ({ found }) => settle({ also: found }),
+      ({ found, limited }) => settle({ also: found, limited: limited === true }),
       () => settle({ failed: true }),
     );
   };
@@ -223,7 +223,7 @@ function useAddFeed() {
     name: search.name,
     results: shown ?? [],
     // Still searching until `find` answers and the first results are in, unless it failed.
-    phase: search.failed ? 'failed' : search.searching || shown === null ? 'searching' : 'done',
+    phase: search.failed ? 'failed' : search.limited ? 'limited' : search.searching || shown === null ? 'searching' : 'done',
   };
   return { view: found, add };
 }

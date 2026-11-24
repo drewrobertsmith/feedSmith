@@ -98,9 +98,14 @@ function FoundList({ view, onChoose }: { view: Extract<AddFeedView, { status: 'f
   );
 }
 
-/** Why a search for a name came to nothing, or null while there's something to show. */
+/** Guessing searches used up for now (FEE-88): said calmly, with the way that always works. */
+const LIMITED = 'Try again in a few minutes. You can still paste the site’s address.';
+
+/** Why a search for a name came to nothing or stopped short, or null while there's nothing to say. */
 function findMessage(view: AddFeedView): string | null {
-  if (view.status !== 'found' || view.phase === 'searching' || view.results.length > 0) return null;
+  if (view.status !== 'found') return null;
+  if (view.phase === 'limited') return LIMITED;
+  if (view.phase === 'searching' || view.results.length > 0) return null;
   return view.phase === 'failed' ? `Couldn’t search just now. ${PASTE}` : `No feeds found for “${view.name}”. ${PASTE}`;
 }
 
@@ -187,7 +192,10 @@ export function AddFeedScreen() {
             ))}
           </View>
         ) : null}
-        {view.status === 'found' && error === null ? <FoundList view={view} onChoose={choose} /> : null}
+        {/* What the catalog already knew stays listed under a limit message (FEE-88). */}
+        {view.status === 'found' && (error === null || (view.phase === 'limited' && view.results.length > 0)) ? (
+          <FoundList view={view} onChoose={choose} />
+        ) : null}
         <AppButton
           label={adding ? 'Adding…' : searching ? 'Finding…' : byName ? 'Find Feeds' : 'Add Feed'}
           onPress={submit}
