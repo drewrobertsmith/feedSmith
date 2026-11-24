@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import Reanimated, { Easing, Keyframe, LayoutAnimationConfig, LinearTransition, ReduceMotion } from 'react-native-reanimated';
 
+import { AppSymbol } from '@/components/app-symbol';
 import { AppText } from '@/components/app-text';
 import { DepthPressable, useControlFace } from '@/components/depth-pressable';
 import { FeedIcon } from '@/components/feed-icon';
@@ -14,7 +15,7 @@ import { useEnvironment } from '@/environment';
 import type { FeedChip } from '@/feeds/feeds-data';
 import { usePin } from '@/feeds/use-pin';
 import { PINNED } from '../../convex/lib/pinned';
-import { chipLabel, fadeRanges, hasPinnedView, revealOffset, transparent } from '@/screens/chip-row-layout';
+import { chipLabel, chipTone, fadeRanges, hasPinnedView, revealOffset, transparent, type ChipTone } from '@/screens/chip-row-layout';
 import { motion } from '@/theme/motion';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
@@ -52,27 +53,25 @@ const FADE = spacing.section;
 /** Something a chip offers TalkBack besides choosing it (Q15): Pin, Unpin, Expand, Collapse. */
 type ChipAction = { name: string; label: string; run: () => void };
 
-/** One chip: a tab in the row. Chosen, it's raised with a Gold label (D5, D27) and springs into place (D7). */
+/**
+ * One chip: a tab in the row. Chosen, it's raised (D27) and springs into place (D7); what it shows, in `chipTone`'s
+ * colour (Gold when chosen, D5), is its children: a Feed's icon and name, or the Pinned chip's glyph and icons.
+ */
 function Chip({
-  label,
   accessibleName,
   selected,
-  active = false,
   expanded,
-  icon,
+  children,
   onPress,
   onLongPress,
   actions,
   onLayout,
 }: {
-  label: string;
   accessibleName: string;
   selected: boolean;
-  /** The Pinned chip while one of its Feeds is chosen: shown as the active group, never Gold (D5, FEE-60). */
-  active?: boolean;
   /** The Pinned chip's group, open or folded (FEE-60). */
   expanded?: boolean;
-  icon?: React.ReactNode;
+  children: React.ReactNode;
   onPress: () => void;
   onLongPress?: () => void;
   actions?: ChipAction[];
@@ -114,23 +113,39 @@ function Chip({
         onAccessibilityAction={(event) => {
           actions?.find((action) => action.name === event.nativeEvent.actionName)?.run();
         }}
-        // Every chip is an object, not an outline (FEE-74, D27): soft, the chosen one raised with its Gold label
-        // (D5), and one under the finger sinks to pressed. Unchosen labels stay muted so the row never competes with
-        // the Articles (FEE-44); the label is what identifies a chip, at 4.5:1 on every face (Q14, D26).
-        // Active (a Pinned Feed chosen): full-strength text, so the group reads as the one you're in.
+        // Every chip is an object, not an outline (FEE-74, D27): soft, the chosen one raised, and one under the finger
+        // sinks to pressed. Its label or glyph identifies it, at 4.5:1 or 3:1 on every face (Q14, D26).
         className="flex-row items-center gap-inside rounded-full px-group py-related"
       >
-        {icon}
-        <AppText
-          variant="label"
-          className={selected ? 'text-accent' : active ? 'text-text' : 'text-text-muted'}
-          accessible={false}
-          numberOfLines={1}
-        >
-          {chipLabel(label)}
-        </AppText>
+        {children}
       </DepthPressable>
     </Animated.View>
+  );
+}
+
+const TONE_CLASS: Record<ChipTone, string> = { accent: 'text-accent', text: 'text-text', textMuted: 'text-text-muted' };
+
+/** A chip's words: TalkBack hears the chip's own name instead. */
+function ChipLabel({ label, tone }: { label: string; tone: ChipTone }) {
+  return (
+    <AppText variant="label" className={TONE_CLASS[tone]} accessible={false} numberOfLines={1}>
+      {label}
+    </AppText>
+  );
+}
+
+/** The Pinned chip's push-pin (FEE-84), in the label's colour and size, growing with the type (Q16). */
+function PinnedGlyph({ tone }: { tone: ChipTone }) {
+  const { colorScheme } = useEnvironment();
+  return (
+    <AppSymbol
+      testID="pinned-glyph"
+      name={{ ios: 'pin.fill', android: 'push_pin' }}
+      size={ICON}
+      tintColor={themes[colorScheme][tone]}
+      importantForAccessibility="no-hide-descendants"
+      accessibilityElementsHidden
+    />
   );
 }
 
@@ -175,17 +190,29 @@ export function ChipRow({
   chips,
   selected,
   onSelect,
+  initiallyHidden = false,
 }: {
   chips: FeedChip[];
   /** The chosen Feed's id, `PINNED` for the Pinned view, or null for All. */
   selected: string | null;
   onSelect: (feedId: string | null) => void;
+  /** With Pinned chosen, its group starts hidden (the state gallery; tests tap the chip). */
+  initiallyHidden?: boolean;
 }) {
   const pin = usePin();
   const pinned = chips.filter((chip) => chip.pinned);
-  // The Pinned group (FEE-60): open while Pinned or one of its Feeds is chosen, folded otherwise; no state of its own.
+  const onPinned = selected === PINNED;
+  // Tapping the chosen Pinned chip hides or shows its group (FEE-84): screen state only, so every new choice
+  // (a tap, a link, restoring) starts with it shown. Reset as the choice changes, during render.
+  const [hidden, setHidden] = useState(initiallyHidden);
+  const [hiddenFor, setHiddenFor] = useState(selected);
+  if (hiddenFor !== selected) {
+    setHiddenFor(selected);
+    setHidden(false);
+  }
+  // The Pinned group (FEE-60): open while Pinned (unless hidden) or one of its Feeds is chosen, folded otherwise.
   const grouped = hasPinnedView(chips);
-  const groupOpen = grouped && (selected === PINNED || pinned.some((chip) => chip.id === selected));
+  const groupOpen = grouped && ((onPinned && !hidden) || pinned.some((chip) => chip.id === selected));
   const shownChips = grouped && !groupOpen ? chips.filter((chip) => !chip.pinned) : chips;
   const { colorScheme, reduceMotion } = useEnvironment();
   const background = themes[colorScheme].background;
@@ -244,26 +271,36 @@ export function ChipRow({
         {/* The row draws still the first time; only a real reveal moves (FEE-60). */}
         <LayoutAnimationConfig skipEntering>
           <Chip
-            label="All"
             accessibleName="All"
             selected={selected === null}
             onPress={() => onSelect(null)}
             onLayout={(event) => chipAt.current.set('', event.nativeEvent.layout)}
-          />
+          >
+            <ChipLabel label="All" tone={chipTone({ selected: selected === null })} />
+          </Chip>
           {/* Two or more Pinned Feeds read together, right after All (FEE-59). It names them for TalkBack. */}
           {grouped ? (
             <Chip
-              label="Pinned"
               accessibleName={`Pinned: ${pinned.map((chip) => chip.title).join(', ')}`}
-              icon={<PinnedStack chips={pinned} />}
-              selected={selected === PINNED}
-              active={groupOpen && selected !== PINNED}
+              selected={onPinned}
               expanded={groupOpen}
-              onPress={() => onSelect(PINNED)}
-              // Open and folded follow the chosen view (FEE-60): expanding chooses Pinned, collapsing chooses All.
-              actions={[groupOpen ? { name: 'collapse', label: 'Collapse', run: () => onSelect(null) } : { name: 'expand', label: 'Expand', run: () => onSelect(PINNED) }]}
+              // Chosen already, a tap hides or shows the group and you keep reading Pinned; otherwise it chooses Pinned,
+              // which always opens the group (FEE-84).
+              onPress={() => (onPinned ? setHidden((now) => !now) : onSelect(PINNED))}
+              // TalkBack's actions follow the tap's rules: on chosen Pinned they hide and show; elsewhere Expand
+              // chooses Pinned and Collapse (a Pinned Feed chosen) chooses All, as before (FEE-60).
+              actions={[
+                groupOpen
+                  ? { name: 'collapse', label: 'Collapse', run: () => (onPinned ? setHidden(true) : onSelect(null)) }
+                  : { name: 'expand', label: 'Expand', run: () => (onPinned ? setHidden(false) : onSelect(PINNED)) },
+              ]}
               onLayout={(event) => chipAt.current.set(PINNED, event.nativeEvent.layout)}
-            />
+            >
+              {/* No word (FEE-84): a push-pin sets it apart from a Feed's chip without relying on colour, then its
+                  Feeds' icons. Active while one of its Feeds is chosen (FEE-60). */}
+              <PinnedGlyph tone={chipTone({ selected: onPinned, active: groupOpen && !onPinned })} />
+              <PinnedStack chips={pinned} />
+            </Chip>
           ) : null}
           {/* Every chip stays mounted: the reveal needs each one measured, and a person's Feeds are tens of small pills. */}
           {/* react-doctor-disable-next-line react-doctor/rn-no-scrollview-mapped-list */}
@@ -281,14 +318,15 @@ export function ChipRow({
               onLayout={(event) => chipAt.current.set(chip.id, event.nativeEvent.layout)}
             >
               <Chip
-                label={chip.title}
                 accessibleName={chip.pinned ? `${chip.title}, Pinned` : chip.title}
                 selected={selected === chip.id}
-                icon={<FeedIcon key={chip.faviconUrl} url={chip.faviconUrl} title={chip.title} size={ICON} fallback="none" />}
                 onPress={() => onSelect(chip.id)}
                 onLongPress={() => void togglePin(chip)}
                 actions={[{ name: 'pin', label: chip.pinned ? 'Unpin' : 'Pin', run: () => void togglePin(chip) }]}
-              />
+              >
+                <FeedIcon key={chip.faviconUrl} url={chip.faviconUrl} title={chip.title} size={ICON} fallback="none" />
+                <ChipLabel label={chipLabel(chip.title)} tone={chipTone({ selected: selected === chip.id })} />
+              </Chip>
             </Reanimated.View>
           ))}
         </LayoutAnimationConfig>

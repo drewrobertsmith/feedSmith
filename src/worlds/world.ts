@@ -98,6 +98,8 @@ export type WorldSpec = {
    * Notes are Pinned, so the Pinned chip shows (FEE-59). `quiet`: two Pinned Feeds with nothing new.
    */
   pins?: 'full' | 'two' | 'three' | 'quiet' | 'none';
+  /** With Pinned chosen, its group starts hidden (FEE-84; the state gallery; tests tap the chip). */
+  pinnedGroup?: 'hidden';
   /** What Manage Feeds lists. Defaults to `some`: one Pinned Feed, one not working. */
   manage?: 'some' | 'pinned' | 'none' | 'loading';
   /** Calm Notes' rename sheet starts open over Manage Feeds (the state gallery; tests tap Rename). */

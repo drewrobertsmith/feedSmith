@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react-native';
+import { render, screen, userEvent } from '@testing-library/react-native';
 
 import { UndoProvider } from '@/components/undo-toast';
 import { EnvironmentProvider } from '@/environment';
@@ -108,5 +108,24 @@ describe('with Remove animations on, the Pinned group opens and folds with no an
   test.each([PINNED, null])('selected %s', async (selected) => {
     await render(<Still selected={selected} />);
     for (const tab of screen.getAllByRole('tab').slice(2)) expect(animationsOf(tab).filter(Boolean)).toEqual([]);
+  });
+
+  // FEE-84: hiding and showing the group from the chosen Pinned chip are the same reveal, so just as still.
+  test('hiding and showing the group from the chosen Pinned chip', async () => {
+    const user = userEvent.setup();
+    await render(<Still selected={PINNED} />);
+    await user.press(screen.getByRole('tab', { name: /^Pinned:/ }));
+    expect(names()).toEqual(['All', 'Pinned: The Verge, Daring Fireball', 'Calm Notes']);
+    for (const tab of screen.getAllByRole('tab').slice(2)) expect(animationsOf(tab).filter(Boolean)).toEqual([]);
+    await user.press(screen.getByRole('tab', { name: /^Pinned:/ }));
+    expect(names()).toEqual(['All', 'Pinned: The Verge, Daring Fireball', 'The Verge, Pinned', 'Daring Fireball, Pinned', 'Calm Notes']);
+    for (const tab of screen.getAllByRole('tab').slice(2)) expect(animationsOf(tab).filter(Boolean)).toEqual([]);
+  });
+
+  test('with motion on, hiding the group does animate (so the check above can fail)', async () => {
+    const user = userEvent.setup();
+    await render(<Row chips={row(['f1', 'f3'])} selected={PINNED} />);
+    await user.press(screen.getByRole('tab', { name: /^Pinned:/ }));
+    expect(animationsOf(screen.getByRole('tab', { name: 'Calm Notes' })).filter(Boolean).length).toBeGreaterThan(0);
   });
 });
