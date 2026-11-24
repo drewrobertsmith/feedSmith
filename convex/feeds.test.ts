@@ -50,7 +50,7 @@ describe('signed out (Q10)', () => {
 describe('adding a Feed', () => {
   test("fetches it at once, and its Articles appear in All, newest first, with the Feed's name", async () => {
     const { a } = await setup();
-    expect(await a.action(api.feeds.add, { url: FEED_URL })).toEqual({ ok: true });
+    expect(await a.action(api.feeds.add, { url: FEED_URL })).toMatchObject({ ok: true });
     expect(network.mock.calls[0][0]).toBe(FEED_URL.replace('www.theverge.com', 'www.theverge.com'));
 
     const all = await a.query(api.articles.all, {});
@@ -144,8 +144,28 @@ describe('each User reads only their own Articles (Q10)', () => {
   test('two Users can follow the same Feed, each with their own copy', async () => {
     const { a, b } = await setup();
     await a.action(api.feeds.add, { url: FEED_URL });
-    expect(await b.action(api.feeds.add, { url: FEED_URL })).toEqual({ ok: true });
+    expect(await b.action(api.feeds.add, { url: FEED_URL })).toMatchObject({ ok: true });
     expect(await b.query(api.articles.all, {})).toHaveLength(3);
+  });
+
+  test("a new Feed is answered with its id, always the caller's own, so the app can open its chip (FEE-45)", async () => {
+    const { t, a, b } = await setup();
+    const owner = (feedId: Id<'feeds'>) => t.run(async (ctx) => (await ctx.db.get(feedId))?.userId);
+    const users = await t.run((ctx) => ctx.db.query('users').take(2));
+    const [userA, userB] = users.map((user) => user._id);
+
+    const added = await a.action(api.feeds.add, { url: FEED_URL });
+    if (!added.ok) throw new Error('not added');
+    expect(await owner(added.feedId)).toBe(userA);
+
+    // The other User adding the same URL gets their own Feed's id, never the first User's.
+    const theirs = await b.action(api.feeds.add, { url: FEED_URL });
+    if (!theirs.ok) throw new Error('not added');
+    expect(theirs.feedId).not.toBe(added.feedId);
+    expect(await owner(theirs.feedId)).toBe(userB);
+
+    // Adding it again answers with the same Feed, already followed.
+    expect(await a.action(api.feeds.add, { url: FEED_URL })).toMatchObject({ reason: 'already-added', feedId: added.feedId });
   });
 });
 
@@ -257,7 +277,7 @@ describe('finding a Feed from a website (T21)', () => {
       'https://www.site.example.com/': () => html(SITE_HEAD),
       'https://www.site.example.com/rss.xml': () => rssOf('Site Example – Everything, all the time'),
     });
-    expect(await a.action(api.feeds.add, { url: 'site.example.com' })).toEqual({ ok: true });
+    expect(await a.action(api.feeds.add, { url: 'site.example.com' })).toMatchObject({ ok: true });
     const [row] = await a.query(api.articles.all, {});
     expect(row).toMatchObject({ title: 'Post', feedTitle: 'Site Example', faviconUrl: 'https://www.site.example.com/touch.png' });
   });
@@ -280,7 +300,7 @@ describe('finding a Feed from a website (T21)', () => {
       ],
     });
     expect(await t.run((ctx) => ctx.db.query('feeds').take(1))).toEqual([]);
-    expect(await a.action(api.feeds.add, { url: 'https://site.example.com/reviews.atom' })).toEqual({ ok: true });
+    expect(await a.action(api.feeds.add, { url: 'https://site.example.com/reviews.atom' })).toMatchObject({ ok: true });
   });
 
   test("a site whose one feed you already follow says so, by the Feed's name, without fetching the feed again", async () => {
@@ -329,14 +349,14 @@ describe('finding a Feed from a website (T21)', () => {
       'https://www.site.example.com/rss.xml': () => rssOf('Site Example – Everything, all the time'),
       'https://www.site.example.com/': () => html(SITE_HEAD),
     });
-    expect(await a.action(api.feeds.add, { url: 'https://www.site.example.com/rss.xml' })).toEqual({ ok: true });
+    expect(await a.action(api.feeds.add, { url: 'https://www.site.example.com/rss.xml' })).toMatchObject({ ok: true });
     expect((await a.query(api.articles.all, {}))[0].feedTitle).toBe('Site Example');
   });
 
   test("when the homepage can't be read, the Feed keeps its own title", async () => {
     const { a } = await setup();
     route({ 'https://www.site.example.com/rss.xml': () => rssOf('Own Title') });
-    expect(await a.action(api.feeds.add, { url: 'https://www.site.example.com/rss.xml' })).toEqual({ ok: true });
+    expect(await a.action(api.feeds.add, { url: 'https://www.site.example.com/rss.xml' })).toMatchObject({ ok: true });
     expect((await a.query(api.articles.all, {}))[0].feedTitle).toBe('Own Title');
   });
 
@@ -361,7 +381,7 @@ describe('what adding a Feed teaches the catalog (FEE-80, T35)', () => {
 
   test('a typed subscriber feed URL with a token never reaches the catalog', async () => {
     const { t, a } = await setup();
-    expect(await a.action(api.feeds.add, { url: FEED_URL })).toEqual({ ok: true });
+    expect(await a.action(api.feeds.add, { url: FEED_URL })).toMatchObject({ ok: true });
     expect(await catalog(t)).toEqual([]);
     expect(JSON.stringify(await a.query(api.catalog.search, { name: 'the verge' }))).not.toContain('SECRET');
   });
@@ -372,14 +392,14 @@ describe('what adding a Feed teaches the catalog (FEE-80, T35)', () => {
       'https://site.example.com/members?token=SECRET': () => home(DECLARES.replace('/rss.xml', '/rss.xml?token=SECRET')),
       'https://site.example.com/rss.xml?token=SECRET': () => new Response(verge),
     });
-    expect(await a.action(api.feeds.add, { url: 'https://site.example.com/members?token=SECRET' })).toEqual({ ok: true });
+    expect(await a.action(api.feeds.add, { url: 'https://site.example.com/members?token=SECRET' })).toMatchObject({ ok: true });
     expect(await catalog(t)).toEqual([]);
   });
 
   test("a site's homepage declaring one feed: once it's added, a search by the site's name finds it without fetching", async () => {
     const { t, a, b } = await setup();
     route({ 'https://site.example.com/': () => home(DECLARES), 'https://site.example.com/rss.xml': () => new Response(verge) });
-    expect(await a.action(api.feeds.add, { url: 'site.example.com' })).toEqual({ ok: true });
+    expect(await a.action(api.feeds.add, { url: 'site.example.com' })).toMatchObject({ ok: true });
     const [entry] = await catalog(t);
     expect(entry).toMatchObject({ url: 'https://site.example.com/rss.xml', name: 'Site Example', source: 'declared', iconUrl: 'https://site.example.com/icon.png' });
     network.mockClear();

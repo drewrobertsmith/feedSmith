@@ -57,7 +57,7 @@ async function setup() {
 /** User A follows a Feed that starts with these Articles. */
 async function follow(s: Awaited<ReturnType<typeof setup>>, items: { guid: string; ago: number }[], headers = {}) {
   network.mockImplementation(async () => new Response(rss(items), { headers }));
-  expect(await s.a.action(api.feeds.add, { url: URL_A })).toEqual({ ok: true });
+  expect(await s.a.action(api.feeds.add, { url: URL_A })).toMatchObject({ ok: true });
   const stored = await s.t.run(async (ctx) => (await ctx.db.query('feeds').first())!);
   return (await feedOf(s, stored._id))!;
 }

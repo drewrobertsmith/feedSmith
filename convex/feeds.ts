@@ -24,14 +24,15 @@ const PULL_LIMIT = 200;
 const PULL_CONCURRENCY = 4;
 
 const vAddResult = v.union(
-  v.object({ ok: v.literal(true) }),
+  /** Added: the new Feed, by its id, so the app can open its chip (FEE-45). */
+  v.object({ ok: v.literal(true), feedId: v.id('feeds') }),
   v.object({ ok: v.literal(false), reason: vAddFeedReason }),
   v.object({ ok: v.literal(false), reason: v.literal('choose'), choices: v.array(vFeedChoice) }),
   /** A Feed the User already follows, by the same URL: the app takes them back to it, by name. */
   v.object({ ok: v.literal(false), reason: v.literal('already-added'), title: v.string(), feedId: v.id('feeds') }),
 );
 type AddResult =
-  | { ok: true }
+  | { ok: true; feedId: Id<'feeds'> }
   | { ok: false; reason: AddFeedReason }
   | { ok: false; reason: 'choose'; choices: FeedLink[] }
   | { ok: false; reason: 'already-added'; title: string; feedId: Id<'feeds'> };
@@ -124,7 +125,11 @@ export const add = action({
       now: Date.now(),
       ...outcome.validators,
     });
-    return stored === null ? { ok: true } : { ok: false, reason: 'already-added', ...stored };
+    if (stored === null) {
+      // The Account was deleted while this add was fetching: nothing was stored, and no one is left to tell.
+      return { ok: false, reason: 'unreachable' };
+    }
+    return stored.added ? { ok: true, feedId: stored.feedId } : { ok: false, reason: 'already-added', title: stored.title, feedId: stored.feedId };
   },
 });
 
@@ -210,19 +215,20 @@ export const store = internalMutation({
     now: v.number(),
     ...vValidators,
   },
-  returns: vFollowed,
+  // The Feed now followed at this URL: `added` when this call created it. Null when the Account is gone.
+  returns: v.union(v.null(), v.object({ title: v.string(), feedId: v.id('feeds'), added: v.boolean() })),
   handler: async (ctx, { userId, url, title, siteUrl, iconUrl, articles, now, etag, lastModified }) => {
     const existing = await ctx.db
       .query('feeds')
       .withIndex('by_user_url', (q) => q.eq('userId', userId).eq('url', url))
       .first();
-    if (existing) return { title: existing.title, feedId: existing._id };
+    if (existing) return { title: existing.title, feedId: existing._id, added: false };
     // The Account was deleted while this add was fetching: store nothing for it (P18, Q28).
     if ((await ctx.db.get(userId)) === null) return null;
     const feedId = await ctx.db.insert('feeds', { userId, url, title, siteUrl, iconUrl });
     await storeNewArticles(ctx, userId, feedId, articles, now);
     await markWorking(ctx, feedId, now, { etag, lastModified });
-    return null;
+    return { title, feedId, added: true };
   },
 });
 
