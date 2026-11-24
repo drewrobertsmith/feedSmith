@@ -5,6 +5,8 @@
  */
 export const palette = {
   midnight: '#1D2532',
+  /** A step darker than Midnight: the face of something set into the page (FEE-83). */
+  midnightDeep: '#161C27',
   /** Between Midnight and Navy: the face of a soft control on Midnight (FEE-74). */
   dusk: '#272F40',
   navy: '#333D5F',
