@@ -42,6 +42,7 @@ export const depth: Record<ThemeName, Record<DepthLevel, Layers>> = {
     soft: { face: palette.paper, shadow: { y: 1, blur: 2, alpha: 0.16 } },
     raised: { face: palette.paperRaised, shadow: { y: 3, blur: 10, alpha: 0.24 } },
     pressed: { face: palette.sand, shadow: { y: 0, blur: 0, alpha: 0 } },
+    // Sand, like pressed: on cream both are below the page; inset alone has the inner shadow (D34).
     inset: { face: palette.sand, shadow: { y: 2, blur: 4, alpha: 0.14, inset: true } },
   },
 };
