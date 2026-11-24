@@ -109,6 +109,16 @@ function findMessage(view: AddFeedView): string | null {
   return view.phase === 'failed' ? `Couldn’t search just now. ${PASTE}` : `No feeds found for “${view.name}”. ${PASTE}`;
 }
 
+/**
+ * The search whose results to list, or null: none under a message, except a limit message (FEE-88),
+ * under which what the catalog already knew stays listed.
+ */
+function listedSearch(view: AddFeedView, message: string | null) {
+  if (view.status !== 'found') return null;
+  if (message === null) return view;
+  return view.phase === 'limited' && view.results.length > 0 ? view : null;
+}
+
 /** Back to Feeds with a followed Feed's chip chosen, and a quiet note naming it (T22). */
 function showFollowed(title: string, feedId: string) {
   ToastAndroid.show(`You already follow ${title}.`, ToastAndroid.SHORT);
@@ -130,6 +140,7 @@ export function AddFeedScreen() {
   const byName = typed.trim() !== '' && !isAddress(typed);
   const field = typeScale.reading;
   const error = view.status === 'error' ? ERRORS[view.reason] : findMessage(view);
+  const listed = listedSearch(view, error);
 
   const addFrom = async (address: string) => {
     if (!address.trim() || adding || searching) return;
@@ -192,10 +203,7 @@ export function AddFeedScreen() {
             ))}
           </View>
         ) : null}
-        {/* What the catalog already knew stays listed under a limit message (FEE-88). */}
-        {view.status === 'found' && (error === null || (view.phase === 'limited' && view.results.length > 0)) ? (
-          <FoundList view={view} onChoose={choose} />
-        ) : null}
+        {listed ? <FoundList view={listed} onChoose={choose} /> : null}
         <AppButton
           label={adding ? 'Adding…' : searching ? 'Finding…' : byName ? 'Find Feeds' : 'Add Feed'}
           onPress={submit}
