@@ -6,7 +6,6 @@ import { Uniwind } from 'uniwind';
 import TabsLayout from '@/app/(tabs)/_layout';
 import FeedsRoute from '@/app/(tabs)/index';
 import SavedRoute from '@/app/(tabs)/saved';
-import AddFeedRoute from '@/app/add-feed';
 import ArticleRoute from '@/app/article/[id]';
 import ManageFeedsRoute from '@/app/manage-feeds';
 import { NativeSheet } from '@/components/native-sheet';
@@ -25,7 +24,6 @@ async function open(spec: WorldSpec) {
       '(tabs)/_layout': TabsLayout,
       '(tabs)/index': FeedsRoute,
       '(tabs)/saved': SavedRoute,
-      'add-feed': AddFeedRoute,
       'article/[id]': ArticleRoute,
       'manage-feeds': ManageFeedsRoute,
     },

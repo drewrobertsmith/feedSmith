@@ -416,7 +416,7 @@ export type World = {
   feeds: FeedsData;
   feedsLog: FeedsLog;
   /** Where the router starts. */
-  initialUrl: '/' | '/saved' | '/sign-in' | '/add-feed' | '/manage-feeds' | `/article/${string}` | `/?feed=${string}`;
+  initialUrl: '/' | '/saved' | '/sign-in' | '/manage-feeds' | `/article/${string}` | `/?feed=${string}`;
   /** Puts back what the world changed: the theme follows the phone again. */
   dispose: () => void;
 };
@@ -469,7 +469,8 @@ export function worldAuth(spec: WorldSpec, log: SignInLog = emptySignInLog()): A
 const SECTION_URLS = {
   feeds: '/',
   saved: '/saved',
-  'add-feed': '/add-feed',
+  // Adding a Feed is a sheet over Feeds (FEE-45): tests tap +, the gallery opens it at once.
+  'add-feed': '/',
   manage: '/manage-feeds',
   article: `/article/${FIXTURE_ROWS[0].id}`,
 } as const satisfies Record<NonNullable<WorldSpec['section']>, World['initialUrl']>;

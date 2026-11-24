@@ -11,6 +11,7 @@ import type { getAnimatedStyle as GetAnimatedStyle } from 'react-native-reanimat
 import * as WebBrowser from 'expo-web-browser';
 import { Uniwind } from 'uniwind';
 
+import { NativeSheet } from '@/components/native-sheet';
 import { publishedAgo, publishedDate } from '@/feeds/format';
 import { depthStyle } from '@/theme/depth';
 import { spacing } from '@/theme/spacing';
@@ -438,11 +439,13 @@ describe('All', () => {
   test.each([
     ['the empty state', 'none'],
     ['the top bar', 'some'],
-  ] as const)('Add a Feed in %s opens the Add Feed screen', async (_where, feeds) => {
+  ] as const)('Add a Feed in %s opens the add sheet over Feeds, which stays behind it (FEE-45, Q32)', async (_where, feeds) => {
     const user = userEvent.setup();
     await open({ colorScheme: 'dark', feeds });
     await user.press(await screen.findByRole('button', { name: 'Add a Feed' }));
-    expect(await screen.findByRole('heading', { name: 'Add a Feed' })).toBeOnTheScreen();
+    expect(jest.mocked(NativeSheet)).toHaveBeenLastCalledWith(expect.objectContaining({ open: true }), undefined);
+    expect(within(screen.getByTestId('add-feed-sheet')).getByRole('heading', { name: 'Add a Feed' })).toBeOnTheScreen();
+    expect(screen.getByRole('heading', { name: 'Feeds' })).toBeOnTheScreen();
   });
 
   describe('swiping a row left in Feeds (FEE-30)', () => {
@@ -777,8 +780,18 @@ describe("the Pinned chip's stacked icons (FEE-61)", () => {
   });
 });
 
-describe('Add a Feed', () => {
+describe('Add a Feed, in its sheet over Feeds (FEE-45)', () => {
   const FIELD = 'Website, feed URL or name';
+  /** Opens a world on Feeds and taps Add a Feed (the + or the empty state's button): the sheet rises. */
+  const openSheet = async (spec: WorldSpec) => {
+    const w = await open(spec);
+    await userEvent.press(await screen.findByRole('button', { name: 'Add a Feed' }));
+    return w;
+  };
+  const sheet = () => screen.getByTestId('add-feed-sheet');
+  const sheetOpen = (open: boolean) =>
+    expect(jest.mocked(NativeSheet)).toHaveBeenLastCalledWith(expect.objectContaining({ open }), undefined);
+  beforeEach(() => jest.mocked(NativeSheet).mockClear());
   const ERRORS = {
     'not-a-feed': 'That address isn’t an RSS or Atom feed. Try the site’s feed URL.',
     unreachable: 'Couldn’t reach that address. Check it, or enter the site’s feed URL.',
@@ -823,8 +836,9 @@ describe('Add a Feed', () => {
 
   test.each(ADD_FEED_WORLDS)('$label', async ({ id, spec }) => {
     const shows = SHOWS[id];
-    await open(spec);
-    expect(await screen.findByRole('heading', { name: 'Add a Feed' })).toHaveStyle({ fontSize: shows.titleSize });
+    await openSheet(spec);
+    sheetOpen(true);
+    expect(within(sheet()).getByRole('heading', { name: 'Add a Feed' })).toHaveStyle({ fontSize: shows.titleSize });
     const field = screen.getByLabelText(FIELD);
     const button = screen.getByRole('button', { name: shows.button });
     if (shows.button === 'Adding…') {
@@ -846,7 +860,7 @@ describe('Add a Feed', () => {
 
   test('a site with several feeds lists them, each named and placed for TalkBack, and choosing one adds it', async () => {
     const user = userEvent.setup();
-    const w = await open({ colorScheme: 'dark', section: 'add-feed', addFeed: 'choose' });
+    const w = await openSheet({ colorScheme: 'dark', addFeed: 'choose' });
     expect(await screen.findByText('This site has more than one feed. Choose one.')).toBeOnTheScreen();
     const [first] = FIXTURE_CHOICES;
     await user.press(screen.getByRole('button', { name: `${first.title}, theverge.com` }));
@@ -854,19 +868,19 @@ describe('Add a Feed', () => {
   });
 
   test('Add Feed waits for a URL or a name', async () => {
-    await open({ colorScheme: 'dark', section: 'add-feed' });
+    await openSheet({ colorScheme: 'dark' });
     expect(await screen.findByRole('button', { name: 'Add Feed' })).toBeDisabled();
   });
 
   test('a name is searched for, an address is added', async () => {
     const user = userEvent.setup();
-    const w = await open({ colorScheme: 'dark', section: 'add-feed' });
+    const w = await openSheet({ colorScheme: 'dark' });
     const field = await screen.findByLabelText(FIELD);
     await user.type(field, 'the verge');
     await user.press(screen.getByRole('button', { name: 'Find Feeds' }));
     expect(w.feedsLog.added).toEqual(['the verge']);
-    // A name keeps you here, to choose from what's found.
-    expect(screen.getByRole('heading', { name: 'Add a Feed' })).toBeOnTheScreen();
+    // A name keeps the sheet open, to choose from what's found.
+    sheetOpen(true);
     await user.clear(field);
     await user.type(field, 'theverge.com');
     expect(screen.getByRole('button', { name: 'Add Feed' })).toBeEnabled();
@@ -874,55 +888,74 @@ describe('Add a Feed', () => {
 
   test('choosing a found Feed adds it, exactly as choosing a discovered one does', async () => {
     const user = userEvent.setup();
-    const w = await open({ colorScheme: 'dark', section: 'add-feed', addFeed: 'find-known' });
+    const w = await openSheet({ colorScheme: 'dark', addFeed: 'find-known' });
     await user.press(await screen.findByRole('button', { name: NEW[0] }));
     expect(w.feedsLog.added).toEqual([FIXTURE_FOUND[0].kind === 'new' ? FIXTURE_FOUND[0].url : '']);
   });
 
-  test('choosing a found Feed you already follow takes you back to its chip, with a quiet note naming it (T22)', async () => {
+  test('choosing a found Feed you already follow closes the sheet on its chip, with a quiet note naming it (T22)', async () => {
     const toast = jest.spyOn(ToastAndroid, 'show').mockImplementation(() => {});
     const user = userEvent.setup();
-    const w = await open({ colorScheme: 'dark', feeds: 'some', addFeed: 'find-following' });
-    await user.press(await screen.findByRole('button', { name: 'Add a Feed' }));
+    const w = await openSheet({ colorScheme: 'dark', feeds: 'some', addFeed: 'find-following' });
     await user.press(await screen.findByRole('button', { name: FOLLOWING }));
-    expect(await screen.findByRole('heading', { name: 'Feeds' })).toBeOnTheScreen();
+    sheetOpen(false);
     expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName('The Verge, Pinned');
     expect(toast).toHaveBeenCalledWith('You already follow The Verge.', ToastAndroid.SHORT);
     expect(w.feedsLog.added).toEqual([]);
     toast.mockRestore();
   });
 
-  test('adding a Feed sends the URL and returns to All', async () => {
+  test('adding a Feed sends the URL, closes the sheet and opens the new Feed on its chip', async () => {
     const user = userEvent.setup();
-    const w = await open({ colorScheme: 'dark', feeds: 'some' });
-    await user.press(await screen.findByRole('button', { name: 'Add a Feed' }));
+    const w = await openSheet({ colorScheme: 'dark', feeds: 'some' });
     await user.type(await screen.findByLabelText(FIELD), 'https://www.theverge.com/rss/index.xml');
     await user.press(screen.getByRole('button', { name: 'Add Feed' }));
     expect(w.feedsLog.added).toEqual(['https://www.theverge.com/rss/index.xml']);
-    expect(await screen.findByRole('heading', { name: 'Feeds' })).toBeOnTheScreen();
+    sheetOpen(false);
+    expect(await screen.findByRole('tab', { selected: true })).toHaveAccessibleName('Kottke');
   });
 
-  test('a Feed you already follow takes you back to its chip, with a quiet note naming it', async () => {
+  test('the first Feed, added from the empty state, opens on its chip too', async () => {
+    const user = userEvent.setup();
+    await openSheet({ colorScheme: 'dark', feeds: 'none' });
+    await user.type(await screen.findByLabelText(FIELD), 'kottke.org');
+    await user.press(screen.getByRole('button', { name: 'Add Feed' }));
+    sheetOpen(false);
+    expect(await screen.findByRole('tab', { selected: true })).toHaveAccessibleName('Kottke');
+  });
+
+  test('closing the sheet (Back, a swipe) keeps what was typed for the next time it opens', async () => {
+    const user = userEvent.setup();
+    const w = await openSheet({ colorScheme: 'dark', feeds: 'some' });
+    await user.type(await screen.findByLabelText(FIELD), 'kottke');
+    // The native sheet reports every kind of dismissal as onClose.
+    await act(async () => jest.mocked(NativeSheet).mock.lastCall![0].onClose());
+    sheetOpen(false);
+    await user.press(screen.getByRole('button', { name: 'Add a Feed' }));
+    expect(screen.getByLabelText(FIELD)).toHaveDisplayValue('kottke');
+    expect(w.feedsLog.added).toEqual([]);
+  });
+
+  test('a Feed you already follow closes the sheet on its chip, with a quiet note naming it', async () => {
     const toast = jest.spyOn(ToastAndroid, 'show').mockImplementation(() => {});
     const user = userEvent.setup();
-    await open({ colorScheme: 'dark', feeds: 'some', addFeed: 'already' });
-    await user.press(await screen.findByRole('button', { name: 'Add a Feed' }));
+    await openSheet({ colorScheme: 'dark', feeds: 'some', addFeed: 'already' });
     await user.type(await screen.findByLabelText(FIELD), 'theverge.com');
     await user.press(screen.getByRole('button', { name: 'Add Feed' }));
-    expect(await screen.findByRole('heading', { name: 'Feeds' })).toBeOnTheScreen();
+    sheetOpen(false);
     expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName('The Verge, Pinned');
     expect(toast).toHaveBeenCalledWith('You already follow The Verge.', ToastAndroid.SHORT);
     expect(screen.queryByRole('alert')).not.toBeOnTheScreen();
     toast.mockRestore();
   });
 
-  test('a failed add stays on the screen with the URL kept', async () => {
+  test('a failed add keeps the sheet open, with the URL kept', async () => {
     const user = userEvent.setup();
-    const w = await open({ colorScheme: 'dark', section: 'add-feed', addFeed: 'not-a-feed' });
+    const w = await openSheet({ colorScheme: 'dark', addFeed: 'not-a-feed' });
     await user.type(await screen.findByLabelText(FIELD), 'https://example.com/');
     await user.press(screen.getByRole('button', { name: 'Add Feed' }));
     expect(w.feedsLog.added).toEqual(['https://example.com/']);
-    expect(screen.getByRole('heading', { name: 'Add a Feed' })).toBeOnTheScreen();
+    sheetOpen(true);
     expect(screen.getByLabelText(FIELD)).toHaveDisplayValue('https://example.com/');
   });
 });
@@ -1198,7 +1231,7 @@ describe('links into Feeds screens (Q25)', () => {
     expect(await screen.findByRole('heading', { name: FIXTURE_ARTICLE.title })).toBeOnTheScreen();
   });
 
-  test.each(['/article/a1', '/add-feed'])('signed out, %s opens sign-in instead', async (url) => {
+  test.each(['/article/a1', '/manage-feeds'])('signed out, %s opens sign-in instead', async (url) => {
     await open({ colorScheme: 'dark', auth: 'signed-out' }, url);
     expect(await screen.findByRole('heading', { name: 'feedSmith' })).toBeOnTheScreen();
     expect(screen.queryByText('Talks resume next year.')).not.toBeOnTheScreen();
