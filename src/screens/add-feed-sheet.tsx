@@ -128,13 +128,8 @@ export function AddFeedSheet({ open, onClose, onFeed }: { open: boolean; onClose
   const { view, add } = useAddFeed();
   // A search shown on arrival (the state gallery) keeps the name it was for in the field.
   const [typed, setTyped] = useState(() => (view.status === 'found' ? view.name : ''));
-  // Each opening starts the field afresh from what's typed: a closed sheet's field may linger natively.
-  const [openings, setOpenings] = useState(0);
-  const [wasOpen, setWasOpen] = useState(open);
-  if (open !== wasOpen) {
-    setWasOpen(open);
-    if (open) setOpenings(openings + 1);
-  }
+  // The field keeps its own text natively; after an add it starts afresh, empty.
+  const [adds, setAdds] = useState(0);
   const { height } = useWindowDimensions();
   const adding = view.status === 'busy';
   const searching = view.status === 'found' && view.phase === 'searching';
@@ -152,6 +147,7 @@ export function AddFeedSheet({ open, onClose, onFeed }: { open: boolean; onClose
     if (outcome.kind === 'already') followed(outcome.title, outcome.feedId);
     else if (outcome.kind === 'added') {
       setTyped('');
+      setAdds(adds + 1);
       onFeed(outcome.feedId);
     }
   };
@@ -174,7 +170,7 @@ export function AddFeedSheet({ open, onClose, onFeed }: { open: boolean; onClose
               Website, feed URL or name
             </AppText>
             <NativeTextField
-              key={openings}
+              key={adds}
               purpose="address"
               label="Website, feed URL or name"
               placeholder="theverge.com"

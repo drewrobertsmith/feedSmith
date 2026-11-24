@@ -924,6 +924,16 @@ describe('Add a Feed, in its sheet over Feeds (FEE-45)', () => {
     expect(await screen.findByRole('tab', { selected: true })).toHaveAccessibleName('Kottke');
   });
 
+  test('after a Feed is added, the next opening starts empty', async () => {
+    const user = userEvent.setup();
+    await openSheet({ colorScheme: 'dark', feeds: 'some' });
+    await user.type(await screen.findByLabelText(FIELD), 'kottke.org');
+    await user.press(screen.getByRole('button', { name: 'Add Feed' }));
+    sheetOpen(false);
+    await user.press(screen.getByRole('button', { name: 'Add a Feed' }));
+    expect(screen.getByLabelText(FIELD)).toHaveDisplayValue('');
+  });
+
   test('closing the sheet (Back, a swipe) keeps what was typed for the next time it opens', async () => {
     const user = userEvent.setup();
     const w = await openSheet({ colorScheme: 'dark', feeds: 'some' });
