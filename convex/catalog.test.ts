@@ -6,7 +6,7 @@ import { api, internal } from './_generated/api';
 import verge from './lib/feed/fixtures/verge.xml?raw';
 import rateLimiterTest from '@convex-dev/rate-limiter/test';
 import schema from './schema';
-import { GUESSES_PER_HOUR } from './rateLimits';
+import { GUESSES_PER_HOUR, rateLimiter } from './rateLimits';
 
 vi.mock('@convex-dev/auth/server', async (original) => ({
   ...(await original<typeof import('@convex-dev/auth/server')>()),
@@ -352,14 +352,24 @@ describe('limiting guessing searches (FEE-88)', () => {
     expect(fetched().length).toBeGreaterThan(0);
   });
 
-  test('the allowance comes back with time', async () => {
-    vi.useFakeTimers();
+  test('a search racing an Account’s deletion leaves no counter behind (Q28)', async () => {
+    const { t, aId } = await setup();
+    await t.run((ctx) => ctx.db.delete(aId));
+    expect(await t.mutation(internal.catalog.startGuessing, { userId: aId, name: 'the verge' })).toBe('known');
+    const full = await t.run((ctx) => rateLimiter.check(ctx, 'guessingSearch', { key: aId, count: GUESSES_PER_HOUR }));
+    expect(full.ok).toBe(true);
+  });
+
+  test('the allowance comes back with time, one search every few minutes', async () => {
+    // Only the clock is faked: fetches still answer at once.
+    vi.useFakeTimers({ toFake: ['Date'] });
     try {
       const { a } = await setup();
-      for (let i = 0; i <= GUESSES_PER_HOUR; i++) await guess(a);
+      for (let i = 0; i < GUESSES_PER_HOUR; i++) await guess(a);
       expect(await guess(a)).toEqual({ found: [], limited: true });
-      vi.advanceTimersByTime(60 * 60_000);
+      vi.setSystemTime(Date.now() + (60 * 60_000) / GUESSES_PER_HOUR);
       expect(await guess(a)).toEqual({ found: [] });
+      expect(await guess(a)).toEqual({ found: [], limited: true });
     } finally {
       vi.useRealTimers();
     }

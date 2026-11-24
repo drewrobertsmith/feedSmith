@@ -4,7 +4,7 @@ import { Uniwind } from 'uniwind';
 import type { Account, Auth } from '@/auth/auth-context';
 import type { SignInView } from '@/auth/sign-in-outcome';
 import type { Environment } from '@/environment';
-import { isAddress, type AddFeedReason, type AddFeedView, type ArticleRow, type ArticleView, type FeedsData, type FoundFeed, type SavedBefore } from '@/feeds/feeds-data';
+import { isAddress, type AddFeedReason, type AddFeedView, type ArticleRow, type ArticleView, type FeedsData, type FoundFeed, type FoundPhase, type SavedBefore } from '@/feeds/feeds-data';
 import {
   FIXTURE_ACCOUNT,
   FIXTURE_ARTICLE,
@@ -38,7 +38,7 @@ import { PINNED } from '../../convex/lib/pinned';
 
 /** Searching for a site's name, as a world shows it (FEE-80). */
 type FindWorld = 'find-searching' | 'find-arriving' | 'find-known' | 'find-following' | 'find-nothing' | 'find-failed' | 'find-limited';
-const found = (results: FoundFeed[], phase: 'searching' | 'done' | 'failed' | 'limited'): AddFeedView => ({ status: 'found', name: 'the verge', results, phase });
+const found = (results: FoundFeed[], phase: FoundPhase): AddFeedView => ({ status: 'found', name: 'the verge', results, phase });
 const FIND_VIEWS: Record<FindWorld, AddFeedView> = {
   'find-searching': found([], 'searching'),
   'find-arriving': found(FIXTURE_FOUND.slice(0, 1), 'searching'),

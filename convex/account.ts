@@ -14,8 +14,10 @@ import { rateLimiter } from './rateLimits';
  * time. It takes no arguments, so it can only ever delete the caller's own Account (Q10).
  *
  * Convex Auth keeps sessions and the Google link in its own components, so they're deleted
- * through those components' functions (T25), and so is their guessing-search counter (FEE-88). The core's `createdUserIds` row has none yet and
+ * through those components' functions (T25). The core's `createdUserIds` row has none yet and
  * stays; it holds only the old id (convex/convex-auth#935).
+ *
+ * The rate limiter's guessing-search counter, keyed by the User's id, is reset too (FEE-88).
  */
 export const deleteAccount = mutation({
   args: {},
@@ -44,7 +46,6 @@ export const deleteAccount = mutation({
     await ctx.runMutation(components.auth.public.revokeSessions, {
       sessionIds: sessions.map((session) => session.sessionId),
     });
-    // Their guessing-search counter is keyed by their id: it goes too (FEE-88, Q28).
     await rateLimiter.reset(ctx, 'guessingSearch', { key: userId });
 
     await ctx.db.delete(userId);

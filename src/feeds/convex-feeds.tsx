@@ -10,6 +10,7 @@ import {
   isAddress,
   type AddFeedView,
   type FoundFeed,
+  type FoundPhase,
   type AddOutcome,
   type AllView,
   type ArticleView,
@@ -158,6 +159,12 @@ type Search = {
   answer: 'pending' | 'done' | 'failed' | 'limited';
 };
 
+/** The search's phase: still searching until `find` answers and the first results are in, unless it failed or was limited. */
+function phaseOf(answer: Search['answer'], resultsIn: boolean): FoundPhase {
+  if (answer === 'failed' || answer === 'limited') return answer;
+  return answer === 'done' && resultsIn ? 'done' : 'searching';
+}
+
 function useAddFeed() {
   const addFeed = useAction(api.feeds.add);
   const findFeeds = useAction(api.catalog.find);
@@ -228,8 +235,7 @@ function useAddFeed() {
     status: 'found',
     name: search.name,
     results: shown ?? [],
-    // Still searching until `find` answers and the first results are in, unless it failed.
-    phase: search.answer === 'failed' || search.answer === 'limited' ? search.answer : search.answer === 'pending' || shown === null ? 'searching' : 'done',
+    phase: phaseOf(search.answer, shown !== null),
   };
   return { view: found, add };
 }
