@@ -12,8 +12,7 @@ import {
   type AllView,
   type ArticleView,
   type ChipsView,
-  type ManageActions,
-  type ManageView,
+  type RemoveFeed,
   type FeedsData,
   type LastUpdatedView,
 } from '@/feeds/feeds-data';
@@ -125,22 +124,9 @@ function useMarkRead() {
   };
 }
 
-function useManage(): ManageView {
-  const feeds = useSignedInQuery(api.feeds.manage, {});
-  return feeds === undefined ? { status: 'loading' } : { status: 'ready', feeds };
-}
-
-function useManageActions(): ManageActions {
-  const rename = useMutation(api.feeds.rename);
+function useRemoveFeed(): RemoveFeed {
   const remove = useMutation(api.feeds.remove);
-  return {
-    rename: async (id, title) => {
-      const result = await rename({ id, title }).catch(() => null);
-      if (!result) return 'failed';
-      return result.ok ? 'ok' : result.reason;
-    },
-    remove: async (id) => ((await remove({ id }).catch(() => null)) ? 'ok' : 'failed'),
-  };
+  return async (id) => ((await remove({ id }).catch(() => null)) ? 'ok' : 'failed');
 }
 
 function useLastUpdated(): LastUpdatedView {
@@ -151,8 +137,7 @@ function useLastUpdated(): LastUpdatedView {
 const convexFeeds: FeedsData = {
   useAll,
   useChips,
-  useManage,
-  useManageActions,
+  useRemoveFeed,
   useArticle,
   useAddFeed,
   useRefresh,

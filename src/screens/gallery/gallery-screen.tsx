@@ -44,7 +44,7 @@ function WorldPreview({ entry, world, theme }: { entry: GalleryEntry; world: Cat
   const spec = { ...world.spec, colorScheme: theme };
   // `world` comes from the catalog, so it's stable while it stays selected.
   useEffect(() => createWorld({ ...world.spec, colorScheme: theme }).dispose, [world, theme]);
-  // One world's Feeds for as long as it's shown: Save, Done and Undo change it, and it keeps the change (FEE-30).
+  // One world's Feeds for as long as it's shown: removing a Feed changes it, and it keeps the change (FEE-97).
   const [feeds] = useState(() => worldFeeds(spec));
   return (
     <AuthContext value={worldAuth(spec)}>

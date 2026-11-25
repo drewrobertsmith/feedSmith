@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import type { SymbolViewProps } from 'expo-symbols';
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
@@ -73,16 +72,12 @@ function confirmDelete(deleteAccount: () => Promise<void>) {
 }
 
 /**
- * The Account sheet (P17): who is signed in, Manage Feeds (D17), then Sign out and Delete account
- * last, behind a divider (Q32).
+ * The Account sheet (P17): who is signed in, then, behind a divider, Sign out and Delete account
+ * last (Q32). Manage Feeds is gone (FEE-97).
  */
-function AccountSheetContent({ onClose }: { onClose: () => void }) {
+function AccountSheetContent() {
   const { account, signOut, signingOut, deleteAccount, deletion } = useAuth();
   const { colorScheme } = useEnvironment();
-  const manageFeeds = () => {
-    onClose();
-    router.push('/manage-feeds');
-  };
 
   return (
     <View testID="account-sheet" className="gap-related pb-section">
@@ -99,7 +94,6 @@ function AccountSheetContent({ onClose }: { onClose: () => void }) {
           ) : null}
         </View>
       ) : null}
-      <SheetRow label="Manage Feeds" icon={{ ios: 'slider.horizontal.3', android: 'tune' }} onPress={manageFeeds} />
       <View className="mx-edge" style={{ height: StyleSheet.hairlineWidth, backgroundColor: themes[colorScheme].decor }} />
       <SheetRow
         label="Sign out"
@@ -158,7 +152,7 @@ export function AccountButton({ initiallyOpen = false }: { initiallyOpen?: boole
         ) : null}
       </DepthPressable>
       <NativeSheet open={open} onClose={close}>
-        <AccountSheetContent onClose={close} />
+        <AccountSheetContent />
       </NativeSheet>
     </>
   );

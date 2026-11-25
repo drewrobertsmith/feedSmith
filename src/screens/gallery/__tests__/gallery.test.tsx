@@ -10,6 +10,7 @@ import SignInRoute from '@/app/sign-in';
 import { AppRoot } from '@/navigation/app-root';
 import { GALLERY } from '@/screens/gallery/registry';
 import * as catalog from '@/worlds/catalog';
+import { FIXTURE_ARTICLE, FIXTURE_UNEXTRACTED_ARTICLE } from '@/worlds/fixtures';
 import { worldAuth, worldFeeds } from '@/worlds/world';
 
 const routes = {
@@ -38,10 +39,10 @@ test('a release build never opens the gallery, even from its deep link', async (
 });
 
 test('renders the real screen for the world named in the link', async () => {
-  await renderRouter(routes, { initialUrl: '/gallery?world=manage-dark' });
+  await renderRouter(routes, { initialUrl: '/gallery?world=reading-dark' });
 
   expect(await screen.findByRole('heading', { name: 'State gallery' })).toBeOnTheScreen();
-  expect(screen.getByRole('heading', { name: 'Manage Feeds' })).toBeOnTheScreen();
+  expect(screen.getByRole('heading', { name: FIXTURE_ARTICLE.title })).toBeOnTheScreen();
   expect(Uniwind.currentTheme).toBe('dark');
 });
 
@@ -49,10 +50,10 @@ test('a second link into the open gallery switches to its world', async () => {
   await renderRouter(routes, { initialUrl: '/gallery?world=dark' });
   await screen.findByRole('heading', { name: 'State gallery' });
 
-  await act(() => router.setParams({ world: 'manage-light' }));
+  await act(() => router.setParams({ world: 'reading-unextracted-light' }));
 
-  expect(screen.getByRole('radio', { name: 'Manage Feeds, light' })).toBeChecked();
-  expect(screen.getByRole('heading', { name: 'Manage Feeds' })).toBeOnTheScreen();
+  expect(screen.getByRole('radio', { name: "Page couldn't be read, light" })).toBeChecked();
+  expect(screen.getByRole('heading', { name: FIXTURE_UNEXTRACTED_ARTICLE.title })).toBeOnTheScreen();
   expect(Uniwind.currentTheme).toBe('light');
 });
 
@@ -85,9 +86,9 @@ test('an Account world with the sheet open shows it at once (FEE-35)', async () 
 });
 
 test('capture mode shows only the world, filling the screen, for the visual check (FEE-70)', async () => {
-  await renderRouter(routes, { initialUrl: '/gallery?world=manage-dark&theme=light&capture=1' });
+  await renderRouter(routes, { initialUrl: '/gallery?world=reading-dark&theme=light&capture=1' });
 
-  expect(await screen.findByRole('heading', { name: 'Manage Feeds' })).toBeOnTheScreen();
+  expect(await screen.findByRole('heading', { name: FIXTURE_ARTICLE.title })).toBeOnTheScreen();
   expect(screen.queryByRole('heading', { name: 'State gallery' })).not.toBeOnTheScreen();
   expect(screen.queryByRole('radiogroup', { name: 'Theme' })).not.toBeOnTheScreen();
   expect(Uniwind.currentTheme).toBe('light');

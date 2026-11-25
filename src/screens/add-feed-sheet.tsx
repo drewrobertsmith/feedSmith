@@ -86,7 +86,6 @@ export function AddFeedSheet({ open, onClose, onFeed }: { open: boolean; onClose
             </AppText>
             <NativeTextField
               key={adds}
-              purpose="address"
               label="Website or feed URL"
               placeholder="theverge.com"
               defaultValue={typed}

@@ -1,7 +1,7 @@
 import { LegendList } from '@legendapp/list/react-native';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { RefreshControl, View } from 'react-native';
+import { Alert, RefreshControl, ToastAndroid, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/app-button';
@@ -11,7 +11,7 @@ import { ChipSwitch, SlideRow } from '@/components/chip-switch';
 import { ArticleRow } from '@/components/article-row';
 import { TopBar, TopBarIcon } from '@/components/top-bar';
 import { useEnvironment, useMinuteClock } from '@/environment';
-import { useAll, useChips, useLastUpdated, useRefresh } from '@/feeds/feeds-data';
+import { useAll, useChips, useLastUpdated, useRefresh, useRemoveFeed, type FeedChip } from '@/feeds/feeds-data';
 import { publishedAgo } from '@/feeds/format';
 import { useShownRows } from '@/feeds/use-shown-rows';
 import { AccountButton } from '@/screens/account/account-sheet';
@@ -19,8 +19,6 @@ import { AddFeedSheet } from '@/screens/add-feed-sheet';
 import { ChipRow } from '@/screens/chip-row';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
-
-const manageFeeds = () => router.push('/manage-feeds');
 
 /**
  * The line under the Feeds title (FEE-47): how fresh All is, so you know whether pulling down is
@@ -34,6 +32,23 @@ function useUpdatedLine(refreshing: boolean): string | undefined {
   return `Updated ${publishedAgo(lastUpdated.at, now)}`;
 }
 
+/**
+ * Removing a Feed (FEE-97, T23): Android's dialog asks first (Q32), saying its Articles go too. Once it's
+ * gone, Feeds shows All (`onRemoved`); a remove that didn't reach the server says so and changes nothing (Q5).
+ */
+function useConfirmRemove(onRemoved: () => void) {
+  const remove = useRemoveFeed();
+  const removeFeed = async (chip: FeedChip) => {
+    if ((await remove(chip.id)) === 'failed') ToastAndroid.show(`Couldn't remove ${chip.title}. Try again.`, ToastAndroid.SHORT);
+    else onRemoved();
+  };
+  return (chip: FeedChip) =>
+    Alert.alert(`Remove ${chip.title}?`, 'Its Articles go too.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: () => void removeFeed(chip) },
+    ]);
+}
+
 /** A row's usual height, for the list's first layout before rows measure themselves. */
 const ESTIMATED_ROW = 112;
 
@@ -41,17 +56,19 @@ const ESTIMATED_ROW = 112;
  * The Feeds section: All, or one Feed's Articles, newest first (Q1, P5, P12), under the chip
  * row (P9). The chosen chip lives in the route (`?feed=`), so it can be restored and linked to;
  * a link's value is untrusted, so anything but one of the User's chips means All (Q25).
- * Adding a Feed is a sheet over it (FEE-45). `accountOpen` and `addOpen` open the Account sheet or
- * the add sheet at once, for the state gallery.
+ * Adding a Feed is a sheet over it (FEE-45); removing one is in its chip's menu (FEE-97). `accountOpen`,
+ * `addOpen` and `menuFor` open the Account sheet, the add sheet or a chip's menu at once, for the state gallery.
  */
 export function FeedsScreen({
   feed,
   accountOpen,
   addOpen = false,
+  menuFor,
 }: {
   feed?: string;
   accountOpen?: boolean;
   addOpen?: boolean;
+  menuFor?: string;
 }) {
   const insets = useSafeAreaInsets();
   const chipsView = useChips();
@@ -82,6 +99,7 @@ export function FeedsScreen({
     setAdding(false);
     select(feedId);
   };
+  const confirmRemove = useConfirmRemove(() => select(null));
   const addSheet = <AddFeedSheet open={adding} onClose={() => setAdding(false)} onFeed={showFeed} />;
 
   const header = (
@@ -93,14 +111,16 @@ export function FeedsScreen({
         action={chips.length > 0 ? <TopBarIcon label="Add a Feed" icon={{ ios: 'plus', android: 'add' }} onPress={addFeed} /> : undefined}
         trailing={<AccountButton initiallyOpen={accountOpen} />}
       />
-      {chips.length > 0 ? <ChipRow chips={chips} selected={selection} onSelect={select} /> : null}
+      {chips.length > 0 ? (
+        <ChipRow chips={chips} selected={selection} onSelect={select} onRemove={confirmRemove} menuFor={menuFor} />
+      ) : null}
       {selectedChip && selection === selectedChip.id && empty ? (
-        // Never a dead end (Q34): a quiet way to check the Feed, rename it or remove it.
+        // Never a dead end (Q34): a Feed that has never had an Article can be removed right here.
         <View className="gap-group px-edge">
           <AppText variant="reading" className="text-text-muted">
             {`No Articles from ${selectedChip.title} yet.`}
           </AppText>
-          <AppButton label="Manage this Feed" onPress={manageFeeds} />
+          <AppButton label={`Remove ${selectedChip.title}`} onPress={() => confirmRemove(selectedChip)} />
         </View>
       ) : null}
     </View>

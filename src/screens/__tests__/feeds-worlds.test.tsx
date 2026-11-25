@@ -2,7 +2,7 @@ import { faceOf } from '../../../test/depth';
 import { act, fireEvent, userEvent, within } from '@testing-library/react-native';
 import { screen } from 'expo-router/testing-library';
 import { useState } from 'react';
-import { Animated, ScrollView, ToastAndroid } from 'react-native';
+import { Alert, Animated, ScrollView, ToastAndroid } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { Uniwind } from 'uniwind';
 
@@ -58,30 +58,32 @@ describe('All', () => {
     feedNames: number;
     /** The line under the Feeds title (FEE-47): when All was last updated, or that it's updating. */
     updated: string | null;
-    /** A chosen Feed with nothing new offers Manage this Feed (Q34). */
-    manage: boolean;
+    /** A chosen Feed with no Articles yet offers Remove, by its name (Q34, FEE-97); null otherwise. */
+    remove: string | null;
+    /** The chip's menu, open: its one action, by name (FEE-97); null when closed. */
+    menu: string | null;
   };
   const ROWS = FIXTURE_ROWS.length;
   const READ = FIXTURE_ROWS.filter((r) => r.read).length;
   const VERGE_ROWS = FIXTURE_ROWS.filter((r) => r.feedId === 'f1').length;
   const SHOWS: Record<AllWorldId, Shows> = {
-    'all-dark': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All', feedNames: ROWS, updated: 'Updated 5 min ago', manage: false },
-    'all-light': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'light', titleSize: 24, selected: 'All', feedNames: ROWS, updated: 'Updated 5 min ago', manage: false },
-    'all-read': { rows: ROWS, read: ROWS, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All', feedNames: ROWS, updated: 'Updated 5 min ago', manage: false },
-    'all-empty': { rows: 0, read: 0, empty: true, refreshing: false, theme: 'dark', titleSize: 24, selected: '', feedNames: 0, updated: null, manage: false },
-    'all-loading': { rows: 0, read: 0, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: '', feedNames: 0, updated: null, manage: false },
-    'all-refreshing': { rows: ROWS, read: READ, empty: false, refreshing: true, theme: 'light', titleSize: 24, selected: 'All', feedNames: ROWS, updated: 'Updating…', manage: false },
-    'all-largest-font': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 48, selected: 'All', feedNames: ROWS, updated: 'Updated 5 min ago', manage: false },
-    'all-feed': { rows: VERGE_ROWS, read: 1, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'The Verge', feedNames: 0, updated: 'Updated 5 min ago', manage: false },
-    'all-feed-light': { rows: 1, read: 0, empty: false, refreshing: false, theme: 'light', titleSize: 24, selected: 'Calm Notes', feedNames: 0, updated: 'Updated 5 min ago', manage: false },
+    'all-dark': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All', feedNames: ROWS, updated: 'Updated 5 min ago', remove: null, menu: null },
+    'all-light': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'light', titleSize: 24, selected: 'All', feedNames: ROWS, updated: 'Updated 5 min ago', remove: null, menu: null },
+    'all-read': { rows: ROWS, read: ROWS, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All', feedNames: ROWS, updated: 'Updated 5 min ago', remove: null, menu: null },
+    'all-empty': { rows: 0, read: 0, empty: true, refreshing: false, theme: 'dark', titleSize: 24, selected: '', feedNames: 0, updated: null, remove: null, menu: null },
+    'all-loading': { rows: 0, read: 0, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: '', feedNames: 0, updated: null, remove: null, menu: null },
+    'all-refreshing': { rows: ROWS, read: READ, empty: false, refreshing: true, theme: 'light', titleSize: 24, selected: 'All', feedNames: ROWS, updated: 'Updating…', remove: null, menu: null },
+    'all-largest-font': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 48, selected: 'All', feedNames: ROWS, updated: 'Updated 5 min ago', remove: null, menu: null },
+    'all-feed': { rows: VERGE_ROWS, read: 1, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'The Verge', feedNames: 0, updated: 'Updated 5 min ago', remove: null, menu: null },
+    'all-feed-light': { rows: 1, read: 0, empty: false, refreshing: false, theme: 'light', titleSize: 24, selected: 'Calm Notes', feedNames: 0, updated: 'Updated 5 min ago', remove: null, menu: null },
     // FEE-93: empty only for a Feed that has never had an Article.
-    'all-feed-empty': { rows: 0, read: 0, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'Farnam Street', feedNames: 0, updated: 'Updated 5 min ago', manage: true },
+    'all-feed-empty': { rows: 0, read: 0, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'Farnam Street', feedNames: 0, updated: 'Updated 5 min ago', remove: 'Remove Farnam Street', menu: null },
     // FEE-93: a rare writer's last two posts, months old, one Read; never an empty page.
-    'feed-rare': { rows: 2, read: 1, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'Daring Fireball', feedNames: 0, updated: 'Updated 5 min ago', manage: false },
-    'feed-rare-light': { rows: 2, read: 1, empty: false, refreshing: false, theme: 'light', titleSize: 24, selected: 'Daring Fireball', feedNames: 0, updated: 'Updated 5 min ago', manage: false },
+    'feed-rare': { rows: 2, read: 1, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'Daring Fireball', feedNames: 0, updated: 'Updated 5 min ago', remove: null, menu: null },
+    'feed-rare-light': { rows: 2, read: 1, empty: false, refreshing: false, theme: 'light', titleSize: 24, selected: 'Daring Fireball', feedNames: 0, updated: 'Updated 5 min ago', remove: null, menu: null },
     // FEE-93: a frequent site shows its whole last 30 days, more than five.
-    'feed-frequent': { rows: VERGE_ROWS + 4, read: 1, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'The Verge', feedNames: 0, updated: 'Updated 5 min ago', manage: false },
-    'all-many-feeds': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All', feedNames: ROWS, updated: 'Updated 5 min ago', manage: false },
+    'feed-frequent': { rows: VERGE_ROWS + 4, read: 1, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'The Verge', feedNames: 0, updated: 'Updated 5 min ago', remove: null, menu: null },
+    'all-many-feeds': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All', feedNames: ROWS, updated: 'Updated 5 min ago', remove: null, menu: null },
     'all-many-feeds-largest-font': {
       rows: ROWS,
       read: READ,
@@ -92,14 +94,21 @@ describe('All', () => {
       selected: 'All',
       feedNames: ROWS,
       updated: 'Updated 5 min ago',
-      manage: false,
+      remove: null,
+      menu: null,
     },
-    'all-remove-animations': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All', feedNames: ROWS, updated: 'Updated 5 min ago', manage: false },
+    // FEE-97: a Feed chip's long-press menu, holding Remove.
+    'feed-menu': { rows: VERGE_ROWS, read: 1, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'The Verge', feedNames: 0, updated: 'Updated 5 min ago', remove: null, menu: 'Remove The Verge' },
+    'feed-menu-light': { rows: VERGE_ROWS, read: 1, empty: false, refreshing: false, theme: 'light', titleSize: 24, selected: 'The Verge', feedNames: 0, updated: 'Updated 5 min ago', remove: null, menu: 'Remove The Verge' },
+    'feed-menu-largest-font': { rows: VERGE_ROWS, read: 1, empty: false, refreshing: false, theme: 'dark', titleSize: 48, selected: 'The Verge', feedNames: 0, updated: 'Updated 5 min ago', remove: null, menu: 'Remove The Verge' },
+    'all-remove-animations': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All', feedNames: ROWS, updated: 'Updated 5 min ago', remove: null, menu: null },
   };
 
   test.each(ALL_WORLDS)('$label', async ({ id, spec }) => {
     const shows = SHOWS[id];
     await open(spec);
+    // A world with a chip's menu open: the gallery opens it at once; here, a long-press does (FEE-97).
+    if ('chipMenu' in spec) await userEvent.longPress(await screen.findByRole('tab', { name: 'The Verge' }));
     expect(await screen.findByRole('heading', { name: 'Feeds' })).toHaveStyle({ fontSize: shows.titleSize });
     expect(screen.queryAllByRole('link')).toHaveLength(shows.rows);
     expect(screen.queryAllByRole('link', { name: /, Read$/ })).toHaveLength(shows.read);
@@ -114,13 +123,18 @@ describe('All', () => {
     }
     if (shows.updated) expect(screen.getByText(shows.updated)).toBeOnTheScreen();
     else expect(screen.queryByText(/^Updat/)).not.toBeOnTheScreen();
-    expect(screen.queryAllByRole('button', { name: 'Manage this Feed' })).toHaveLength(shows.manage ? 1 : 0);
+    // Nothing manages Feeds any more but Remove (FEE-97).
+    expect(screen.queryByText(/Manage/)).not.toBeOnTheScreen();
+    expect(screen.queryAllByRole('button', { name: /^Remove / })).toHaveLength(shows.remove ? 1 : 0);
+    if (shows.remove) expect(screen.getByRole('button', { name: shows.remove })).toBeOnTheScreen();
+    expect(screen.queryAllByRole('menuitem')).toHaveLength(shows.menu ? 1 : 0);
+    if (shows.menu) expect(screen.getByRole('menuitem', { name: shows.menu })).toBeOnTheScreen();
     if (shows.selected) expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName(shows.selected);
     expect(screen.queryAllByTestId('row-feed-name')).toHaveLength(shows.feedNames);
     expect(Uniwind.currentTheme).toBe(shows.theme);
   });
 
-  // FEE-94: Pinned is gone. A chip is a Feed's name and nothing more: no Pinned chip, group or tray, no long-press.
+  // FEE-94: Pinned is gone: no Pinned chip, group or tray. FEE-97: a Feed's chip holds Remove, on a long-press and for TalkBack.
   test.each(['dark', 'light'] as const)(
     'the chip row in %s: All, then one chip per Feed, named by the Feed alone; no + chip and no Pinned (P5, P9, FEE-44, FEE-94)',
     async (colorScheme) => {
@@ -133,10 +147,11 @@ describe('All', () => {
       expect(screen.queryByRole('tab', { name: /Pinned/ })).not.toBeOnTheScreen();
       expect(screen.queryByTestId('pinned-tray', { includeHiddenElements: true })).not.toBeOnTheScreen();
       expect(screen.queryByTestId('pinned-glyph', { includeHiddenElements: true })).not.toBeOnTheScreen();
-      for (const tab of tabs) {
-        expect(tab.props.onLongPress).toBeUndefined();
-        expect(tab.props.accessibilityActions ?? []).toEqual([]);
-      }
+      expect(tabs[0].props.onLongPress).toBeUndefined();
+      expect(tabs[0].props.accessibilityActions ?? []).toEqual([]);
+      tabs.slice(1).forEach((tab, i) =>
+        expect(tab.props.accessibilityActions).toEqual([{ name: 'remove', label: `Remove ${names[i + 1]}` }]),
+      );
     },
   );
 
@@ -807,7 +822,7 @@ describe('links into Feeds screens (Q25)', () => {
     expect(await screen.findByRole('heading', { name: FIXTURE_ARTICLE.title })).toBeOnTheScreen();
   });
 
-  test.each(['/article/a1', '/manage-feeds'])('signed out, %s opens sign-in instead', async (url) => {
+  test.each(['/article/a1'])('signed out, %s opens sign-in instead', async (url) => {
     await open({ colorScheme: 'dark', auth: 'signed-out' }, url);
     expect(await screen.findByRole('heading', { name: 'feedSmith' })).toBeOnTheScreen();
     expect(screen.queryByText('Talks resume next year.')).not.toBeOnTheScreen();
@@ -817,11 +832,86 @@ describe('links into Feeds screens (Q25)', () => {
 
 const ARTICLE_TITLE = FIXTURE_ARTICLE.title;
 
-test('Manage this Feed opens Manage Feeds from a Feed with no Articles yet (FEE-47, Q34)', async () => {
-  const user = userEvent.setup();
-  await open({ colorScheme: 'dark', feeds: 'some', chips: 'many', feed: 'f4' });
-  await user.press(await screen.findByRole('button', { name: 'Manage this Feed' }));
-  expect(await screen.findByRole('heading', { name: 'Manage Feeds' })).toBeOnTheScreen();
+describe('Remove, from a Feed\'s chip (FEE-97, T23, Q32)', () => {
+  const alerts = () => jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  type Buttons = Parameters<typeof Alert.alert>[2];
+  const confirm = async (buttons: Buttons, text: 'Remove' | 'Cancel') =>
+    // Cancel has no handler: Android just closes the dialog.
+    act(async () => buttons!.find((button) => button.text === text)!.onPress?.());
+
+  test('a long-press on a Feed\'s chip opens its menu, with Remove by name; All has none', async () => {
+    const user = userEvent.setup();
+    await open({ colorScheme: 'dark', feeds: 'some', feed: 'f1' });
+    expect(screen.queryByRole('menuitem')).not.toBeOnTheScreen();
+    await user.longPress(await screen.findByRole('tab', { name: 'The Verge' }));
+    expect(screen.getByRole('menuitem', { name: 'Remove The Verge' })).toBeOnTheScreen();
+    expect(screen.getAllByRole('menuitem')).toHaveLength(1);
+  });
+
+  test('Remove asks first, saying its Articles go too; confirming removes it and shows All', async () => {
+    const alert = alerts();
+    const user = userEvent.setup();
+    const w = await open({ colorScheme: 'dark', feeds: 'some', feed: 'f1' });
+    await user.longPress(await screen.findByRole('tab', { name: 'The Verge' }));
+    await user.press(screen.getByRole('menuitem', { name: 'Remove The Verge' }));
+    expect(screen.queryByRole('menuitem')).not.toBeOnTheScreen();
+    expect(w.feedsLog.removed).toEqual([]);
+    const [title, message, buttons] = alert.mock.lastCall!;
+    expect([title, message]).toEqual(['Remove The Verge?', 'Its Articles go too.']);
+    expect(buttons!.find((button) => button.text === 'Remove')!.style).toBe('destructive');
+    await confirm(buttons, 'Remove');
+    expect(w.feedsLog.removed).toEqual(['f1']);
+    expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName('All');
+    expect(screen.queryByRole('tab', { name: 'The Verge' })).not.toBeOnTheScreen();
+    alert.mockRestore();
+  });
+
+  test('cancelling keeps the Feed and stays on its page', async () => {
+    const alert = alerts();
+    const user = userEvent.setup();
+    const w = await open({ colorScheme: 'dark', feeds: 'some', feed: 'f1' });
+    await user.longPress(await screen.findByRole('tab', { name: 'The Verge' }));
+    await user.press(screen.getByRole('menuitem', { name: 'Remove The Verge' }));
+    await confirm(alert.mock.lastCall![2], 'Cancel');
+    expect(w.feedsLog.removed).toEqual([]);
+    expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName('The Verge');
+    alert.mockRestore();
+  });
+
+  test('TalkBack\'s Remove action on a chip asks the same question', async () => {
+    const alert = alerts();
+    await open({ colorScheme: 'dark', feeds: 'some' });
+    const chip = await screen.findByRole('tab', { name: 'Calm Notes' });
+    await act(async () => chip.props.onAccessibilityAction({ nativeEvent: { actionName: 'remove' } }));
+    expect(alert.mock.lastCall![0]).toBe('Remove Calm Notes?');
+    alert.mockRestore();
+  });
+
+  test('a Feed with no Articles yet offers Remove there too (Q34)', async () => {
+    const alert = alerts();
+    const user = userEvent.setup();
+    const w = await open({ colorScheme: 'dark', feeds: 'some', chips: 'many', feed: 'f4' });
+    await user.press(await screen.findByRole('button', { name: 'Remove Farnam Street' }));
+    await confirm(alert.mock.lastCall![2], 'Remove');
+    expect(w.feedsLog.removed).toEqual(['f4']);
+    expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName('All');
+    alert.mockRestore();
+  });
+
+  test("a remove that doesn't reach the server says so, and keeps the Feed (Q5)", async () => {
+    const alert = alerts();
+    const toast = jest.spyOn(ToastAndroid, 'show').mockImplementation(() => {});
+    const user = userEvent.setup();
+    const w = await open({ colorScheme: 'dark', feeds: 'some', feed: 'f1', removes: 'fail' });
+    await user.longPress(await screen.findByRole('tab', { name: 'The Verge' }));
+    await user.press(screen.getByRole('menuitem', { name: 'Remove The Verge' }));
+    await confirm(alert.mock.lastCall![2], 'Remove');
+    expect(toast).toHaveBeenCalledWith("Couldn't remove The Verge. Try again.", ToastAndroid.SHORT);
+    expect(w.feedsLog.removed).toEqual([]);
+    expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName('The Verge');
+    alert.mockRestore();
+    toast.mockRestore();
+  });
 });
 
 describe('buttons have depth, not outlines (FEE-75, D27)', () => {

@@ -5,7 +5,6 @@ import FeedsRoute from '@/app/index';
 import ArticleRoute from '@/app/article/[id]';
 import AuthReturnRoute from '@/app/auth';
 import GalleryRoute from '@/app/gallery';
-import ManageFeedsRoute from '@/app/manage-feeds';
 import SignInRoute from '@/app/sign-in';
 import { AppRoot } from '@/navigation/app-root';
 import type { World } from '@/worlds/world';
@@ -17,7 +16,6 @@ export function renderWorld(world: World, initialUrl: string = world.initialUrl)
       _layout: () => <AppRoot environment={world.environment} auth={world.auth} feeds={world.feeds} />,
       index: FeedsRoute,
       'article/[id]': ArticleRoute,
-      'manage-feeds': ManageFeedsRoute,
       'sign-in': SignInRoute,
       auth: AuthReturnRoute,
       gallery: GalleryRoute,
