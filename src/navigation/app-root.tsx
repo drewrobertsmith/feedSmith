@@ -39,7 +39,7 @@ function ThemedStack() {
       {session === 'loading' ? null : (
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Protected guard={session === 'signed-in'}>
-            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="index" />
             <Stack.Screen name="article/[id]" />
             <Stack.Screen name="manage-feeds" />
           </Stack.Protected>
@@ -64,10 +64,10 @@ function ThemedStack() {
  */
 export function AppRoot({ environment, auth, feeds }: { environment?: Environment; auth?: Auth; feeds?: FeedsData }) {
   const stack = (
-    // Gestures (dragging Pinned Feeds, D13) need a root that sees every touch.
+    // Gesture Handler's root: nothing of ours drags or swipes since FEE-94/95, but navigation may.
     <GestureHandlerRootView style={{ flex: 1 }}>
       <EnvironmentProvider environment={environment}>
-        {/* One Undo note at a time, across screens: Done in the Reading view shows it in Saved (Q35). */}
+        {/* One note at a time, across screens (Q35). */}
         <UndoProvider>
           <ThemedStack />
         </UndoProvider>

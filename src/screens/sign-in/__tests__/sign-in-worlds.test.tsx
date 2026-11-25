@@ -2,9 +2,7 @@ import { userEvent } from '@testing-library/react-native';
 import { renderRouter, screen } from 'expo-router/testing-library';
 import { Uniwind } from 'uniwind';
 
-import TabsLayout from '@/app/(tabs)/_layout';
-import FeedsRoute from '@/app/(tabs)/index';
-import SavedRoute from '@/app/(tabs)/saved';
+import FeedsRoute from '@/app/index';
 import AuthReturnRoute from '@/app/auth';
 import GalleryRoute from '@/app/gallery';
 import SignInRoute from '@/app/sign-in';
@@ -17,9 +15,7 @@ function renderWorld(world: World, initialUrl: string = world.initialUrl) {
   return renderRouter(
     {
       _layout: () => <AppRoot environment={world.environment} auth={world.auth} feeds={world.feeds} />,
-      '(tabs)/_layout': TabsLayout,
-      '(tabs)/index': FeedsRoute,
-      '(tabs)/saved': SavedRoute,
+      index: FeedsRoute,
       'sign-in': SignInRoute,
       auth: AuthReturnRoute,
       gallery: GalleryRoute,

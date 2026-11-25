@@ -30,7 +30,6 @@ export const FIXTURE_ROWS: ArticleRow[] = [
     ...VERGE_FACE,
     publishedAt: day(21),
     read: false,
-    saved: false,
   },
   {
     id: 'a2',
@@ -40,7 +39,6 @@ export const FIXTURE_ROWS: ArticleRow[] = [
     ...VERGE_FACE,
     publishedAt: day(20),
     read: true,
-    saved: true,
   },
   {
     id: 'a3',
@@ -49,9 +47,8 @@ export const FIXTURE_ROWS: ArticleRow[] = [
     ...VERGE_FACE,
     publishedAt: day(19),
     read: false,
-    saved: true,
   },
-  { id: 'a4', feedId: 'f2', title: 'A quiet guide to slow reading', feedTitle: 'Calm Notes', publishedAt: day(17), read: false, saved: false },
+  { id: 'a4', feedId: 'f2', title: 'A quiet guide to slow reading', feedTitle: 'Calm Notes', publishedAt: day(17), read: false },
 ];
 
 /**
@@ -69,7 +66,6 @@ export const FIXTURE_KEPT_ROWS: ArticleRow[] = [
     authors: ['John Gruber'],
     publishedAt: Date.UTC(2026, 9, 7, 12),
     read: false,
-    saved: false,
   },
   {
     id: 'k2',
@@ -80,7 +76,6 @@ export const FIXTURE_KEPT_ROWS: ArticleRow[] = [
     authors: ['John Gruber'],
     publishedAt: Date.UTC(2026, 8, 2, 12),
     read: true,
-    saved: false,
   },
 ];
 
@@ -96,27 +91,7 @@ export const FIXTURE_BUSY_ROWS: ArticleRow[] = [16, 14, 12, 10].map((d, i) => ({
   ...VERGE_FACE,
   publishedAt: day(d),
   read: false,
-  saved: false,
 }));
-
-/**
- * Saved, most recently Saved first: the two Saved Articles from All (one already Read), and one whose
- * Feed was removed, which keeps its Feed's name but has no Feed to link to (T23).
- */
-export const FIXTURE_SAVED_ROWS: ArticleRow[] = [
-  FIXTURE_ROWS[2],
-  FIXTURE_ROWS[1],
-  {
-    id: 's1',
-    title: 'What the long winter taught a lighthouse keeper',
-    subtitle: 'Three months alone on a rock, and the routines that kept the light on.',
-    authors: ['Mara Lindqvist'],
-    feedTitle: 'Morning Brief',
-    publishedAt: day(2),
-    read: false,
-    saved: true,
-  },
-];
 
 /** Every Article in All Read. */
 export const FIXTURE_READ_ROWS: ArticleRow[] = FIXTURE_ROWS.map((row) => ({ ...row, read: true }));
@@ -130,7 +105,6 @@ export const FIXTURE_ARTICLE: ReadingArticle = {
   link: 'https://www.theverge.com/tech/1039554/un-regulations-killer-robots',
   subtitle: 'Countries agreed only to start discussing options for autonomous weapons.',
   authors: ['Terrence O’Brien'],
-  saved: false,
   // The Feed's lead image is also the first image in its text: the Reading view shows it once.
   imageUrl: RUNWAY_PHOTO,
   omitted: [],
@@ -205,7 +179,6 @@ export const FIXTURE_EXTRACTING_ARTICLE: ReadingArticle = {
   blocks: [{ type: 'paragraph', spans: [{ text: CALM_SUBTITLE }] }],
   omitted: [],
   page: 'extracting',
-  saved: false,
 };
 
 /** A summary-only Article whose page couldn't be read: the fallback (Q6). */

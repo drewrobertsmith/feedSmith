@@ -127,7 +127,7 @@ function AccountSheetContent({ onClose }: { onClose: () => void }) {
 }
 
 /**
- * The account circle at the top right of Feeds and Saved (P17): the User's initial in D5's
+ * The account circle at the top right of Feeds (P17): the User's initial in D5's
  * "yours" Gold, on a soft face (D27). Tapping it opens the Account sheet.
  * `initiallyOpen` is for the state gallery's open-sheet worlds.
  */

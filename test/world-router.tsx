@@ -1,9 +1,7 @@
 import { act, fireEvent } from '@testing-library/react-native';
 import { renderRouter, screen } from 'expo-router/testing-library';
 
-import TabsLayout from '@/app/(tabs)/_layout';
-import FeedsRoute from '@/app/(tabs)/index';
-import SavedRoute from '@/app/(tabs)/saved';
+import FeedsRoute from '@/app/index';
 import ArticleRoute from '@/app/article/[id]';
 import AuthReturnRoute from '@/app/auth';
 import GalleryRoute from '@/app/gallery';
@@ -17,9 +15,7 @@ export function renderWorld(world: World, initialUrl: string = world.initialUrl)
   return renderRouter(
     {
       _layout: () => <AppRoot environment={world.environment} auth={world.auth} feeds={world.feeds} />,
-      '(tabs)/_layout': TabsLayout,
-      '(tabs)/index': FeedsRoute,
-      '(tabs)/saved': SavedRoute,
+      index: FeedsRoute,
       'article/[id]': ArticleRoute,
       'manage-feeds': ManageFeedsRoute,
       'sign-in': SignInRoute,

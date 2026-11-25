@@ -1,12 +1,10 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { Pressable, View, type AccessibilityActionEvent } from 'react-native';
+import { Pressable, View } from 'react-native';
 
-import { AppSymbol } from '@/components/app-symbol';
 import { AppText } from '@/components/app-text';
 import { SharedTitle } from '@/components/shared-title';
 import { FeedIcon } from '@/components/feed-icon';
-import { ROW_ACTIONS, rowAction, type RowActionName } from '@/components/row-action';
 import { useEnvironment } from '@/environment';
 import type { ArticleRow as Row } from '@/feeds/feeds-data';
 import { byline, publishedAgo } from '@/feeds/format';
@@ -16,53 +14,34 @@ import { themes } from '@/theme/tokens';
 const READ_IMAGE_OPACITY = 0.55;
 const THUMBNAIL = 72;
 const FAVICON = 16;
-const SAVED_MARK = 16;
 
 
 /**
- * One Article in a list (P12): Feeds and Saved share it. Its parts each have one voice (Q29):
- * muted sans meta, the title in Literata, a full-strength sans byline, the Subtitle in small muted
- * Literata. `feedNamed` off leaves the Feed's name out where a chip already names it (P20).
- * `savedMark` shows a Saved Article's Gold mark (D5), where not every row is Saved. Its action,
- * Save or Done, is offered to TalkBack as well as by the swipe (Q15).
+ * One Article in a list (P12). Its parts each have one voice (Q29): muted sans meta, the title in
+ * Literata, a full-strength sans byline, the Subtitle in small muted Literata. `feedNamed` off leaves
+ * the Feed's name out where a chip already names it (P20). Opening it is its one action: Save and
+ * Done are gone (FEE-95).
  */
-export function ArticleRow({
-  article,
-  feedNamed,
-  savedMark,
-  onAction,
-}: {
-  article: Row;
-  feedNamed: boolean;
-  savedMark: boolean;
-  onAction: (action: RowActionName) => void;
-}) {
+export function ArticleRow({ article, feedNamed }: { article: Row; feedNamed: boolean }) {
   const { colorScheme, fontScale, now } = useEnvironment();
   const theme = themes[colorScheme];
   const ago = publishedAgo(article.publishedAt, now());
   const credit = byline(article.authors);
-  const showMark = savedMark && article.saved;
   const label = [
     article.title,
     credit,
     feedNamed ? article.feedTitle : undefined,
     ago,
-    showMark ? 'Saved' : undefined,
     article.read ? 'Read' : undefined,
   ]
     .filter(Boolean)
     .join(', ');
   const thumbnail = THUMBNAIL * fontScale;
-  const action = rowAction(article);
 
   return (
     <Pressable
       role="link"
       aria-label={label}
-      accessibilityActions={[{ name: action, label: ROW_ACTIONS[action].label }]}
-      onAccessibilityAction={(event: AccessibilityActionEvent) => {
-        if (event.nativeEvent.actionName === action) onAction(action);
-      }}
       onPress={() => router.push(`/article/${article.id}`)}
       android_ripple={{ color: theme.surface }}
       className="flex-row gap-group bg-background px-edge py-group"
@@ -85,16 +64,6 @@ export function ArticleRow({
           <AppText variant="label" className="text-text-muted">
             {ago}
           </AppText>
-          {/* Yours (D5): Gold, the one accent, and a bookmark with a tick, so it reads without colour too (Q14). */}
-          {showMark ? (
-            <AppSymbol
-              testID="row-saved-mark"
-              name={{ ios: 'bookmark.fill', android: 'bookmark_added' }}
-              size={SAVED_MARK}
-              tintColor={theme.accent}
-              accessible={false}
-            />
-          ) : null}
         </View>
         {/* Its own view, so opening the Article can carry it into the headline (FEE-48). */}
         <SharedTitle articleId={article.id}>

@@ -9,14 +9,10 @@ import { AppText } from '@/components/app-text';
 import { SharedTitleScreen } from '@/components/shared-title';
 import { ChipSwitch, SlideRow } from '@/components/chip-switch';
 import { ArticleRow } from '@/components/article-row';
-import { rowAction } from '@/components/row-action';
-import { SwipeRow } from '@/components/swipe-row';
 import { TopBar, TopBarIcon } from '@/components/top-bar';
-import { UndoToastHost } from '@/components/undo-toast';
 import { useEnvironment, useMinuteClock } from '@/environment';
 import { useAll, useChips, useLastUpdated, useRefresh } from '@/feeds/feeds-data';
 import { publishedAgo } from '@/feeds/format';
-import { useSaveAndDone } from '@/feeds/use-save-and-done';
 import { useShownRows } from '@/feeds/use-shown-rows';
 import { AccountButton } from '@/screens/account/account-sheet';
 import { AddFeedSheet } from '@/screens/add-feed-sheet';
@@ -75,7 +71,6 @@ export function FeedsScreen({
   const updated = useUpdatedLine(refreshing);
   const { colorScheme } = useEnvironment();
   const theme = themes[colorScheme];
-  const saveOrDone = useSaveAndDone();
   const noFeeds = chipsView.status === 'ready' && chips.length === 0;
   const empty = all.status === 'ready' && all.articles.length === 0;
 
@@ -137,15 +132,7 @@ export function FeedsScreen({
           keyExtractor={(article) => article.id}
           renderItem={({ item }) => (
             <SlideRow>
-              {/* Save, or Done once Saved: either way the row stays in Feeds, so it springs back. */}
-              <SwipeRow
-                id={item.id}
-                action={rowAction(item)}
-                leaves={false}
-                onCommit={() => saveOrDone(item.id, rowAction(item), { haptic: false })}
-              >
-                <ArticleRow article={item} feedNamed={rowsNameFeeds} savedMark onAction={(action) => saveOrDone(item.id, action)} />
-              </SwipeRow>
+              <ArticleRow article={item} feedNamed={rowsNameFeeds} />
             </SlideRow>
           )}
           estimatedItemSize={ESTIMATED_ROW}
@@ -165,7 +152,6 @@ export function FeedsScreen({
           contentContainerStyle={{ paddingBottom: insets.bottom + spacing.section }}
         />
       </ChipSwitch>
-      <UndoToastHost />
       {addSheet}
       </View>
     </SharedTitleScreen>

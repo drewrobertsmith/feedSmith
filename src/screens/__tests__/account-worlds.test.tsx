@@ -5,9 +5,7 @@ import { renderRouter, screen } from 'expo-router/testing-library';
 import { Alert } from 'react-native';
 import { Uniwind } from 'uniwind';
 
-import TabsLayout from '@/app/(tabs)/_layout';
-import FeedsRoute from '@/app/(tabs)/index';
-import SavedRoute from '@/app/(tabs)/saved';
+import FeedsRoute from '@/app/index';
 import ManageFeedsRoute from '@/app/manage-feeds';
 import SignInRoute from '@/app/sign-in';
 import { NativeSheet } from '@/components/native-sheet';
@@ -18,7 +16,7 @@ import { reanimatedReducesMotion } from '../../../test/reduced-motion';
 
 type Shows = {
   theme: 'dark' | 'light';
-  section: 'Feeds' | 'Saved';
+  section: 'Feeds';
   /** What TalkBack hears for the circle (Q15). */
   circle: string;
   initial: string;
@@ -33,7 +31,7 @@ const OPEN = { title: 'Ada Lovelace', email: 'ada@example.com', signingOut: fals
 
 const SHOWS: Record<AccountWorldId, Shows> = {
   'account-circle-dark': { theme: 'dark', section: 'Feeds', circle: ADA, initial: 'A', sheet: null, fontScale: 1, reduceMotion: false },
-  'account-circle-light': { theme: 'light', section: 'Saved', circle: ADA, initial: 'A', sheet: null, fontScale: 1, reduceMotion: false },
+  'account-circle-light': { theme: 'light', section: 'Feeds', circle: ADA, initial: 'A', sheet: null, fontScale: 1, reduceMotion: false },
   'account-sheet': { theme: 'dark', section: 'Feeds', circle: ADA, initial: 'A', sheet: OPEN, fontScale: 1, reduceMotion: false },
   'account-signing-out': {
     theme: 'dark',
@@ -44,7 +42,7 @@ const SHOWS: Record<AccountWorldId, Shows> = {
     fontScale: 1,
     reduceMotion: false,
   },
-  'account-no-server': { theme: 'dark', section: 'Saved', circle: ADA, initial: 'A', sheet: OPEN, fontScale: 1, reduceMotion: false },
+  'account-no-server': { theme: 'dark', section: 'Feeds', circle: ADA, initial: 'A', sheet: OPEN, fontScale: 1, reduceMotion: false },
   // Google gave no name: the email stands in, for the circle's letter and for TalkBack.
   'account-no-name': {
     theme: 'light',
@@ -93,9 +91,7 @@ function renderWorld(world: World) {
   return renderRouter(
     {
       _layout: () => <AppRoot environment={world.environment} auth={world.auth} feeds={world.feeds} />,
-      '(tabs)/_layout': TabsLayout,
-      '(tabs)/index': FeedsRoute,
-      '(tabs)/saved': SavedRoute,
+      index: FeedsRoute,
       'manage-feeds': ManageFeedsRoute,
       'sign-in': SignInRoute,
     },

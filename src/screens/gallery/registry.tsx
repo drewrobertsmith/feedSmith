@@ -3,7 +3,6 @@ import type { ReactElement } from 'react';
 import { FeedsScreen } from '@/screens/feeds-screen';
 import { ManageFeedsScreen } from '@/screens/manage-feeds-screen';
 import { ReadingScreen } from '@/screens/reading/reading-screen';
-import { SavedScreen } from '@/screens/saved-screen';
 import { SignInScreen } from '@/screens/sign-in/sign-in-screen';
 import {
   ACCOUNT_WORLDS,
@@ -11,7 +10,6 @@ import {
   ALL_WORLDS,
   MANAGE_WORLDS,
   READING_WORLDS,
-  SAVED_WORLDS,
   SHELL_WORLDS,
   SIGN_IN_WORLDS,
 } from '@/worlds/catalog';
@@ -30,7 +28,7 @@ export const GALLERY: readonly GalleryEntry[] = [
   {
     screen: 'Shell',
     worlds: SHELL_WORLDS,
-    render: (spec) => (spec.section === 'saved' ? <SavedScreen /> : <FeedsScreen />),
+    render: () => <FeedsScreen />,
   },
   {
     screen: 'Sign in',
@@ -38,7 +36,6 @@ export const GALLERY: readonly GalleryEntry[] = [
     render: () => <SignInScreen />,
   },
   { screen: 'All', worlds: ALL_WORLDS, render: (spec) => <FeedsScreen feed={spec.feed} /> },
-  { screen: 'Saved', worlds: SAVED_WORLDS, render: () => <SavedScreen /> },
   // The add sheet over Feeds, open (FEE-45).
   { screen: 'Add a Feed', worlds: ADD_FEED_WORLDS, render: (spec) => <FeedsScreen feed={spec.feed} addOpen /> },
   {
@@ -51,9 +48,6 @@ export const GALLERY: readonly GalleryEntry[] = [
   {
     screen: 'Account',
     worlds: ACCOUNT_WORLDS,
-    render: (spec) => {
-      const accountOpen = spec.accountSheet === 'open';
-      return spec.section === 'saved' ? <SavedScreen accountOpen={accountOpen} /> : <FeedsScreen accountOpen={accountOpen} />;
-    },
+    render: (spec) => <FeedsScreen accountOpen={spec.accountSheet === 'open'} />,
   },
 ];

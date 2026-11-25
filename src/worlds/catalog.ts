@@ -4,8 +4,6 @@ import type { CatalogWorld } from '@/worlds/world';
 export const SHELL_WORLDS = [
   { id: 'dark', label: 'Dark, Feeds', spec: { colorScheme: 'dark' } },
   { id: 'light', label: 'Light, Feeds', spec: { colorScheme: 'light' } },
-  { id: 'dark-saved', label: 'Dark, Saved', spec: { colorScheme: 'dark', section: 'saved' } },
-  { id: 'light-saved', label: 'Light, Saved', spec: { colorScheme: 'light', section: 'saved' } },
   { id: 'largest-font', label: 'Largest font size', spec: { colorScheme: 'dark', fontScale: 2 } },
   { id: 'remove-animations', label: 'Remove animations', spec: { colorScheme: 'dark', reduceMotion: true } },
 ] as const satisfies readonly CatalogWorld[];
@@ -133,17 +131,6 @@ export const READING_WORLDS = [
     label: 'Reading, largest font size',
     spec: { colorScheme: 'dark', section: 'article', fontScale: 2 },
   },
-  { id: 'reading-saved', label: 'Reading a Saved Article', spec: { colorScheme: 'dark', section: 'article', articleSaved: true } },
-  {
-    id: 'reading-saved-light',
-    label: 'Reading a Saved Article, light',
-    spec: { colorScheme: 'light', section: 'article', articleSaved: true },
-  },
-  {
-    id: 'reading-removed-feed',
-    label: 'Saved, its Feed removed',
-    spec: { colorScheme: 'dark', section: 'article', article: 'removed-feed', articleSaved: true },
-  },
 ] as const satisfies readonly CatalogWorld[];
 
 export type ReadingWorldId = (typeof READING_WORLDS)[number]['id'];
@@ -189,7 +176,7 @@ export type ManageWorldId = (typeof MANAGE_WORLDS)[number]['id'];
 /** The account circle and the Account sheet (FEE-35, P17, D17). */
 export const ACCOUNT_WORLDS = [
   { id: 'account-circle-dark', label: 'Account circle, dark', spec: { colorScheme: 'dark', feeds: 'some' } },
-  { id: 'account-circle-light', label: 'Account circle, light', spec: { colorScheme: 'light', section: 'saved' } },
+  { id: 'account-circle-light', label: 'Account circle, light', spec: { colorScheme: 'light' } },
   { id: 'account-sheet', label: 'Account sheet', spec: { colorScheme: 'dark', feeds: 'some', accountSheet: 'open' } },
   {
     id: 'account-signing-out',
@@ -199,7 +186,7 @@ export const ACCOUNT_WORLDS = [
   {
     id: 'account-no-server',
     label: 'Sign out with no server',
-    spec: { colorScheme: 'dark', section: 'saved', accountSheet: 'open', signOut: 'no-server' },
+    spec: { colorScheme: 'dark', accountSheet: 'open', signOut: 'no-server' },
   },
   {
     id: 'account-no-name',
@@ -231,30 +218,4 @@ export const ACCOUNT_WORLDS = [
 ] as const satisfies readonly CatalogWorld[];
 
 export type AccountWorldId = (typeof ACCOUNT_WORLDS)[number]['id'];
-
-/** Saved (FEE-30): most recently Saved first, its empty state, and an Article whose Feed was removed (T23). */
-export const SAVED_WORLDS = [
-  { id: 'saved-dark', label: 'Saved, dark', spec: { colorScheme: 'dark', section: 'saved', feeds: 'some' } },
-  { id: 'saved-light', label: 'Saved, light', spec: { colorScheme: 'light', section: 'saved', feeds: 'some' } },
-  { id: 'saved-empty', label: 'Nothing Saved yet', spec: { colorScheme: 'dark', section: 'saved', feeds: 'some', saved: 'none' } },
-  {
-    id: 'saved-empty-light',
-    label: 'Nothing Saved yet, light',
-    spec: { colorScheme: 'light', section: 'saved', feeds: 'some', saved: 'none' },
-  },
-  { id: 'saved-loading', label: 'Saved, loading', spec: { colorScheme: 'dark', section: 'saved', feeds: 'some', saved: 'loading' } },
-  {
-    id: 'saved-largest-font',
-    label: 'Saved, largest font size',
-    spec: { colorScheme: 'dark', section: 'saved', feeds: 'some', fontScale: 2 },
-  },
-  {
-    id: 'saved-remove-animations',
-    label: 'Saved, Remove animations',
-    spec: { colorScheme: 'dark', section: 'saved', feeds: 'some', reduceMotion: true },
-  },
-] as const satisfies readonly CatalogWorld[];
-
-export type SavedWorldId = (typeof SAVED_WORLDS)[number]['id'];
-
 
