@@ -71,24 +71,12 @@ export const ADD_FEED_WORLDS = [
   { id: 'add-no-feed', label: 'No feed found', spec: { colorScheme: 'light', section: 'add-feed', addFeed: 'no-feed-found' } },
   { id: 'add-not-a-feed', label: 'Not a feed', spec: { colorScheme: 'dark', section: 'add-feed', addFeed: 'not-a-feed' } },
   { id: 'add-unreachable', label: 'Unreachable', spec: { colorScheme: 'light', section: 'add-feed', addFeed: 'unreachable' } },
+  // Text that isn't an address, a name say, is this error: Add a Feed doesn't search (FEE-96).
+  { id: 'add-invalid', label: 'Not an address', spec: { colorScheme: 'dark', section: 'add-feed', addFeed: 'invalid-url' } },
   {
     id: 'add-largest-font',
     label: 'Add a Feed, largest font size',
     spec: { colorScheme: 'dark', section: 'add-feed', addFeed: 'choose', fontScale: 2 },
-  },
-  // Finding a Feed by its site's name (FEE-80).
-  { id: 'add-find-searching', label: 'Searching for a name', spec: { colorScheme: 'dark', section: 'add-feed', addFeed: 'find-searching' } },
-  { id: 'add-find-arriving', label: 'Results arriving', spec: { colorScheme: 'light', section: 'add-feed', addFeed: 'find-arriving' } },
-  { id: 'add-find-known', label: 'Found', spec: { colorScheme: 'dark', section: 'add-feed', addFeed: 'find-known' } },
-  { id: 'add-find-following', label: 'Found one you follow', spec: { colorScheme: 'light', section: 'add-feed', addFeed: 'find-following' } },
-  { id: 'add-find-nothing', label: 'Nothing found', spec: { colorScheme: 'dark', section: 'add-feed', addFeed: 'find-nothing' } },
-  { id: 'add-find-failed', label: 'Search failed', spec: { colorScheme: 'light', section: 'add-feed', addFeed: 'find-failed' } },
-  // Guessing searches used up for now (FEE-88), with what the catalog already knew still listed.
-  { id: 'add-find-limited', label: 'Searches used up', spec: { colorScheme: 'dark', section: 'add-feed', addFeed: 'find-limited' } },
-  {
-    id: 'add-find-largest-font',
-    label: 'Found, largest font size',
-    spec: { colorScheme: 'dark', section: 'add-feed', addFeed: 'find-following', fontScale: 2 },
   },
 ] as const satisfies readonly CatalogWorld[];
 

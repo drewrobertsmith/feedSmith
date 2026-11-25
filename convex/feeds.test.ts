@@ -82,6 +82,9 @@ describe('adding a Feed', () => {
   test.each([
     ['not https', 'http://example.com/feed', 'invalid-url', false],
     ['too long', `https://example.com/${'a'.repeat(3000)}`, 'invalid-url', false],
+    // Not an address at all (FEE-96): never fetched as https://theverge.
+    ['a name, one word', 'theverge', 'invalid-url', false],
+    ['a name, two words', 'the verge', 'invalid-url', false],
   ])('a URL that is %s is refused without fetching', async (_case, url, reason, fetched) => {
     const { a } = await setup();
     expect(await a.action(api.feeds.add, { url })).toEqual({ ok: false, reason });
@@ -372,7 +375,7 @@ describe('finding a Feed from a website (T21)', () => {
   );
 });
 
-describe('what adding a Feed teaches the catalog (FEE-80, T35)', () => {
+describe('adding a Feed leaves the catalog alone (FEE-96)', () => {
   const home = (head: string) => new Response(`<!doctype html><html><head>${head}</head><body><p>Home of the site, with news every day.</p></body></html>`);
   const DECLARES =
     '<meta property="og:site_name" content="Site Example"><link rel="icon" href="/icon.png"><link rel="alternate" type="application/rss+xml" href="/rss.xml">';
@@ -381,38 +384,14 @@ describe('what adding a Feed teaches the catalog (FEE-80, T35)', () => {
   const catalog = (t: Awaited<ReturnType<typeof setup>>['t']) =>
     t.run((ctx) => ctx.db.query('feedCatalog').take(10));
 
-  test('a typed subscriber feed URL with a token never reaches the catalog', async () => {
+  test("a site's homepage declaring one feed is added, and the catalog stays empty", async () => {
     const { t, a } = await setup();
-    expect(await a.action(api.feeds.add, { url: FEED_URL })).toMatchObject({ ok: true });
-    expect(await catalog(t)).toEqual([]);
-    expect(JSON.stringify(await a.query(api.catalog.search, { name: 'the verge' }))).not.toContain('SECRET');
-  });
-
-  test('a typed page with a path or query never teaches the catalog its feeds, even declared ones', async () => {
-    const { t, a } = await setup();
-    route({
-      'https://site.example.com/members?token=SECRET': () => home(DECLARES.replace('/rss.xml', '/rss.xml?token=SECRET')),
-      'https://site.example.com/rss.xml?token=SECRET': () => new Response(verge),
-    });
-    expect(await a.action(api.feeds.add, { url: 'https://site.example.com/members?token=SECRET' })).toMatchObject({ ok: true });
-    expect(await catalog(t)).toEqual([]);
-  });
-
-  test("a site's homepage declaring one feed: once it's added, a search by the site's name finds it without fetching", async () => {
-    const { t, a, b } = await setup();
     route({ 'https://site.example.com/': () => home(DECLARES), 'https://site.example.com/rss.xml': () => new Response(verge) });
     expect(await a.action(api.feeds.add, { url: 'site.example.com' })).toMatchObject({ ok: true });
-    const [entry] = await catalog(t);
-    expect(entry).toMatchObject({ url: 'https://site.example.com/rss.xml', name: 'Site Example', source: 'declared', iconUrl: 'https://site.example.com/icon.png' });
-    network.mockClear();
-    // Another User finds it by name: public, and nothing of User A's comes with it.
-    expect(await b.query(api.catalog.search, { name: 'site example' })).toEqual([
-      { kind: 'new', url: 'https://site.example.com/rss.xml', title: 'Site Example', host: 'site.example.com', iconUrl: 'https://site.example.com/icon.png' },
-    ]);
-    expect(network).not.toHaveBeenCalled();
+    expect(await catalog(t)).toEqual([]);
   });
 
-  test('a homepage declaring several feeds: its first, once proven to parse, joins the catalog', async () => {
+  test('a homepage declaring several feeds offers the choice, and nothing joins the catalog', async () => {
     vi.useFakeTimers();
     try {
       const { t, a } = await setup();
@@ -423,13 +402,13 @@ describe('what adding a Feed teaches the catalog (FEE-80, T35)', () => {
       });
       expect(await a.action(api.feeds.add, { url: 'site.example.com' })).toMatchObject({ reason: 'choose' });
       await t.finishAllScheduledFunctions(vi.runAllTimers);
-      expect((await catalog(t)).map((entry) => entry.url)).toEqual(['https://site.example.com/rss.xml']);
+      expect(await catalog(t)).toEqual([]);
     } finally {
       vi.useRealTimers();
     }
   });
 
-  test('adding a Feed already in the catalog refreshes its name and icon, and adds nothing new', async () => {
+  test('adding a Feed already in the catalog leaves its entry as it was', async () => {
     const { t, a } = await setup();
     await t.mutation(internal.catalog.remember, {
       url: 'https://site.example.com/rss.xml',
@@ -439,12 +418,8 @@ describe('what adding a Feed teaches the catalog (FEE-80, T35)', () => {
       source: 'declared',
       now: 1,
     });
-    const siteFeed = '<rss version="2.0"><channel><title>Site feed</title><link>https://site.example.com/</link><item><title>Post</title><guid>p1</guid></item></channel></rss>';
-    route({ 'https://site.example.com/': () => home(DECLARES), 'https://site.example.com/rss.xml': () => new Response(siteFeed) });
-    await a.action(api.feeds.add, { url: 'https://site.example.com/rss.xml' });
-    const entries = await catalog(t);
-    expect(entries).toHaveLength(1);
-    expect(entries[0]).toMatchObject({ name: 'Site Example', iconUrl: 'https://site.example.com/icon.png' });
-    expect(entries[0].seenAt).toBeGreaterThan(1);
+    route({ 'https://site.example.com/': () => home(DECLARES), 'https://site.example.com/rss.xml': () => new Response(verge) });
+    expect(await a.action(api.feeds.add, { url: 'https://site.example.com/rss.xml' })).toMatchObject({ ok: true });
+    expect(await catalog(t)).toEqual([expect.objectContaining({ name: 'Old Name', seenAt: 1 })]);
   });
 });

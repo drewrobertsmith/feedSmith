@@ -17,10 +17,4 @@ export const motion = {
    * Short enough to stay inside the 300 ms tap-to-text budget.
    */
   articleOpen: { duration: 300, easing: [0.2, 0, 0, 1], fadeOutEnd: 1, fadeIn: 150 },
-  /**
-   * A Feed found by name arrives in Add a Feed (FEE-80): it fades in, rising `distance` into its
-   * place, while the rows after it make room on the same curve, so nothing jumps. A search brings a
-   * handful at most, so quiet: no scale, no bounce.
-   */
-  resultArrive: { distance: 8, duration: 200, easing: [0.16, 1, 0.3, 1] },
 } as const;
