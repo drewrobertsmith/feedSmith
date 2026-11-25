@@ -108,7 +108,7 @@ function FeedRow({ feed, onRename }: { feed: ManagedFeed; onRename: () => void }
   const { remove } = useManageActions();
 
   const confirmRemove = () =>
-    Alert.alert(`Remove ${feed.title}?`, 'Its Articles go too. Articles you’ve Saved stay in Saved.', [
+    Alert.alert(`Remove ${feed.title}?`, 'Its Articles go too.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Remove',

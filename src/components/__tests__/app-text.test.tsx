@@ -30,11 +30,11 @@ test('scales size and line height with the environment', async () => {
 test('headings are announced as headings', async () => {
   await render(
     <EnvironmentProvider environment={env(1)}>
-      <AppText variant="title">Saved</AppText>
+      <AppText variant="title">Feeds</AppText>
     </EnvironmentProvider>,
   );
 
-  expect(screen.getByRole('heading', { name: 'Saved' })).toBeOnTheScreen();
+  expect(screen.getByRole('heading', { name: 'Feeds' })).toBeOnTheScreen();
 });
 
 test("an Article's own words are set in Literata, in real cuts; the app's in Instrument Sans (D6)", async () => {

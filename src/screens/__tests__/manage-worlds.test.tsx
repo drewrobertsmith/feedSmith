@@ -3,9 +3,7 @@ import { renderRouter, screen } from 'expo-router/testing-library';
 import { Alert } from 'react-native';
 import { Uniwind } from 'uniwind';
 
-import TabsLayout from '@/app/(tabs)/_layout';
-import FeedsRoute from '@/app/(tabs)/index';
-import SavedRoute from '@/app/(tabs)/saved';
+import FeedsRoute from '@/app/index';
 import ArticleRoute from '@/app/article/[id]';
 import ManageFeedsRoute from '@/app/manage-feeds';
 import { NativeSheet } from '@/components/native-sheet';
@@ -21,9 +19,7 @@ async function open(spec: WorldSpec) {
   await renderRouter(
     {
       _layout: () => <AppRoot environment={w.environment} auth={w.auth} feeds={w.feeds} />,
-      '(tabs)/_layout': TabsLayout,
-      '(tabs)/index': FeedsRoute,
-      '(tabs)/saved': SavedRoute,
+      index: FeedsRoute,
       'article/[id]': ArticleRoute,
       'manage-feeds': ManageFeedsRoute,
     },
@@ -175,7 +171,7 @@ describe('Manage Feeds', () => {
     expect(w.feedsLog.renames).toEqual([]);
   });
 
-  test('removing a Feed asks first, saying Saved Articles stay (T23), then removes it', async () => {
+  test('removing a Feed asks first, saying its Articles go too, then removes it', async () => {
     const alert = jest.spyOn(Alert, 'alert');
     const user = userEvent.setup();
     const w = await open({ colorScheme: 'dark', section: 'manage' });
@@ -183,7 +179,7 @@ describe('Manage Feeds', () => {
     expect(w.feedsLog.removed).toEqual([]);
     const [title, message, buttons] = alert.mock.calls[0];
     expect(title).toBe('Remove Calm Notes?');
-    expect(message).toBe('Its Articles go too. Articles you’ve Saved stay in Saved.');
+    expect(message).toBe('Its Articles go too.');
     const remove = buttons!.find((b) => b.text === 'Remove')!;
     expect(remove.style).toBe('destructive');
     await act(async () => remove.onPress!());

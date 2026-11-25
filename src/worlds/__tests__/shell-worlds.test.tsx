@@ -1,9 +1,7 @@
 import { renderRouter, screen } from 'expo-router/testing-library';
 import { Uniwind } from 'uniwind';
 
-import TabsLayout from '@/app/(tabs)/_layout';
-import FeedsRoute from '@/app/(tabs)/index';
-import SavedRoute from '@/app/(tabs)/saved';
+import FeedsRoute from '@/app/index';
 import AuthReturnRoute from '@/app/auth';
 import GalleryRoute from '@/app/gallery';
 import SignInRoute from '@/app/sign-in';
@@ -13,7 +11,7 @@ import { createWorld } from '@/worlds/world';
 import { reanimatedReducesMotion } from '../../../test/reduced-motion';
 
 type Shows = {
-  heading: 'Feeds' | 'Saved';
+  heading: 'Feeds';
   message: RegExp;
   theme: 'dark' | 'light';
   titleSize: number;
@@ -21,13 +19,10 @@ type Shows = {
 };
 
 const FEEDS = /Add a Feed to see its Articles here/;
-const SAVED = /Nothing Saved yet/;
 
 const SHOWS: Record<ShellWorldId, Shows> = {
   dark: { heading: 'Feeds', message: FEEDS, theme: 'dark', titleSize: 24, reduceMotion: false },
   light: { heading: 'Feeds', message: FEEDS, theme: 'light', titleSize: 24, reduceMotion: false },
-  'dark-saved': { heading: 'Saved', message: SAVED, theme: 'dark', titleSize: 24, reduceMotion: false },
-  'light-saved': { heading: 'Saved', message: SAVED, theme: 'light', titleSize: 24, reduceMotion: false },
   'largest-font': { heading: 'Feeds', message: FEEDS, theme: 'dark', titleSize: 48, reduceMotion: false },
   'remove-animations': { heading: 'Feeds', message: FEEDS, theme: 'dark', titleSize: 24, reduceMotion: true },
 };
@@ -39,9 +34,7 @@ test.each(SHELL_WORLDS)('$label', async ({ id, spec }) => {
   await renderRouter(
     {
       _layout: () => <AppRoot environment={world.environment} auth={world.auth} feeds={world.feeds} />,
-      '(tabs)/_layout': TabsLayout,
-      '(tabs)/index': FeedsRoute,
-      '(tabs)/saved': SavedRoute,
+      index: FeedsRoute,
       gallery: GalleryRoute,
       'sign-in': SignInRoute,
       auth: AuthReturnRoute,

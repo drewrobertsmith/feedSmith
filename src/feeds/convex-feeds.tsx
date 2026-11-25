@@ -1,6 +1,5 @@
 import { useAction, useConvexAuth, useMutation, useQuery } from 'convex/react';
-import type { OptimisticLocalStore } from 'convex/browser';
-import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex/server';
+import type { FunctionArgs, FunctionReference } from 'convex/server';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { api } from '../../convex/_generated/api';
@@ -18,8 +17,6 @@ import {
   type ManageActions,
   type ManageView,
   type FeedsData,
-  type SavedActions,
-  type SavedView,
   type LastUpdatedView,
 } from '@/feeds/feeds-data';
 
@@ -60,53 +57,6 @@ function useAll(feedId: string | null): AllView {
   const articles = useSignedInQuery(api.articles.all, feedId === null ? {} : { feedId });
   useEffect(() => rememberTitles(articles), [articles]);
   return articles === undefined ? { status: 'loading' } : { status: 'ready', articles };
-}
-
-function useSaved(): SavedView {
-  const articles = useSignedInQuery(api.articles.saved, {});
-  useEffect(() => rememberTitles(articles), [articles]);
-  return articles === undefined ? { status: 'loading' } : { status: 'ready', articles };
-}
-
-type Row = FunctionReturnType<typeof api.articles.saved>[number];
-
-/**
- * Shows an Article Saved or not, and Read, everywhere the app has it (Q3): every list of All and
- * its Feeds, Saved, and its Reading view, before the server answers. A refusal rolls it back.
- */
-function showSaved(store: OptimisticLocalStore, id: string, saved: boolean) {
-  const mark = (row: Row): Row => (row.id === id ? { ...row, saved, read: saved ? row.read : true } : row);
-  let found: Row | undefined;
-  for (const { args, value } of store.getAllQueries(api.articles.all)) {
-    if (!value) continue;
-    found ??= value.find((row) => row.id === id);
-    store.setQuery(api.articles.all, args, value.map(mark));
-  }
-  const list = store.getQuery(api.articles.saved, {});
-  if (list) {
-    found ??= list.find((row) => row.id === id);
-    const rest = list.filter((row) => row.id !== id);
-    // Newly Saved goes to the top; one already there keeps its place.
-    const already = list.some((row) => row.id === id);
-    store.setQuery(api.articles.saved, {}, saved && found ? (already ? list : [mark(found), ...rest]) : rest);
-  }
-  for (const { args, value } of store.getAllQueries(api.articles.get)) {
-    if (value && args.id === id) store.setQuery(api.articles.get, args, { ...value, saved });
-  }
-}
-
-function useSavedActions(): SavedActions {
-  const save = useMutation(api.articles.save).withOptimisticUpdate((store, { id }) => showSaved(store, id, true));
-  const done = useMutation(api.articles.done).withOptimisticUpdate((store, { id }) => showSaved(store, id, false));
-  // Undo puts the server's state back; the lists follow when it answers.
-  const restore = useMutation(api.articles.restore);
-  return {
-    save: (id) => save({ id }).catch(() => null),
-    done: (id) => done({ id }).catch(() => null),
-    restore: async (id, before) => {
-      await restore({ id, ...before }).catch(() => null);
-    },
-  };
 }
 
 function useChips(): ChipsView {
@@ -258,8 +208,6 @@ function useLastUpdated(): LastUpdatedView {
 const convexFeeds: FeedsData = {
   useAll,
   useChips,
-  useSaved,
-  useSavedActions,
   useManage,
   useManageActions,
   useArticle,

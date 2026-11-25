@@ -1,13 +1,8 @@
 import { faceOf } from '../../../test/depth';
-import { act, fireEvent, userEvent, waitFor, within } from '@testing-library/react-native';
-import * as Haptics from 'expo-haptics';
+import { act, fireEvent, userEvent, within } from '@testing-library/react-native';
 import { screen } from 'expo-router/testing-library';
 import { useState } from 'react';
-import { Animated, Dimensions, ScrollView, ToastAndroid } from 'react-native';
-import { State, type LegacyPanGesture } from 'react-native-gesture-handler';
-import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
-import { getAnimatedStyle as untypedGetAnimatedStyle } from 'react-native-reanimated';
-import type { getAnimatedStyle as GetAnimatedStyle } from 'react-native-reanimated/lib/typescript/jestUtils/index.native';
+import { Animated, ScrollView, ToastAndroid } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { Uniwind } from 'uniwind';
 
@@ -15,7 +10,6 @@ import { NativeSheet } from '@/components/native-sheet';
 import { publishedAgo, publishedDate } from '@/feeds/format';
 import { depthStyle } from '@/theme/depth';
 import { spacing } from '@/theme/spacing';
-import { themes } from '@/theme/tokens';
 import {
   ADD_FEED_WORLDS,
   ALL_WORLDS,
@@ -38,12 +32,6 @@ import { createWorld, type World, type WorldSpec } from '@/worlds/world';
 import { layOutList, renderWorld } from '../../../test/world-router';
 
 jest.mock('expo-web-browser', () => ({ openBrowserAsync: jest.fn() }));
-// Reanimated's real one, as its native typings describe it (T31).
-const getAnimatedStyle = untypedGetAnimatedStyle as unknown as typeof GetAnimatedStyle;
-jest.mock('expo-haptics', () => ({
-  ...jest.requireActual('expo-haptics'),
-  performAndroidHapticsAsync: jest.fn(() => Promise.resolve()),
-}));
 
 let world: World | undefined;
 const open = async (spec: WorldSpec, initialUrl?: string) => {
@@ -318,10 +306,10 @@ describe('All', () => {
     const [first, second] = FIXTURE_ROWS;
     expect(rows[0]).toHaveAccessibleName(`${first.title}, By Terrence O’Brien, The Verge, ${publishedAgo(first.publishedAt, FIXTURE_NOW)}`);
     expect(rows[1]).toHaveAccessibleName(
-      `${second.title}, By Emma Roth and Jay Peters, The Verge, ${publishedAgo(second.publishedAt, FIXTURE_NOW)}, Saved, Read`,
+      `${second.title}, By Emma Roth and Jay Peters, The Verge, ${publishedAgo(second.publishedAt, FIXTURE_NOW)}, Read`,
     );
     const [, , third] = FIXTURE_ROWS;
-    expect(rows[2]).toHaveAccessibleName(`${third.title}, The Verge, ${publishedAgo(third.publishedAt, FIXTURE_NOW)}, Saved`);
+    expect(rows[2]).toHaveAccessibleName(`${third.title}, The Verge, ${publishedAgo(third.publishedAt, FIXTURE_NOW)}`);
   });
 
   test("a row credits its authors under the title, above the Subtitle; a row with none has no byline (FEE-41)", async () => {
@@ -431,120 +419,6 @@ describe('All', () => {
     expect(screen.getByRole('heading', { name: 'Feeds' })).toBeOnTheScreen();
   });
 
-  describe('swiping a row left in Feeds (FEE-30)', () => {
-    beforeEach(() => {
-      jest.useFakeTimers();
-      jest.mocked(Haptics.performAndroidHapticsAsync).mockClear();
-    });
-    afterEach(() => jest.useRealTimers());
-    const width = () => Dimensions.get('window').width;
-    const swipe = async (id: string, translationX: number) =>
-      act(async () =>
-        fireGestureHandler<LegacyPanGesture>(getByGestureTestId(`swipe-${id}`), [
-          { state: State.BEGAN, translationX: 0 },
-          { state: State.ACTIVE, translationX: -20 },
-          { translationX },
-          { state: State.END, translationX, velocityX: 0 },
-        ]),
-      );
-    const translateX = (id: string) => {
-      const style = getAnimatedStyle(screen.getByTestId(`swipe-row-${id}`)) as { transform?: { translateX: number }[] };
-      return style.transform?.[0]?.translateX ?? 0;
-    };
-
-    test('Saves it; the row springs back and stays, now marked in Gold, with Undo', async () => {
-      const w = await open({ colorScheme: 'dark', feeds: 'some' });
-      const [first] = FIXTURE_ROWS;
-      await screen.findByRole('heading', { name: 'Feeds' });
-      await swipe(first.id, -0.6 * width());
-      await act(async () => jest.advanceTimersByTime(1000));
-
-      expect(w.feedsLog.saves).toEqual([first.id]);
-      expect(jest.mocked(Haptics.performAndroidHapticsAsync).mock.calls).toEqual([[Haptics.AndroidHaptics.Segment_Tick]]);
-      expect(translateX(first.id)).toBe(0);
-      expect(screen.getByRole('link', { name: new RegExp(`^${first.title.slice(0, 20)}.*, Saved$`) })).toBeOnTheScreen();
-      expect(screen.getByTestId('undo-toast')).toBeOnTheScreen();
-      // The panel behind it said Save, in Gold.
-      expect(screen.getAllByTestId('swipe-panel-save', { includeHiddenElements: true }).length).toBeGreaterThan(0);
-    });
-
-    test('a Saved row swiped marks it Done, and stays in Feeds as Read (P21)', async () => {
-      const w = await open({ colorScheme: 'dark', feeds: 'some' });
-      const saved = FIXTURE_ROWS[2];
-      await screen.findByRole('heading', { name: 'Feeds' });
-      expect(screen.getAllByTestId('swipe-panel-done', { includeHiddenElements: true }).length).toBeGreaterThan(0);
-      await swipe(saved.id, -0.6 * width());
-      await act(async () => jest.advanceTimersByTime(1000));
-      expect(w.feedsLog.dones).toEqual([saved.id]);
-      expect(screen.getByRole('link', { name: new RegExp(`^${saved.title.slice(0, 20)}.*, Read$`) })).not.toHaveAccessibleName(/Saved/);
-    });
-
-    test.each([
-      ['springs home', false, true],
-      ['is home at once with Remove animations (Q17)', true, false],
-    ])('let go early, the row %s', async (_name, reduceMotion, moving) => {
-      await open({ colorScheme: 'dark', feeds: 'some', reduceMotion });
-      const [first] = FIXTURE_ROWS;
-      await screen.findByRole('heading', { name: 'Feeds' });
-      await swipe(first.id, -0.2 * width());
-      await act(async () => jest.advanceTimersByTime(16));
-      expect(translateX(first.id) !== 0).toBe(moving);
-      await act(async () => jest.advanceTimersByTime(1000));
-      expect(translateX(first.id)).toBe(0);
-    });
-  });
-
-  describe('Save and Done from a row (FEE-30)', () => {
-    const row = (title: string) => screen.findByRole('link', { name: new RegExp(`^${title.slice(0, 20)}`) });
-
-    test('a Saved Article is marked in Gold, to the eye and to TalkBack (D5)', async () => {
-      await open({ colorScheme: 'dark', feeds: 'some' });
-      await screen.findByRole('heading', { name: 'Feeds' });
-      const saved = FIXTURE_ROWS.filter((r) => r.saved);
-      expect(screen.getAllByTestId('row-saved-mark')).toHaveLength(saved.length);
-      expect(screen.getAllByRole('link', { name: /, Saved(, Read)?$/ })).toHaveLength(saved.length);
-      for (const mark of screen.getAllByTestId('row-saved-mark')) expect(mark.props.tintColor).toBe(themes.dark.accent);
-    });
-
-    test('a row offers Save to TalkBack, or Done once Saved (Q15)', async () => {
-      await open({ colorScheme: 'dark', feeds: 'some' });
-      expect((await row(FIXTURE_ROWS[0].title)).props.accessibilityActions).toEqual([{ name: 'save', label: 'Save' }]);
-      expect((await row(FIXTURE_ROWS[2].title)).props.accessibilityActions).toEqual([{ name: 'done', label: 'Done' }]);
-    });
-
-    test('Save marks it at once, with a haptic, says so, and Undo takes it back (Q3, Q35)', async () => {
-      const w = await open({ colorScheme: 'dark', feeds: 'some' });
-      const [first] = FIXTURE_ROWS;
-      await act(async () => fireEvent(await row(first.title), 'accessibilityAction', { nativeEvent: { actionName: 'save' } }));
-
-      expect(w.feedsLog.saves).toEqual([first.id]);
-      expect(Haptics.performAndroidHapticsAsync).toHaveBeenCalledWith(Haptics.AndroidHaptics.Confirm);
-      expect(await row(first.title)).toHaveAccessibleName(/, Saved$/);
-      const toast = await screen.findByTestId('undo-toast');
-      expect(within(toast).getByText('Saved.')).toBeOnTheScreen();
-
-      await userEvent.press(within(toast).getByRole('button', { name: 'Undo' }));
-      await waitFor(() => expect(w.feedsLog.restores).toEqual([{ id: first.id, before: {} }]));
-      expect(await row(first.title)).not.toHaveAccessibleName(/Saved/);
-    });
-
-    test('Done on a Saved row takes it out of Saved and leaves it Read (P8)', async () => {
-      const w = await open({ colorScheme: 'dark', feeds: 'some' });
-      const saved = FIXTURE_ROWS[2];
-      await act(async () => fireEvent(await row(saved.title), 'accessibilityAction', { nativeEvent: { actionName: 'done' } }));
-      expect(w.feedsLog.dones).toEqual([saved.id]);
-      expect(await row(saved.title)).toHaveAccessibleName(/, Read$/);
-      expect(await row(saved.title)).not.toHaveAccessibleName(/Saved/);
-      expect(within(await screen.findByTestId('undo-toast')).getByText('Marked Done.')).toBeOnTheScreen();
-    });
-
-    test("a Save that doesn't reach the server offers no Undo to do", async () => {
-      const w = await open({ colorScheme: 'dark', feeds: 'some', savedWrites: 'fail' });
-      await act(async () => fireEvent(await row(FIXTURE_ROWS[0].title), 'accessibilityAction', { nativeEvent: { actionName: 'save' } }));
-      await userEvent.press(within(await screen.findByTestId('undo-toast')).getByRole('button', { name: 'Undo' }));
-      expect(w.feedsLog.restores).toEqual([]);
-    });
-  });
 });
 
 describe('Add a Feed, in its sheet over Feeds (FEE-45)', () => {
@@ -753,7 +627,6 @@ describe('the Reading view', () => {
     /** The Feed name, a link to that Feed (FEE-47); null when there's no Article. */
     feed: string | null;
     /** The floating Save or Done (FEE-30); null when there's no Article. */
-    pill: 'Save' | 'Done' | null;
   };
   const ARTICLE = FIXTURE_ARTICLE.title;
   const CALM = FIXTURE_EXTRACTING_ARTICLE.title;
@@ -775,10 +648,10 @@ describe('the Reading view', () => {
     byline: null,
   } as const;
   const SHOWS: Record<ReadingWorldId, Shows> = {
-    'reading-dark': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'dark', feed: 'The Verge', pill: 'Save' },
-    'reading-light': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'light', feed: 'The Verge', pill: 'Save' },
-    'reading-no-lead-image': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'dark', feed: 'The Verge', pill: 'Save' },
-    'reading-long-feed-name': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'light', feed: 'The Verge - Full RSS for subscribers | The Verge', pill: 'Save' },
+    'reading-dark': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'dark', feed: 'The Verge' },
+    'reading-light': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'light', feed: 'The Verge' },
+    'reading-no-lead-image': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'dark', feed: 'The Verge' },
+    'reading-long-feed-name': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'light', feed: 'The Verge - Full RSS for subscribers | The Verge' },
     'reading-several-authors': {
       ...full,
       heading: ARTICLE,
@@ -786,20 +659,17 @@ describe('the Reading view', () => {
       byline: 'By Terrence O’Brien, Emma Roth and 2 others',
       theme: 'dark',
       feed: 'The Verge',
-      pill: 'Save',
     },
-    'reading-no-author': { ...full, heading: ARTICLE, body: 'Talks resume next year.', byline: null, theme: 'light', feed: 'The Verge', pill: 'Save' },
-    'reading-omitted': { ...full, heading: ARTICLE, body: 'And how the prices compare:', omittedLines: 2, theme: 'dark', feed: 'The Verge', pill: 'Save' },
-    'reading-missing': { ...full, heading: MISSING, body: null, titleSize: 24, openButton: false, byline: null, theme: 'dark', feed: null, pill: null },
-    'reading-extracting': { ...full, heading: CALM, body: SUBTITLE, note: BRINGING, byline: null, theme: 'dark', feed: 'Calm Notes', pill: 'Save' },
-    'reading-unextracted': { ...fallback, theme: 'dark', feed: 'Calm Notes', pill: 'Save' },
-    'reading-unextracted-no-image': { ...fallback, leadImage: false, theme: 'dark', feed: 'Calm Notes', pill: 'Save' },
-    'reading-unextracted-light': { ...fallback, theme: 'light', feed: 'Calm Notes', pill: 'Save' },
-    'reading-unextracted-largest-font': { ...fallback, titleSize: 60, theme: 'dark', feed: 'Calm Notes', pill: 'Save' },
-    'reading-largest-font': { ...full, heading: ARTICLE, body: 'Talks resume next year.', titleSize: 60, theme: 'dark', feed: 'The Verge', pill: 'Save' },
-    'reading-saved': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'dark', feed: 'The Verge', pill: 'Done' },
-    'reading-saved-light': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'light', feed: 'The Verge', pill: 'Done' },
-    // Opening, before the Article arrives: only the headline the list had, ready for its title to land on (FEE-48).
+    'reading-no-author': { ...full, heading: ARTICLE, body: 'Talks resume next year.', byline: null, theme: 'light', feed: 'The Verge' },
+    'reading-omitted': { ...full, heading: ARTICLE, body: 'And how the prices compare:', omittedLines: 2, theme: 'dark', feed: 'The Verge' },
+    'reading-missing': { ...full, heading: MISSING, body: null, titleSize: 24, openButton: false, byline: null, theme: 'dark', feed: null },
+    'reading-extracting': { ...full, heading: CALM, body: SUBTITLE, note: BRINGING, byline: null, theme: 'dark', feed: 'Calm Notes' },
+    'reading-unextracted': { ...fallback, theme: 'dark', feed: 'Calm Notes' },
+    'reading-unextracted-no-image': { ...fallback, leadImage: false, theme: 'dark', feed: 'Calm Notes' },
+    'reading-unextracted-light': { ...fallback, theme: 'light', feed: 'Calm Notes' },
+    'reading-unextracted-largest-font': { ...fallback, titleSize: 60, theme: 'dark', feed: 'Calm Notes' },
+    'reading-largest-font': { ...full, heading: ARTICLE, body: 'Talks resume next year.', titleSize: 60, theme: 'dark', feed: 'The Verge' },
+        // Opening, before the Article arrives: only the headline the list had, ready for its title to land on (FEE-48).
     'reading-opening': {
       heading: ARTICLE,
       body: null,
@@ -811,38 +681,10 @@ describe('the Reading view', () => {
       openButton: false,
       leadImage: false,
       feed: null,
-      pill: null,
     },
     // Its Feed is gone: the name stays, as plain text, with nowhere to link (T23).
-    'reading-removed-feed': { ...full, heading: ARTICLE, body: 'Talks resume next year.', theme: 'dark', feed: null, pill: 'Done' },
   };
 
-  describe('Save and Done (FEE-30)', () => {
-    test('Save keeps it, with a haptic, says so, and offers Done in its place (Q3, Q35)', async () => {
-      const w = await open({ colorScheme: 'dark', section: 'article' });
-      await userEvent.press(await screen.findByRole('button', { name: 'Save' }));
-      expect(w.feedsLog.saves).toEqual([FIXTURE_ROWS[0].id]);
-      expect(Haptics.performAndroidHapticsAsync).toHaveBeenCalledWith(Haptics.AndroidHaptics.Confirm);
-      expect(await screen.findByRole('button', { name: 'Done' })).toBeOnTheScreen();
-      expect(within(await screen.findByTestId('undo-toast')).getByText('Saved.')).toBeOnTheScreen();
-    });
-
-    test('Done finishes it: back to the list, with Undo there (P8, Q35)', async () => {
-      const w = await open({ colorScheme: 'dark', feeds: 'some', articleSaved: true }, '/');
-      await userEvent.press(await screen.findByRole('link', { name: new RegExp(`^${FIXTURE_ROWS[0].title.slice(0, 20)}`) }));
-      await userEvent.press(await screen.findByRole('button', { name: 'Done' }));
-      expect(w.feedsLog.dones).toEqual([FIXTURE_ROWS[0].id]);
-      expect(await screen.findByRole('heading', { name: 'Feeds' })).toBeOnTheScreen();
-      expect(screen).toHavePathname('/');
-      expect(within(await screen.findByTestId('undo-toast')).getByText('Marked Done.')).toBeOnTheScreen();
-    });
-
-    test("an Article whose Feed was removed names it, but can't link to it (T23)", async () => {
-      await open({ colorScheme: 'dark', section: 'article', article: 'removed-feed', articleSaved: true });
-      expect(await screen.findByText('Morning Brief')).toBeOnTheScreen();
-      expect(screen.queryByRole('link', { name: /open its Articles$/ })).not.toBeOnTheScreen();
-    });
-  });
 
   test.each(READING_WORLDS)('$label', async ({ id, spec }) => {
     const shows = SHOWS[id];
@@ -855,9 +697,8 @@ describe('the Reading view', () => {
     expect(screen.queryAllByRole('button', { name: 'Open original' })).toHaveLength(shows.openButton ? 1 : 0);
     if (shows.feed) expect(screen.getByRole('link', { name: `${shows.feed}, open its Articles` })).toBeOnTheScreen();
     else expect(screen.queryByRole('link', { name: /open its Articles$/ })).not.toBeOnTheScreen();
-    expect(screen.queryAllByRole('button', { name: /^(Save|Done)$/ }).map((b) => b.props.accessibilityLabel)).toEqual(
-      shows.pill ? [shows.pill] : [],
-    );
+    // Save and Done are gone (FEE-95): the page offers only the Article and Open original.
+    expect(screen.queryAllByRole('button', { name: /^(Save|Done)$/ })).toHaveLength(0);
     if (shows.byline) expect(screen.getByText(shows.byline)).toBeOnTheScreen();
     else expect(screen.queryByText(/^By /)).not.toBeOnTheScreen();
     // The fallback draws only the lead image, when there is one.
@@ -1026,20 +867,6 @@ test('Manage this Feed opens Manage Feeds from a Feed with no Articles yet (FEE-
 });
 
 describe('buttons have depth, not outlines (FEE-75, D27)', () => {
-  test.each(['dark', 'light'] as const)('in %s, the Reading view\'s Save is soft above the page and sinks when pressed', async (colorScheme) => {
-    await open({ colorScheme, section: 'article' });
-    const save = await screen.findByRole('button', { name: 'Save' });
-    expect(faceOf(save)).toMatchObject(depthStyle(colorScheme, 'soft'));
-    expect(save).not.toHaveStyle({ borderWidth: expect.any(Number) });
-    await fireEvent(save, 'pressIn');
-    expect(faceOf(screen.getByRole('button', { name: 'Save' }))).toMatchObject(depthStyle(colorScheme, 'pressed'));
-  });
-
-  test('Done, on a Saved Article, is soft too', async () => {
-    await open({ colorScheme: 'dark', section: 'article', articleSaved: true });
-    expect(faceOf(await screen.findByRole('button', { name: 'Done' }))).toMatchObject(depthStyle('dark', 'soft'));
-  });
-
   test.each([
     ['Add a Feed', { colorScheme: 'dark', feeds: 'none' }],
     ['Open original', { colorScheme: 'light', section: 'article', article: 'unextracted' }],
@@ -1112,7 +939,8 @@ describe('the headline is there from the first frame, and stays the same headlin
     await renderWorld({ ...world, feeds });
     const before = await screen.findByRole('heading', { name: first.title });
     await act(async () => arrive());
-    expect(await screen.findByRole('button', { name: 'Save' })).toBeOnTheScreen();
+    // The Article's arrived once its page offers Open original.
+    expect(await screen.findByRole('button', { name: 'Open original' })).toBeOnTheScreen();
     expect(screen.getByRole('heading', { name: first.title })).toBe(before);
     world.dispose();
   });
