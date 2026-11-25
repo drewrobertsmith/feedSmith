@@ -10,7 +10,8 @@ export type MenuAction = { label: string; destructive?: boolean; onPress: () => 
 /**
  * Android's own menu (Material 3's `DropdownMenu`, through Expo UI's Compose layer), anchored to the
  * React Native view it wraps. It opens when `open` says so, so the caller chooses how (a long-press);
- * a tap outside or back closes it. Choosing an action closes it first, then runs the action.
+ * a tap outside or back closes it. Choosing an action closes it first, then runs the action. The
+ * wrapped view never takes a touch: what's under it keeps its own, as under `NativeSheet`.
  */
 export function NativeMenu({
   open,
@@ -26,7 +27,7 @@ export function NativeMenu({
   const { colorScheme } = useEnvironment();
   const theme = themes[colorScheme];
   return (
-    <Host matchContents>
+    <Host matchContents pointerEvents="none">
       <DropdownMenu expanded={open} onDismissRequest={onClose} color={theme.surface}>
         <DropdownMenu.Trigger>
           <RNHostView matchContents>{children}</RNHostView>

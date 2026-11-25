@@ -80,47 +80,6 @@ function Chip({
   );
 }
 
-/**
- * A Feed's chip, with its menu (FEE-97): a long-press opens Android's menu, anchored to the chip, holding
- * Remove. It's the only action a Feed has, kept out of the way of reading (D40's "no long-press" undone).
- */
-function FeedChipWithMenu({
-  chip,
-  selected,
-  onSelect,
-  onRemove,
-  initiallyOpen,
-  onLayout,
-}: {
-  chip: FeedChip;
-  selected: boolean;
-  onSelect: () => void;
-  onRemove: () => void;
-  /** The menu starts open: the state gallery's menu worlds. */
-  initiallyOpen: boolean;
-  onLayout: (event: LayoutChangeEvent) => void;
-}) {
-  const [open, setOpen] = useState(initiallyOpen);
-  const label = `Remove ${chip.title}`;
-  return (
-    // Measured here, in the row's own coordinates: the menu's native host sits between the row and the chip.
-    <View onLayout={onLayout}>
-      <NativeMenu open={open} onClose={() => setOpen(false)} actions={[{ label, destructive: true, onPress: onRemove }]}>
-        <Chip
-          accessibleName={chip.title}
-          selected={selected}
-          onPress={onSelect}
-          onLongPress={() => setOpen(true)}
-          remove={{ label, onRemove }}
-        >
-          <FeedIcon key={chip.faviconUrl} url={chip.faviconUrl} title={chip.title} size={ICON} fallback="none" />
-          <ChipLabel label={chipLabel(chip.title)} tone={chipTone({ selected })} />
-        </Chip>
-      </NativeMenu>
-    </View>
-  );
-}
-
 const TONE_CLASS: Record<ChipTone, string> = { accent: 'text-accent', textMuted: 'text-text-muted' };
 
 /** A chip's words: TalkBack hears the chip's own name instead. */
@@ -131,6 +90,16 @@ function ChipLabel({ label, tone }: { label: string; tone: ChipTone }) {
     </AppText>
   );
 }
+
+/** Where a chip sits in the row's content, as it last laid out. */
+type Box = { x: number; y: number; width: number; height: number };
+const NO_BOX: Box = { x: 0, y: 0, width: 0, height: 0 };
+
+/**
+ * The chip whose menu is showing (FEE-97), and where it sits: the menu anchors to an empty box laid over
+ * it. It stays after the menu closes, so the menu can leave on its own motion.
+ */
+type Menu = { id: string; open: boolean; box?: Box };
 
 /**
  * The chip row under the Feeds top bar (P5, P9, D12): All, then the Feeds in the server's order. For
@@ -158,9 +127,16 @@ export function ChipRow({
   const background = themes[colorScheme].background;
   const scroller = useRef<ScrollViewInstance>(null);
   /** Each chip's place in the row, by Feed id (All is ''), measured as it lays out. */
-  const chipAt = useRef(new Map<string, { x: number; width: number }>());
-  const place = (event: LayoutChangeEvent, id: string) =>
-    chipAt.current.set(id, { x: event.nativeEvent.layout.x, width: event.nativeEvent.layout.width });
+  const chipAt = useRef(new Map<string, Box>());
+  const [menu, setMenu] = useState<Menu | null>(menuFor ? { id: menuFor, open: true } : null);
+  const place = (event: LayoutChangeEvent, id: string) => {
+    const { x, y, width, height } = event.nativeEvent.layout;
+    chipAt.current.set(id, { x, y, width, height });
+    // A menu opened before its chip was measured (the gallery's) finds its place now.
+    setMenu((now) => (now?.id === id && !now.box ? { ...now, box: { x, y, width, height } } : now));
+  };
+  const openMenu = (id: string) => setMenu({ id, open: true, box: chipAt.current.get(id) });
+  const menuChip = menu ? chips.find((chip) => chip.id === menu.id) : undefined;
   const [row, setRow] = useState({ width: 0, content: 0 });
   /** Where the row is scrolled to: native for the fades, a ref for the reveal (no React state on a scroll). */
   const [scroll] = useState(() => new Animated.Value(0));
@@ -214,16 +190,36 @@ export function ChipRow({
         {/* Every chip stays mounted: a chosen one is measured to scroll into view, and a person's Feeds are tens of small pills. */}
         {/* react-doctor-disable-next-line react-doctor/rn-no-scrollview-mapped-list */}
         {chips.map((chip) => (
-          <FeedChipWithMenu
+          <Chip
             key={chip.id}
-            chip={chip}
+            accessibleName={chip.title}
             selected={selected === chip.id}
-            onSelect={() => onSelect(chip.id)}
-            onRemove={() => onRemove(chip)}
-            initiallyOpen={menuFor === chip.id}
+            onPress={() => onSelect(chip.id)}
             onLayout={(event) => place(event, chip.id)}
-          />
+            onLongPress={() => openMenu(chip.id)}
+            remove={{ label: `Remove ${chip.title}`, onRemove: () => onRemove(chip) }}
+          >
+            <FeedIcon key={chip.faviconUrl} url={chip.faviconUrl} title={chip.title} size={ICON} fallback="none" />
+            <ChipLabel label={chipLabel(chip.title)} tone={chipTone({ selected: selected === chip.id })} />
+          </Chip>
         ))}
+        {menu && menuChip ? (
+          // The menu's anchor: an empty box over the chip, scrolling with it, that never takes a touch. The chips
+          // themselves stay plain React Native, since Android's host around a chip would clip its shadow (D27).
+          <View
+            pointerEvents="box-none"
+            className="absolute"
+            style={{ left: (menu.box ?? NO_BOX).x, top: (menu.box ?? NO_BOX).y }}
+          >
+            <NativeMenu
+              open={menu.open}
+              onClose={() => setMenu((now) => now && { ...now, open: false })}
+              actions={[{ label: `Remove ${menuChip.title}`, destructive: true, onPress: () => onRemove(menuChip) }]}
+            >
+              <View style={{ width: (menu.box ?? NO_BOX).width, height: (menu.box ?? NO_BOX).height }} />
+            </NativeMenu>
+          </View>
+        ) : null}
       </Animated.ScrollView>
       {/* More chips lie past a faded edge; the fade is the page's own colour, so it never greys. */}
       {fades ? (
