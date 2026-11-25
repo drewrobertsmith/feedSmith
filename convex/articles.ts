@@ -6,6 +6,7 @@ import { requireUserId } from './lib/currentUser';
 import { ownFeed, pinnedFeeds } from './feeds';
 import { PINNED } from './lib/pinned';
 import { faviconOf } from './lib/feed/face';
+import { RETENTION } from './lib/feed/record';
 import { type ReadingPage, vBlock, vOmittedKind, vReadingPage } from './lib/feed/validators';
 
 /** All shows a User's newest Articles, up to this many: the scrolling budget's 300 (FEE-27). */
@@ -99,9 +100,10 @@ export const all = query({
         .sort((a, b) => b.publishedAt - a.publishedAt)
         .slice(0, ALL_LIMIT);
     } else if (args.feedId === undefined) {
+      // All is what's new: the last 30 days. A Feed's kept older posts (FEE-93) show on its own page instead.
       articles = await ctx.db
         .query('articles')
-        .withIndex('by_user_published', (q) => q.eq('userId', userId))
+        .withIndex('by_user_published', (q) => q.eq('userId', userId).gte('publishedAt', Date.now() - RETENTION))
         .order('desc')
         .take(ALL_LIMIT);
     } else {

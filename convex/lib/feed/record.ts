@@ -6,13 +6,16 @@ import { backoff, nextCheckIn, PACE_WINDOW } from './pace';
 import { bringFetchForward } from './timer';
 import type { StoredArticle } from './validators';
 
-/** Articles that aren't Saved are kept this long after publication (P14). */
+/** Articles that aren't Saved are kept this long after publication (P14)... */
 export const RETENTION = 30 * 24 * 60 * 60_000;
+/** ...except each Feed's newest few, whatever their age, so a rare writer's page is never empty (FEE-93). */
+export const KEEP_NEWEST = 5;
 /** Enough of a Feed's recent Articles to judge its pace; busier Feeds sit at the floor anyway. */
 const PACE_SAMPLE = 700;
 
 /**
- * Stores the Articles the Feed doesn't have yet, by guid, skipping any already past retention.
+ * Stores the Articles the Feed doesn't have yet, by guid. One past retention is stored only when it's
+ * among this fetch's `KEEP_NEWEST` newest, so a Feed that rarely posts still shows its last posts (FEE-93).
  * Expects each guid once in `articles` (`articlesToStore` guarantees it): the check is against
  * what's already stored, not within the batch. When any new one is summary only, its Feed's
  * pages are read next (T8).
@@ -34,9 +37,15 @@ export async function storeNewArticles(
         .first(),
     ),
   );
+  const newest = new Set(
+    [...articles]
+      .sort((x, y) => y.publishedAt - x.publishedAt)
+      .slice(0, KEEP_NEWEST)
+      .map((article) => article.guid),
+  );
   const stored = await Promise.all(
     articles.map(async ({ blocks, omitted, extraction, ...fields }) => {
-      if (fields.publishedAt < now - RETENTION) return false;
+      if (fields.publishedAt < now - RETENTION && !newest.has(fields.guid)) return false;
       const existing = await ctx.db
         .query('articles')
         .withIndex('by_feed_guid', (q) => q.eq('feedId', feedId).eq('guid', fields.guid))
