@@ -55,6 +55,51 @@ export const FIXTURE_ROWS: ArticleRow[] = [
 ];
 
 /**
+ * Daring Fireball's last posts, kept although they're months old (FEE-93): a Feed keeps its five newest,
+ * whatever their age, so a rare writer's page shows them. All and Pinned stay on the last 30 days, so
+ * these show only on Daring Fireball's own page. One is Read, so it's dimmed there as in All.
+ */
+export const FIXTURE_KEPT_ROWS: ArticleRow[] = [
+  {
+    id: 'k1',
+    feedId: 'f3',
+    title: 'The iPhone’s quiet year',
+    feedTitle: 'Daring Fireball',
+    faviconUrl: FIREBALL_ICON,
+    authors: ['John Gruber'],
+    publishedAt: Date.UTC(2026, 9, 7, 12),
+    read: false,
+    saved: false,
+  },
+  {
+    id: 'k2',
+    feedId: 'f3',
+    title: 'Notes on a long summer',
+    feedTitle: 'Daring Fireball',
+    faviconUrl: FIREBALL_ICON,
+    authors: ['John Gruber'],
+    publishedAt: Date.UTC(2026, 8, 2, 12),
+    read: true,
+    saved: false,
+  },
+];
+
+/** More of The Verge's last 30 days, for a frequent site with more than five on its page (FEE-93). */
+export const FIXTURE_BUSY_ROWS: ArticleRow[] = [16, 14, 12, 10].map((d, i) => ({
+  id: `b${i + 1}`,
+  title: [
+    'Google’s new phone is mostly the old one',
+    'The best e-readers to buy right now',
+    'A smaller tablet makes a quiet comeback',
+    'Why every app wants to be a browser',
+  ][i],
+  ...VERGE_FACE,
+  publishedAt: day(d),
+  read: false,
+  saved: false,
+}));
+
+/**
  * Saved, most recently Saved first: the two Saved Articles from All (one already Read), and one whose
  * Feed was removed, which keeps its Feed's name but has no Feed to link to (T23).
  */
@@ -236,7 +281,7 @@ export const FIXTURE_QUIET_PINS: FeedChip[] = [
 
 /**
  * The chip row (P9): one Pinned Feed, then the rest by their newest Article. Calm Notes has no
- * icon; Daring Fireball has no Articles in the last 30 days.
+ * icon; Daring Fireball has no Articles in the last 30 days, only its kept older ones (FEE-93).
  */
 export const FIXTURE_CHIPS: FeedChip[] = [
   { id: 'f1', title: VERGE, faviconUrl: VERGE_ICON, pinned: true },

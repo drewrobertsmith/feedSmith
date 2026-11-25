@@ -57,6 +57,15 @@ async function setup() {
   return { t, ...ids, asA: t.withIdentity({ subject: ids.a }), asB: t.withIdentity({ subject: ids.b }) };
 }
 
+/**
+ * Five Articles newer than any other in The Verge: the cleanup keeps each Feed's five newest, whatever
+ * their age (FEE-93), so these make the older ones fair game for it.
+ */
+const fiveNewer = (t: Awaited<ReturnType<typeof setup>>['t'], userId: Id<'users'>, feedId: Id<'feeds'>) =>
+  t.run(async (ctx) => {
+    for (let i = 0; i < 5; i += 1) await ctx.db.insert('articles', { userId, feedId, guid: `newer${i}`, title: 'newer', publishedAt: START + i });
+  });
+
 describe('Saving an Article (Q3)', () => {
   test('puts it in Saved, most recently Saved first', async () => {
     const { asA, one, two, three } = await setup();
@@ -183,7 +192,8 @@ describe('only the signed-in User, only their own Articles (Q10)', () => {
 
 describe('what you Saved is never lost (P14, T23)', () => {
   test('the 30-day cleanup keeps a Saved Article until it is Done', async () => {
-    const { t, asA, one, two } = await setup();
+    const { t, asA, a, verge, one, two } = await setup();
+    await fiveNewer(t, a, verge);
     await asA.mutation(api.articles.save, { id: one });
     vi.setSystemTime(START + 40 * DAY);
 
@@ -200,6 +210,7 @@ describe('what you Saved is never lost (P14, T23)', () => {
 
   test('the cleanup gets past a full batch of old Saved Articles', async () => {
     const { t, a, verge } = await setup();
+    await fiveNewer(t, a, verge);
     const unsaved = await t.run(async (ctx) => {
       for (let i = 0; i < 120; i += 1) {
         await ctx.db.insert('articles', { userId: a, feedId: verge, guid: `s${i}`, title: 's', publishedAt: START - 60 * DAY, savedAt: START });

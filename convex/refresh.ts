@@ -6,7 +6,7 @@ import { internalAction, internalMutation, internalQuery, type ActionCtx } from 
 import { DELETE_BATCH } from './lib/feed/blocks';
 import { deleteArticles } from './lib/deleteArticles';
 import { fetchFeed } from './lib/feed/fetch';
-import { markFailing, markWorking, RETENTION, scheduleOf, storeNewArticles } from './lib/feed/record';
+import { KEEP_NEWEST, markFailing, markWorking, RETENTION, scheduleOf, storeNewArticles } from './lib/feed/record';
 import { bookNextFetch, ensureFetchBooked } from './lib/feed/timer';
 import { vStoredArticle, vValidators } from './lib/feed/validators';
 
@@ -152,17 +152,72 @@ export const ensureFetchTimer = internalMutation({
   },
 });
 
-/** Deletes Articles 30 days after publication (P14), a batch at a time. Saved Articles stay until Done. */
+/** Feeds handed to their own cleanup per run. */
+const FEEDS_PER_RUN = 100;
+
+/**
+ * Deletes Articles 30 days after publication (P14), Feed by Feed: each Feed keeps its `KEEP_NEWEST`
+ * newest whatever their age, so a rare writer's page is never empty (FEE-93). Saved Articles stay until Done.
+ */
 export const cleanup = internalMutation({
-  args: {},
+  args: { cursor: v.optional(v.union(v.string(), v.null())) },
   returns: v.null(),
-  handler: async (ctx) => {
-    const old = await ctx.db
+  handler: async (ctx, args) => {
+    const page = await ctx.db.query('feeds').paginate({ cursor: args.cursor ?? null, numItems: FEEDS_PER_RUN });
+    await Promise.all(page.page.map((feed) => ctx.scheduler.runAfter(0, internal.refresh.cleanupFeed, { feedId: feed._id, cursor: null })));
+    // Once per run: Articles left by a removed Feed (kept while Saved, T23) belong to no Feed above.
+    if (!args.cursor) await ctx.scheduler.runAfter(0, internal.refresh.cleanupOrphans, { cursor: null });
+    if (!page.isDone) await ctx.scheduler.runAfter(0, internal.refresh.cleanup, { cursor: page.continueCursor });
+    return null;
+  },
+});
+
+/**
+ * Old Articles whose Feed was removed: kept while Saved (T23), deleted once they're not. Paged by cursor
+ * through every unsaved Article past retention, so the many that still have a Feed never stall it.
+ */
+export const cleanupOrphans = internalMutation({
+  args: { cursor: v.union(v.string(), v.null()) },
+  returns: v.null(),
+  handler: async (ctx, { cursor }) => {
+    const page = await ctx.db
       .query('articles')
       .withIndex('by_saved_published', (q) => q.eq('savedAt', undefined).lt('publishedAt', Date.now() - RETENTION))
-      .take(DELETE_BATCH);
-    await deleteArticles(ctx, old);
-    if (old.length === DELETE_BATCH) await ctx.scheduler.runAfter(0, internal.refresh.cleanup, {});
+      .paginate({ cursor, numItems: DELETE_BATCH });
+    const feeds = await Promise.all(page.page.map((article) => ctx.db.get(article.feedId)));
+    await deleteArticles(
+      ctx,
+      page.page.filter((_, i) => feeds[i] === null),
+    );
+    if (!page.isDone) await ctx.scheduler.runAfter(0, internal.refresh.cleanupOrphans, { cursor: page.continueCursor });
+    return null;
+  },
+});
+
+/**
+ * One Feed's cleanup: pages through its Articles past retention, oldest first, deleting those that
+ * aren't among its newest few or Saved. Paging by cursor gets past the ones it keeps, so a page of
+ * kept or Saved Articles never stalls it, and identical publish times can't keep extra.
+ */
+export const cleanupFeed = internalMutation({
+  args: { feedId: v.id('feeds'), cursor: v.union(v.string(), v.null()) },
+  returns: v.null(),
+  handler: async (ctx, { feedId, cursor }) => {
+    const newest = await ctx.db
+      .query('articles')
+      .withIndex('by_feed_published', (q) => q.eq('feedId', feedId))
+      .order('desc')
+      .take(KEEP_NEWEST);
+    const keep = new Set(newest.map((article) => article._id));
+    const page = await ctx.db
+      .query('articles')
+      .withIndex('by_feed_published', (q) => q.eq('feedId', feedId).lt('publishedAt', Date.now() - RETENTION))
+      .paginate({ cursor, numItems: DELETE_BATCH });
+    await deleteArticles(
+      ctx,
+      page.page.filter((article) => !keep.has(article._id) && article.savedAt === undefined),
+    );
+    if (!page.isDone) await ctx.scheduler.runAfter(0, internal.refresh.cleanupFeed, { feedId, cursor: page.continueCursor });
     return null;
   },
 });

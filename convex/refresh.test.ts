@@ -122,12 +122,23 @@ describe('each Feed on its own pace (T19)', () => {
     expect((await s.a.query(api.articles.all, {})).map((r) => r.title)).toEqual(['Fresh', 'g1']);
   });
 
-  test("Articles already past the 30 days kept aren't stored, only to be deleted", async () => {
+  // FEE-93: a rare writer's last posts are kept, whatever their age, so their page is never empty.
+  test("Articles past the 30 days are stored only when they're among the Feed's five newest", async () => {
     const s = await setup();
     const feed = await follow(s, [{ guid: 'g1', ago: HOUR }]);
-    network.mockImplementation(async () => new Response(rss([{ guid: 'old', ago: 40 * DAY }, { guid: 'g1', ago: HOUR }])));
+    const old = [40, 50, 60, 70, 80, 90].map((days) => ({ guid: `old${days}`, ago: days * DAY }));
+    network.mockImplementation(async () => new Response(rss([{ guid: 'g1', ago: HOUR }, ...old])));
     await refresh(s, feed._id);
-    expect((await s.a.query(api.articles.all, {})).map((r) => r.title)).toEqual(['g1']);
+    expect((await s.a.query(api.articles.all, { feedId: feed._id })).map((r) => r.title)).toEqual(['g1', 'old40', 'old50', 'old60', 'old70']);
+  });
+
+  test('a Feed whose posts are all months old keeps its five newest when it is added', async () => {
+    const s = await setup();
+    const feed = await follow(
+      s,
+      [45, 60, 90, 120, 150, 200, 250].map((days) => ({ guid: `p${days}`, ago: days * DAY })),
+    );
+    expect((await s.a.query(api.articles.all, { feedId: feed._id })).map((r) => r.title)).toEqual(['p45', 'p60', 'p90', 'p120', 'p150']);
   });
 });
 
@@ -301,15 +312,46 @@ describe('pulling down fetches every Feed now', () => {
 describe('cleaning up old Articles (P14)', () => {
   test('deletes Articles and their bodies 30 days after publication, and keeps newer ones', async () => {
     const s = await setup();
-    await follow(s, [
+    // A busy Feed: its five newest are recent, so the old one isn't one it keeps (FEE-93).
+    const feed = await follow(s, [
       { guid: 'old', ago: 29 * DAY },
-      { guid: 'new', ago: HOUR },
+      ...[1, 2, 3, 4, 5].map((hours) => ({ guid: `new${hours}`, ago: hours * HOUR })),
     ]);
     vi.setSystemTime(START + 2 * DAY);
     await s.t.mutation(internal.refresh.cleanup, {});
     await runScheduledNow(s.t);
-    expect((await s.a.query(api.articles.all, {})).map((r) => r.title)).toEqual(['new']);
-    expect(await s.t.run((ctx) => ctx.db.query('articleBodies').take(1000))).toHaveLength(1);
+    expect((await s.a.query(api.articles.all, { feedId: feed._id })).map((r) => r.title)).toEqual(['new1', 'new2', 'new3', 'new4', 'new5']);
+    expect(await s.t.run((ctx) => ctx.db.query('articleBodies').take(1000))).toHaveLength(5);
+  });
+
+  // FEE-93: the cleanup keeps each Feed's five newest, so a rare writer never empties out.
+  test("keeps each Feed's five newest, however old, and deletes its other old Articles", async () => {
+    const s = await setup();
+    const feed = await follow(s, [{ guid: 'g0', ago: HOUR }]);
+    await s.t.run(async (ctx) => {
+      for (let i = 1; i <= 8; i++) {
+        const articleId = await ctx.db.insert('articles', { userId: s.userA, feedId: feed._id, guid: `o${i}`, title: `o${i}`, publishedAt: START - (30 + i) * DAY });
+        await ctx.db.insert('articleBodies', { userId: s.userA, articleId, blocks: [], omitted: [] });
+      }
+    });
+    await s.t.mutation(internal.refresh.cleanup, {});
+    await runScheduledNow(s.t);
+    expect((await s.a.query(api.articles.all, { feedId: feed._id })).map((r) => r.title)).toEqual(['g0', 'o1', 'o2', 'o3', 'o4']);
+    expect(await s.t.run((ctx) => ctx.db.query('articleBodies').take(1000))).toHaveLength(5);
+  });
+
+  test('a busy Feed loses everything past 30 days, since its five newest are recent', async () => {
+    const s = await setup();
+    const feed = await follow(
+      s,
+      [1, 2, 3, 4, 5, 6].map((hours) => ({ guid: `n${hours}`, ago: hours * HOUR })),
+    );
+    await s.t.run(async (ctx) => {
+      await ctx.db.insert('articles', { userId: s.userA, feedId: feed._id, guid: 'stale', title: 'stale', publishedAt: START - 40 * DAY });
+    });
+    await s.t.mutation(internal.refresh.cleanup, {});
+    await runScheduledNow(s.t);
+    expect((await s.a.query(api.articles.all, { feedId: feed._id })).map((r) => r.title)).not.toContain('stale');
   });
 
   test('a large backlog is deleted over several runs, in batches', async () => {
@@ -329,7 +371,25 @@ describe('cleaning up old Articles (P14)', () => {
     });
     await s.t.mutation(internal.refresh.cleanup, {});
     await runScheduledNow(s.t);
-    expect(await s.t.run((ctx) => ctx.db.query('articles').take(1000))).toHaveLength(1);
-    expect(await s.t.run((ctx) => ctx.db.query('articleBodies').take(1000))).toHaveLength(1);
+    // The Feed's five newest stay: its recent one and four of the old ones, even with identical publish times.
+    expect(await s.t.run((ctx) => ctx.db.query('articles').take(1000))).toHaveLength(5);
+    expect(await s.t.run((ctx) => ctx.db.query('articleBodies').take(1000))).toHaveLength(5);
+  });
+
+  // FEE-93: All stays about what's new; a rare writer's kept old posts show on its own page, not at All's bottom.
+  test("All shows only the last 30 days, while a Feed's page shows its kept older posts", async () => {
+    const s = await setup();
+    const feed = await follow(s, [
+      { guid: 'recent', ago: HOUR },
+      { guid: 'months', ago: 90 * DAY },
+    ]);
+    expect((await s.a.query(api.articles.all, {})).map((r) => r.title)).toEqual(['recent']);
+    expect((await s.a.query(api.articles.all, { feedId: feed._id })).map((r) => r.title)).toEqual(['recent', 'months']);
+  });
+
+  test("another User can't read a Feed's kept posts", async () => {
+    const s = await setup();
+    const feed = await follow(s, [{ guid: 'months', ago: 90 * DAY }]);
+    expect(await s.b.query(api.articles.all, { feedId: feed._id })).toEqual([]);
   });
 });

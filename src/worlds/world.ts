@@ -27,6 +27,8 @@ import {
   FIXTURE_NO_PINS,
   FIXTURE_QUIET_PINS,
   FIXTURE_ROWS,
+  FIXTURE_BUSY_ROWS,
+  FIXTURE_KEPT_ROWS,
   FIXTURE_SAVED_ROWS,
   FIXTURE_THREE_PINS,
   FIXTURE_TWO_PINS,
@@ -71,8 +73,11 @@ export type WorldSpec = {
   signOut?: 'busy' | 'no-server';
   /** Deleting the Account: `busy` is under way; `failed` didn't reach the server. */
   deleteAccount?: 'busy' | 'failed';
-  /** What All holds. Defaults to no Feeds yet. `read` is every Article already Read. */
-  feeds?: 'none' | 'loading' | 'some' | 'read';
+  /**
+   * What All holds. Defaults to no Feeds yet. `read` is every Article already Read. `busy`: `some`, with
+   * The Verge posting more than five times in 30 days (FEE-93).
+   */
+  feeds?: 'none' | 'loading' | 'some' | 'read' | 'busy';
   /** Eight followed Feeds, one with a long name, instead of the usual three (FEE-44). */
   chips?: 'many';
   /**
@@ -250,7 +255,12 @@ export function worldFeeds(
           : addFeed.startsWith('find-')
             ? FIND_VIEWS[addFeed as FindWorld]
             : { status: 'error', reason: addFeed as AddFeedReason };
-  const universe = [...FIXTURE_ROWS, ...FIXTURE_SAVED_ROWS.filter((row) => !FIXTURE_ROWS.some((r) => r.id === row.id))];
+  const universe = [
+    ...FIXTURE_ROWS,
+    ...FIXTURE_KEPT_ROWS,
+    ...FIXTURE_BUSY_ROWS,
+    ...FIXTURE_SAVED_ROWS.filter((row) => !FIXTURE_ROWS.some((r) => r.id === row.id)),
+  ];
   // Saved has Articles when the world has Feeds, unless it says otherwise.
   const savedSpec = spec.saved ?? (feeds === 'some' || feeds === 'read' ? 'some' : 'none');
   const store = savedStore(
@@ -302,13 +312,17 @@ export function worldFeeds(
       const state = useStore();
       if (feeds === 'loading') return { status: 'loading' };
       return viewOf(state, `all:${feedId}`, () => {
-        const rows = (feeds === 'some' ? FIXTURE_ROWS : feeds === 'read' ? FIXTURE_READ_ROWS : []).map((row) => live(row, state));
+        // All and Pinned are the last 30 days; a Feed's page adds its kept older posts (FEE-93), as the backend does.
+        const recent =
+          feeds === 'some' ? FIXTURE_ROWS : feeds === 'busy' ? [...FIXTURE_ROWS, ...FIXTURE_BUSY_ROWS] : feeds === 'read' ? FIXTURE_READ_ROWS : [];
+        const kept = feeds === 'some' || feeds === 'busy' ? FIXTURE_KEPT_ROWS : [];
+        const newestFirst = (list: ArticleRow[]) => [...list].sort((x, y) => y.publishedAt - x.publishedAt).map((row) => live(row, state));
         const shown =
           feedId === null
-            ? rows
+            ? newestFirst(recent)
             : feedId === PINNED
-              ? rows.filter((row) => row.feedId !== undefined && pinnedIds.has(row.feedId))
-              : rows.filter((row) => row.feedId === feedId);
+              ? newestFirst(recent.filter((row) => row.feedId !== undefined && pinnedIds.has(row.feedId)))
+              : newestFirst([...recent, ...kept].filter((row) => row.feedId === feedId));
         return { status: 'ready' as const, articles: shown };
       });
     },
