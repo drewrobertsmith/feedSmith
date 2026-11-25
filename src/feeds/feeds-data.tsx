@@ -83,29 +83,11 @@ export type AddOutcome =
 /** A feed a site advertises, to choose from (T21). */
 export type FeedChoice = { url: string; title: string };
 
-/**
- * A Feed found by its site's name (FEE-80): one you already follow, by its id (never its URL, Q9),
- * or a public one to add, by its URL.
- */
-export type FoundFeed =
-  | { kind: 'following'; feedId: string; title: string; host: string; iconUrl?: string }
-  | { kind: 'new'; url: string; title: string; host: string; iconUrl?: string };
-
 export type AddFeedView =
   | { status: 'idle' }
   | { status: 'busy' }
   | { status: 'error'; reason: AddFeedReason }
-  | { status: 'choose'; choices: FeedChoice[] }
-  /**
-   * Searching for a site's name (FEE-80): what's found so far, best first, while the search is
-   * `searching` and once it's `done`; `failed` when the search itself didn't go through (offline,
-   * or the server); `limited` when the User has used up their guessing searches for now (FEE-88),
-   * with what the catalog already knew still listed.
-   */
-  | { status: 'found'; name: string; results: FoundFeed[]; phase: FoundPhase };
-
-/** Where a search for a name is up to (FEE-80, FEE-88). */
-export type FoundPhase = 'searching' | 'done' | 'failed' | 'limited';
+  | { status: 'choose'; choices: FeedChoice[] };
 
 /**
  * Everything the screens read and do with Feeds and Articles. Convex backs it in the app
@@ -123,9 +105,8 @@ export type FeedsData = {
   useManageActions: () => ManageActions;
   useArticle: (id: string) => ArticleView;
   /**
-   * Adding a Feed: where it's up to, and `add`, which resolves to what happened. Given an address
-   * it adds (T21); given a site's name it searches (FEE-80), resolving to `stay` at once while the
-   * view fills in with what's found.
+   * Adding a Feed: where it's up to, and `add`, which resolves to what happened. Only an address is
+   * added (T21); any other text is the invalid-address error, with nothing sent (FEE-96).
    */
   useAddFeed: () => { view: AddFeedView; add: (typed: string) => Promise<AddOutcome> };
   /** Pulling down: fetches every Feed now, on the server (P15, Q21). */

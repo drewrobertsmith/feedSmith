@@ -21,7 +21,6 @@ import {
 import {
   FIXTURE_ARTICLE,
   FIXTURE_CHOICES,
-  FIXTURE_FOUND,
   FIXTURE_EXTRACTING_ARTICLE,
   FIXTURE_NOW,
   FIXTURE_ROWS,
@@ -422,7 +421,7 @@ describe('All', () => {
 });
 
 describe('Add a Feed, in its sheet over Feeds (FEE-45)', () => {
-  const FIELD = 'Website, feed URL or name';
+  const FIELD = 'Website or feed URL';
   /** Opens a world on Feeds and taps Add a Feed (the + or the empty state's button): the sheet rises. */
   const openSheet = async (spec: WorldSpec) => {
     const w = await open(spec);
@@ -438,25 +437,15 @@ describe('Add a Feed, in its sheet over Feeds (FEE-45)', () => {
     unreachable: 'Couldn’t reach that address. Check it, or enter the site’s feed URL.',
     'invalid-url': 'Enter a website or feed URL, like theverge.com.',
     'no-feed-found': 'No feed found at that address. Try the site’s feed URL.',
-    'find-nothing': 'No feeds found for “the verge”. Paste the site’s address instead, like theverge.com.',
-    'find-failed': 'Couldn’t search just now. Paste the site’s address instead, like theverge.com.',
-    'find-limited': 'Try again in a few minutes. You can still paste the site’s address.',
   };
-  const LOOKING = 'Looking for “the verge”…';
-  const FOUND_FOR = 'Feeds for “the verge”';
-  /** Each found Feed as TalkBack hears it: its name and site, and whether you follow it. */
-  const NEW = ['The Verge, theverge.com', 'Verge Agency, vergeagency.com'];
-  const FOLLOWING = 'The Verge, theverge.com, following';
   type Shows = {
-    button: 'Add Feed' | 'Adding…' | 'Find Feeds' | 'Finding…';
+    button: 'Add Feed' | 'Adding…';
     error: string | null;
-    status: string | null;
     choices: number;
-    found: readonly string[];
     titleSize: number;
     theme: 'dark' | 'light';
   };
-  const base = { error: null, status: null, choices: 0, found: [], titleSize: 24 } as const;
+  const base = { error: null, choices: 0, titleSize: 24 } as const;
   const SHOWS: Record<AddFeedWorldId, Shows> = {
     'add-idle': { ...base, button: 'Add Feed', theme: 'dark' },
     'add-busy': { ...base, button: 'Adding…', theme: 'dark' },
@@ -464,15 +453,8 @@ describe('Add a Feed, in its sheet over Feeds (FEE-45)', () => {
     'add-no-feed': { ...base, button: 'Add Feed', error: ERRORS['no-feed-found'], theme: 'light' },
     'add-not-a-feed': { ...base, button: 'Add Feed', error: ERRORS['not-a-feed'], theme: 'dark' },
     'add-unreachable': { ...base, button: 'Add Feed', error: ERRORS.unreachable, theme: 'light' },
+    'add-invalid': { ...base, button: 'Add Feed', error: ERRORS['invalid-url'], theme: 'dark' },
     'add-largest-font': { ...base, button: 'Add Feed', choices: FIXTURE_CHOICES.length, titleSize: 48, theme: 'dark' },
-    'add-find-searching': { ...base, button: 'Finding…', status: LOOKING, theme: 'dark' },
-    'add-find-arriving': { ...base, button: 'Finding…', status: LOOKING, found: NEW.slice(0, 1), theme: 'light' },
-    'add-find-known': { ...base, button: 'Find Feeds', status: FOUND_FOR, found: NEW, theme: 'dark' },
-    'add-find-following': { ...base, button: 'Find Feeds', status: FOUND_FOR, found: [FOLLOWING, NEW[1]], theme: 'light' },
-    'add-find-nothing': { ...base, button: 'Find Feeds', error: ERRORS['find-nothing'], theme: 'dark' },
-    'add-find-failed': { ...base, button: 'Find Feeds', error: ERRORS['find-failed'], theme: 'light' },
-    'add-find-limited': { ...base, button: 'Find Feeds', error: ERRORS['find-limited'], status: FOUND_FOR, found: NEW.slice(0, 1), theme: 'dark' },
-    'add-find-largest-font': { ...base, button: 'Find Feeds', status: FOUND_FOR, found: [FOLLOWING, NEW[1]], titleSize: 48, theme: 'dark' },
   };
 
   test.each(ADD_FEED_WORLDS)('$label', async ({ id, spec }) => {
@@ -485,17 +467,14 @@ describe('Add a Feed, in its sheet over Feeds (FEE-45)', () => {
     if (shows.button === 'Adding…') {
       expect(button).toBeDisabled();
       expect(field).toHaveProp('editable', false);
-    } else if (shows.button === 'Finding…') {
-      expect(button).toBeBusy();
     } else {
       expect(button).toBeOnTheScreen();
     }
     if (shows.error) expect(screen.getByRole('alert')).toHaveTextContent(shows.error);
     else expect(screen.queryByRole('alert')).not.toBeOnTheScreen();
-    if (shows.status) expect(screen.getByText(shows.status)).toBeOnTheScreen();
-    for (const name of shows.found) expect(screen.getByRole('button', { name })).toBeOnTheScreen();
-    // A site's feeds to choose from, or Feeds found by name: never both.
-    expect(screen.queryAllByRole('button', { name: /, (theverge|vergeagency)\.com(, following)?$/ })).toHaveLength(shows.choices + shows.found.length);
+    expect(screen.queryAllByRole('button', { name: /, theverge\.com$/ })).toHaveLength(shows.choices);
+    // One field, for an address: it never asks for a name (FEE-96).
+    expect(screen.queryByText(/name/i)).not.toBeOnTheScreen();
     expect(Uniwind.currentTheme).toBe(shows.theme);
   });
 
@@ -508,42 +487,21 @@ describe('Add a Feed, in its sheet over Feeds (FEE-45)', () => {
     expect(w.feedsLog.added).toEqual([first.url]);
   });
 
-  test('Add Feed waits for a URL or a name', async () => {
+  test('Add Feed waits for an address', async () => {
     await openSheet({ colorScheme: 'dark' });
     expect(await screen.findByRole('button', { name: 'Add Feed' })).toBeDisabled();
   });
 
-  test('a name is searched for, an address is added', async () => {
+  test('text that isn’t an address says so and keeps the sheet open, rather than searching (FEE-96)', async () => {
     const user = userEvent.setup();
     const w = await openSheet({ colorScheme: 'dark' });
-    const field = await screen.findByLabelText(FIELD);
-    await user.type(field, 'the verge');
-    await user.press(screen.getByRole('button', { name: 'Find Feeds' }));
-    expect(w.feedsLog.added).toEqual(['the verge']);
-    // A name keeps the sheet open, to choose from what's found.
-    sheetOpen(true);
-    await user.clear(field);
-    await user.type(field, 'theverge.com');
-    expect(screen.getByRole('button', { name: 'Add Feed' })).toBeEnabled();
-  });
-
-  test('choosing a found Feed adds it, exactly as choosing a discovered one does', async () => {
-    const user = userEvent.setup();
-    const w = await openSheet({ colorScheme: 'dark', addFeed: 'find-known' });
-    await user.press(await screen.findByRole('button', { name: NEW[0] }));
-    expect(w.feedsLog.added).toEqual([FIXTURE_FOUND[0].kind === 'new' ? FIXTURE_FOUND[0].url : '']);
-  });
-
-  test('choosing a found Feed you already follow closes the sheet on its chip, with a quiet note naming it (T22)', async () => {
-    const toast = jest.spyOn(ToastAndroid, 'show').mockImplementation(() => {});
-    const user = userEvent.setup();
-    const w = await openSheet({ colorScheme: 'dark', feeds: 'some', addFeed: 'find-following' });
-    await user.press(await screen.findByRole('button', { name: FOLLOWING }));
-    sheetOpen(false);
-    expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName('The Verge');
-    expect(toast).toHaveBeenCalledWith('You already follow The Verge.', ToastAndroid.SHORT);
+    await user.type(await screen.findByLabelText(FIELD), 'the verge');
+    expect(screen.queryByRole('button', { name: /Find/ })).not.toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Add Feed' }));
+    expect(screen.getByRole('alert')).toHaveTextContent(ERRORS['invalid-url']);
     expect(w.feedsLog.added).toEqual([]);
-    toast.mockRestore();
+    sheetOpen(true);
+    expect(screen.getByLabelText(FIELD)).toHaveDisplayValue('the verge');
   });
 
   test('adding a Feed sends the URL, closes the sheet and opens the new Feed on its chip', async () => {
