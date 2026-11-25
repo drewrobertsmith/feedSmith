@@ -44,7 +44,12 @@ export const ALL_WORLDS = [
   { id: 'all-largest-font', label: 'All, largest font size', spec: { colorScheme: 'dark', feeds: 'some', fontScale: 2 } },
   { id: 'all-feed', label: 'One Feed chosen', spec: { colorScheme: 'dark', feeds: 'some', feed: 'f1' } },
   { id: 'all-feed-light', label: 'One Feed chosen, light', spec: { colorScheme: 'light', feeds: 'some', feed: 'f2' } },
-  { id: 'all-feed-empty', label: 'A Feed with nothing new', spec: { colorScheme: 'dark', feeds: 'some', feed: 'f3' } },
+  // FEE-93: a Feed's page is empty only when the Feed has never had an Article.
+  { id: 'all-feed-empty', label: 'A Feed with no Articles yet', spec: { colorScheme: 'dark', feeds: 'some', chips: 'many', feed: 'f4' } },
+  // FEE-93: a rare writer's page shows its last posts, months old; a frequent site's shows its last 30 days.
+  { id: 'feed-rare', label: 'A rare writer: last posts months ago', spec: { colorScheme: 'dark', feeds: 'some', feed: 'f3' } },
+  { id: 'feed-rare-light', label: 'A rare writer, light', spec: { colorScheme: 'light', feeds: 'some', feed: 'f3' } },
+  { id: 'feed-frequent', label: 'A frequent site: seven this month', spec: { colorScheme: 'dark', feeds: 'busy', feed: 'f1' } },
   { id: 'all-many-feeds', label: 'Many Feeds, one long name', spec: { colorScheme: 'dark', feeds: 'some', chips: 'many' } },
   {
     id: 'all-many-feeds-largest-font',

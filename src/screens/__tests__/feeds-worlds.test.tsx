@@ -94,7 +94,13 @@ describe('All', () => {
     'all-largest-font': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 48, selected: 'All', feedNames: ROWS, updated: 'Updated 5 min ago', manage: false },
     'all-feed': { rows: VERGE_ROWS, read: 1, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'The Verge, Pinned', feedNames: 0, updated: 'Updated 5 min ago', manage: false },
     'all-feed-light': { rows: 1, read: 0, empty: false, refreshing: false, theme: 'light', titleSize: 24, selected: 'Calm Notes', feedNames: 0, updated: 'Updated 5 min ago', manage: false },
-    'all-feed-empty': { rows: 0, read: 0, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'Daring Fireball', feedNames: 0, updated: 'Updated 5 min ago', manage: true },
+    // FEE-93: empty only for a Feed that has never had an Article.
+    'all-feed-empty': { rows: 0, read: 0, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'Farnam Street', feedNames: 0, updated: 'Updated 5 min ago', manage: true },
+    // FEE-93: a rare writer's last two posts, months old, one Read; never an empty page.
+    'feed-rare': { rows: 2, read: 1, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'Daring Fireball', feedNames: 0, updated: 'Updated 5 min ago', manage: false },
+    'feed-rare-light': { rows: 2, read: 1, empty: false, refreshing: false, theme: 'light', titleSize: 24, selected: 'Daring Fireball', feedNames: 0, updated: 'Updated 5 min ago', manage: false },
+    // FEE-93: a frequent site shows its whole last 30 days, more than five.
+    'feed-frequent': { rows: VERGE_ROWS + 4, read: 1, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'The Verge, Pinned', feedNames: 0, updated: 'Updated 5 min ago', manage: false },
     'all-many-feeds': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All', feedNames: ROWS, updated: 'Updated 5 min ago', manage: false },
     'all-many-feeds-largest-font': {
       rows: ROWS,
@@ -252,9 +258,28 @@ describe('All', () => {
     expect(screen.getByText('Daring Fireball')).toHaveProp('numberOfLines', 1);
   });
 
-  test('a Feed with nothing new says so, by name', async () => {
+  // FEE-93: a Feed's page is empty only when the Feed has never had an Article, and says so plainly.
+  test('a Feed with no Articles yet says so, by name', async () => {
+    await open({ colorScheme: 'dark', feeds: 'some', chips: 'many', feed: 'f4' });
+    expect(await screen.findByText('No Articles from Farnam Street yet.')).toBeOnTheScreen();
+  });
+
+  test("a rare writer's page shows its last posts, newest first, though they're months old; All doesn't", async () => {
     await open({ colorScheme: 'dark', feeds: 'some', feed: 'f3' });
-    expect(await screen.findByText('No Articles from Daring Fireball in the last 30 days.')).toBeOnTheScreen();
+    const rows = await screen.findAllByRole('link');
+    expect(rows.map((row) => row.props.accessibilityLabel)).toEqual([
+      expect.stringMatching(/^The iPhone’s quiet year/),
+      expect.stringMatching(/^Notes on a long summer.*, Read$/),
+    ]);
+    expect(screen.queryByText(/No Articles from Daring Fireball/)).not.toBeOnTheScreen();
+    await userEvent.press(screen.getByRole('tab', { name: 'All' }));
+    expect(screen.queryAllByRole('link', { name: /quiet year|long summer/ })).toHaveLength(0);
+  });
+
+  test("an old post on a rare writer's page opens in the Reading view", async () => {
+    await open({ colorScheme: 'dark', feeds: 'some', feed: 'f3' });
+    await userEvent.press((await screen.findAllByRole('link'))[0]);
+    expect(screen).toHavePathname('/article/k1');
   });
 
   test.each([
@@ -1390,9 +1415,9 @@ describe('links into Feeds screens (Q25)', () => {
 
 const ARTICLE_TITLE = FIXTURE_ARTICLE.title;
 
-test('Manage this Feed opens Manage Feeds from a Feed with nothing new (FEE-47, Q34)', async () => {
+test('Manage this Feed opens Manage Feeds from a Feed with no Articles yet (FEE-47, Q34)', async () => {
   const user = userEvent.setup();
-  await open({ colorScheme: 'dark', feeds: 'some', feed: 'f3' });
+  await open({ colorScheme: 'dark', feeds: 'some', chips: 'many', feed: 'f4' });
   await user.press(await screen.findByRole('button', { name: 'Manage this Feed' }));
   expect(await screen.findByRole('heading', { name: 'Manage Feeds' })).toBeOnTheScreen();
 });

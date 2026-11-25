@@ -118,7 +118,7 @@ export function FeedsScreen({
         // Never a dead end (Q34): a quiet way to check the Feed, rename it or remove it.
         <View className="gap-group px-edge">
           <AppText variant="reading" className="text-text-muted">
-            {`No Articles from ${selectedChip.title} in the last 30 days.`}
+            {`No Articles from ${selectedChip.title} yet.`}
           </AppText>
           <AppButton label="Manage this Feed" onPress={manageFeeds} />
         </View>
