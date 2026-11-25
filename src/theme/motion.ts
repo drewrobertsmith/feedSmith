@@ -21,14 +21,6 @@ export const motion = {
    */
   chipSwitch: { distance: 24, duration: 200, fadeFrom: 0.6, easing: [0.16, 1, 0.3, 1] },
   /**
-   * The Pinned group opening and folding (FEE-60), tapped as often as any chip, so quiet, and never
-   * two things in one place. Opening: the chips after the group make room at once, and the Pinned
-   * Feeds' chips fade in `delay` later, travelling `distance` out from the Pinned chip, into space
-   * already opened. Folding: they fade back toward it over `exit`, and only then does the row close
-   * up. One curve, the fast-start, gentle-settle one; no scale, no bounce. About 260 ms each way.
-   */
-  groupReveal: { distance: 8, delay: 60, duration: 200, exit: 90, easing: [0.16, 1, 0.3, 1] },
-  /**
    * Opening an Article (FEE-48): the row's title box travels into the headline's place in `duration`, on
    * Material's emphasized curve. The row's words fade over the whole way (`fadeOutEnd` 1: an earlier end left
    * the box travelling empty, seen frame by frame), and the headline's fade in over `fadeIn` as it lands.

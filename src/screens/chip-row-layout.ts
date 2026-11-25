@@ -42,22 +42,10 @@ export function transparent(colour: string): string {
   return `${colour}00`;
 }
 
-/**
- * Whether the Pinned view exists (FEE-59): two or more Pinned Feeds. With one, its chip is enough;
- * with none, there's nothing to read together.
- */
-export function hasPinnedView(chips: readonly { pinned: boolean }[]): boolean {
-  return chips.filter((chip) => chip.pinned).length >= 2;
-}
+/** The theme colour a chip's label takes (D5). */
+export type ChipTone = 'accent' | 'textMuted';
 
-/** The theme colour a chip's label or glyph takes (D5, FEE-60, FEE-84). */
-export type ChipTone = 'accent' | 'text' | 'textMuted';
-
-/**
- * Chosen is Gold (D5). Active, the Pinned chip while one of its Feeds is chosen, is full-strength, so the group reads
- * as the one you're in without competing. Every other chip is muted, so the row never competes with the Articles.
- */
-export function chipTone({ selected, active = false }: { selected: boolean; active?: boolean }): ChipTone {
-  if (selected) return 'accent';
-  return active ? 'text' : 'textMuted';
+/** Chosen is Gold (D5); every other chip is muted, so the row never competes with the Articles. */
+export function chipTone({ selected }: { selected: boolean }): ChipTone {
+  return selected ? 'accent' : 'textMuted';
 }

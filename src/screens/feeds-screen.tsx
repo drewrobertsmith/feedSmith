@@ -15,14 +15,12 @@ import { TopBar, TopBarIcon } from '@/components/top-bar';
 import { UndoToastHost } from '@/components/undo-toast';
 import { useEnvironment, useMinuteClock } from '@/environment';
 import { useAll, useChips, useLastUpdated, useRefresh } from '@/feeds/feeds-data';
-import { PINNED } from '../../convex/lib/pinned';
 import { publishedAgo } from '@/feeds/format';
 import { useSaveAndDone } from '@/feeds/use-save-and-done';
 import { useShownRows } from '@/feeds/use-shown-rows';
 import { AccountButton } from '@/screens/account/account-sheet';
 import { AddFeedSheet } from '@/screens/add-feed-sheet';
 import { ChipRow } from '@/screens/chip-row';
-import { hasPinnedView } from '@/screens/chip-row-layout';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
 
@@ -48,35 +46,31 @@ const ESTIMATED_ROW = 112;
  * row (P9). The chosen chip lives in the route (`?feed=`), so it can be restored and linked to;
  * a link's value is untrusted, so anything but one of the User's chips means All (Q25).
  * Adding a Feed is a sheet over it (FEE-45). `accountOpen` and `addOpen` open the Account sheet or
- * the add sheet at once, and `groupHidden` starts the chosen Pinned chip's group hidden (FEE-84), for the state gallery.
+ * the add sheet at once, for the state gallery.
  */
 export function FeedsScreen({
   feed,
   accountOpen,
   addOpen = false,
-  groupHidden,
 }: {
   feed?: string;
   accountOpen?: boolean;
   addOpen?: boolean;
-  groupHidden?: boolean;
 }) {
   const insets = useSafeAreaInsets();
   const chipsView = useChips();
   const chips = chipsView.status === 'ready' ? chipsView.chips : [];
-  // With two or more Pinned Feeds, Pinned is a view of its own (FEE-59); with fewer, a link to it means All.
-  const pinnedView = hasPinnedView(chips);
+  // All or one of the User's Feeds; anything else in a link, `pinned` included (FEE-94), means All (Q25).
   const selectedChip = chips.find((chip) => chip.id === feed) ?? null;
-  const selection = feed === PINNED && pinnedView ? PINNED : (selectedChip?.id ?? null);
+  const selection = selectedChip?.id ?? null;
   const all = useAll(selection);
   // The chosen chip's place in the row: All is 0, then each chip in order.
-  const order = ['', ...(pinnedView ? [PINNED] : []), ...chips.map((chip) => chip.id)];
+  const order = ['', ...chips.map((chip) => chip.id)];
   const chipIndex = order.indexOf(selection ?? '');
   // What the list shows: the last ready rows while a newly chosen Feed's load (FEE-42).
   const shown = useShownRows(all, chipIndex);
-  // All and Pinned mix Feeds, so their rows name theirs; one Feed's chip already names it (P20).
-  const shownSelection = order[shown.index];
-  const rowsNameFeeds = shownSelection === '' || shownSelection === PINNED;
+  // All mixes Feeds, so its rows name theirs; one Feed's chip already names it (P20).
+  const rowsNameFeeds = order[shown.index] === '';
   const { refreshing, refresh } = useRefresh();
   const updated = useUpdatedLine(refreshing);
   const { colorScheme } = useEnvironment();
@@ -104,16 +98,7 @@ export function FeedsScreen({
         action={chips.length > 0 ? <TopBarIcon label="Add a Feed" icon={{ ios: 'plus', android: 'add' }} onPress={addFeed} /> : undefined}
         trailing={<AccountButton initiallyOpen={accountOpen} />}
       />
-      {chips.length > 0 ? <ChipRow chips={chips} selected={selection} onSelect={select} initiallyHidden={groupHidden} /> : null}
-      {selection === PINNED && empty ? (
-        // Never a dead end (Q34): the Pinned Feeds are chosen in Manage Feeds.
-        <View className="gap-group px-edge">
-          <AppText variant="reading" className="text-text-muted">
-            No Articles from your Pinned Feeds in the last 30 days.
-          </AppText>
-          <AppButton label="Manage Feeds" onPress={manageFeeds} />
-        </View>
-      ) : null}
+      {chips.length > 0 ? <ChipRow chips={chips} selected={selection} onSelect={select} /> : null}
       {selectedChip && selection === selectedChip.id && empty ? (
         // Never a dead end (Q34): a quiet way to check the Feed, rename it or remove it.
         <View className="gap-group px-edge">

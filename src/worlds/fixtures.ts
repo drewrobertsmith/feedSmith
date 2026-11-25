@@ -56,7 +56,7 @@ export const FIXTURE_ROWS: ArticleRow[] = [
 
 /**
  * Daring Fireball's last posts, kept although they're months old (FEE-93): a Feed keeps its five newest,
- * whatever their age, so a rare writer's page shows them. All and Pinned stay on the last 30 days, so
+ * whatever their age, so a rare writer's page shows them. All stays on the last 30 days, so
  * these show only on Daring Fireball's own page. One is Read, so it's dimmed there as in All.
  */
 export const FIXTURE_KEPT_ROWS: ArticleRow[] = [
@@ -248,76 +248,37 @@ export const FIXTURE_FOUND_FOLLOWING: FoundFeed[] = [
 ];
 
 /**
- * Two Pinned Feeds, so the Pinned chip shows (FEE-59): The Verge and Daring Fireball. Pinned then
- * lists The Verge's Articles and not Calm Notes', so it differs from All.
- */
-export const FIXTURE_TWO_PINS: FeedChip[] = [
-  { id: 'f1', title: VERGE, faviconUrl: VERGE_ICON, pinned: true },
-  { id: 'f3', title: 'Daring Fireball', faviconUrl: FIREBALL_ICON, pinned: true },
-  { id: 'f2', title: 'Calm Notes', pinned: false },
-];
-
-/** Three Pinned Feeds, the most there can be (P9); Calm Notes has no icon, so it shows its initial (FEE-61). */
-export const FIXTURE_THREE_PINS: FeedChip[] = [
-  { id: 'f1', title: VERGE, faviconUrl: VERGE_ICON, pinned: true },
-  { id: 'f3', title: 'Daring Fireball', faviconUrl: FIREBALL_ICON, pinned: true },
-  { id: 'f2', title: 'Calm Notes', pinned: true },
-];
-
-/** No Pinned Feeds: no Pinned chip, no group (FEE-60). */
-export const FIXTURE_NO_PINS: FeedChip[] = [
-  { id: 'f1', title: VERGE, faviconUrl: VERGE_ICON, pinned: false },
-  { id: 'f2', title: 'Calm Notes', pinned: false },
-  { id: 'f3', title: 'Daring Fireball', faviconUrl: FIREBALL_ICON, pinned: false },
-];
-
-/** Two Pinned Feeds with nothing in the last 30 days: Pinned is empty (FEE-59). */
-export const FIXTURE_QUIET_PINS: FeedChip[] = [
-  { id: 'f3', title: 'Daring Fireball', faviconUrl: FIREBALL_ICON, pinned: true },
-  { id: 'f9', title: 'Kottke', pinned: true },
-  { id: 'f1', title: VERGE, faviconUrl: VERGE_ICON, pinned: false },
-  { id: 'f2', title: 'Calm Notes', pinned: false },
-];
-
-/**
- * The chip row (P9): one Pinned Feed, then the rest by their newest Article. Calm Notes has no
+ * The chip row (P9): the Feeds by their newest Article. Calm Notes has no
  * icon; Daring Fireball has no Articles in the last 30 days, only its kept older ones (FEE-93).
  */
 export const FIXTURE_CHIPS: FeedChip[] = [
-  { id: 'f1', title: VERGE, faviconUrl: VERGE_ICON, pinned: true },
-  { id: 'f2', title: 'Calm Notes', pinned: false },
-  { id: 'f3', title: 'Daring Fireball', faviconUrl: FIREBALL_ICON, pinned: false },
+  { id: 'f1', title: VERGE, faviconUrl: VERGE_ICON },
+  { id: 'f2', title: 'Calm Notes' },
+  { id: 'f3', title: 'Daring Fireball', faviconUrl: FIREBALL_ICON },
 ];
 
 /** The Feed a world's Add a Feed adds: it joins the chips once added (FEE-45). */
-export const FIXTURE_ADDED_CHIP: FeedChip = { id: 'f9', title: 'Kottke', pinned: false };
+export const FIXTURE_ADDED_CHIP: FeedChip = { id: 'f9', title: 'Kottke' };
 
 /** Someone following eight Feeds, one with a long name: the chip row runs off-screen (FEE-44). */
 export const FIXTURE_MANY_CHIPS: FeedChip[] = [
-  { id: 'f1', title: 'The Verge - Full RSS for subscribers | The Verge', faviconUrl: VERGE_ICON, pinned: true },
-  { id: 'f2', title: 'Calm Notes', pinned: false },
-  { id: 'f3', title: 'Daring Fireball', faviconUrl: FIREBALL_ICON, pinned: false },
-  { id: 'f4', title: 'Farnam Street', pinned: false },
-  { id: 'f5', title: 'Stratechery', pinned: false },
-  { id: 'f6', title: 'Six Colors', pinned: false },
-  { id: 'f7', title: 'MacStories', pinned: false },
-  { id: 'f8', title: 'Kottke', pinned: false },
+  { id: 'f1', title: 'The Verge - Full RSS for subscribers | The Verge', faviconUrl: VERGE_ICON },
+  { id: 'f2', title: 'Calm Notes' },
+  { id: 'f3', title: 'Daring Fireball', faviconUrl: FIREBALL_ICON },
+  { id: 'f4', title: 'Farnam Street' },
+  { id: 'f5', title: 'Stratechery' },
+  { id: 'f6', title: 'Six Colors' },
+  { id: 'f7', title: 'MacStories' },
+  { id: 'f8', title: 'Kottke' },
 ];
 
-/** Manage Feeds (D13): one Pinned Feed, then the rest by name; Farnam Street has stopped working. */
+/** Manage Feeds (D13): the Feeds by name; Farnam Street has stopped working. */
 export const FIXTURE_MANAGE: ManagedFeed[] = [
-  { id: 'f1', title: VERGE, faviconUrl: VERGE_ICON, host: 'www.theverge.com', pinned: true, working: true },
-  { id: 'f2', title: 'Calm Notes', host: 'calmnotes.example', pinned: false, working: true },
-  { id: 'f4', title: 'Farnam Street', faviconUrl: FARNAM_ICON, host: 'fs.blog', pinned: false, working: false },
+  { id: 'f1', title: VERGE, faviconUrl: VERGE_ICON, host: 'www.theverge.com', working: true },
+  { id: 'f2', title: 'Calm Notes', host: 'calmnotes.example', working: true },
+  { id: 'f4', title: 'Farnam Street', faviconUrl: FARNAM_ICON, host: 'fs.blog', working: false },
 ];
 
-/** Three Pinned Feeds, so they can be ordered, and a fourth Pin is refused. */
-export const FIXTURE_MANAGE_PINNED: ManagedFeed[] = [
-  { ...FIXTURE_MANAGE[0] },
-  { ...FIXTURE_MANAGE[1], pinned: true },
-  { ...FIXTURE_MANAGE[2], pinned: true },
-  { id: 'f3', title: 'Daring Fireball', host: 'daringfireball.net', pinned: false, working: true },
-];
 
 /** The signed-in User's Account (P17): a made-up person, never the owner's real Google account (Q22). */
 export const FIXTURE_ACCOUNT: Account = { name: 'Ada Lovelace', email: 'ada@example.com', initial: 'A' };

@@ -17,8 +17,6 @@ import {
   type ChipsView,
   type ManageActions,
   type ManageView,
-  type PinOutcome,
-  type PinResult,
   type FeedsData,
   type SavedActions,
   type SavedView,
@@ -114,34 +112,6 @@ function useSavedActions(): SavedActions {
 function useChips(): ChipsView {
   const chips = useSignedInQuery(api.feeds.chips, {});
   return chips === undefined ? { status: 'loading' } : { status: 'ready', chips };
-}
-
-/**
- * Pins or unpins at once (Q35): the chip and Manage Feeds show it before the server answers, and
- * the server's order follows. A refusal (a fourth Pin) rolls it back.
- */
-function useSetPinned() {
-  const setPinned = useMutation(api.feeds.setPinned).withOptimisticUpdate((store, { id, pinned }) => {
-    const chips = store.getQuery(api.feeds.chips, {});
-    if (chips) store.setQuery(api.feeds.chips, {}, chips.map((chip) => (chip.id === id ? { ...chip, pinned } : chip)));
-    const feeds = store.getQuery(api.feeds.manage, {});
-    if (feeds) store.setQuery(api.feeds.manage, {}, feeds.map((feed) => (feed.id === id ? { ...feed, pinned } : feed)));
-  });
-  return async (id: string, pinned: boolean): Promise<PinResult> => {
-    const result = await setPinned({ id, pinned }).catch(() => null);
-    if (!result) return { outcome: 'not-found' };
-    if (!result.ok) return { outcome: result.reason };
-    return result.place === undefined ? { outcome: 'ok' } : { outcome: 'ok', place: result.place };
-  };
-}
-
-function useRestorePin() {
-  const restorePin = useMutation(api.feeds.restorePin);
-  return async (id: string, place?: number): Promise<PinOutcome> => {
-    const result = await restorePin(place === undefined ? { id } : { id, place }).catch(() => null);
-    if (!result) return 'not-found';
-    return result.ok ? 'ok' : result.reason;
-  };
 }
 
 function useArticle(id: string): ArticleView {
@@ -270,14 +240,6 @@ function useManage(): ManageView {
 function useManageActions(): ManageActions {
   const rename = useMutation(api.feeds.rename);
   const remove = useMutation(api.feeds.remove);
-  // The new order shows at once, so a dropped row settles where it was let go; a refusal rolls it back.
-  const orderPins = useMutation(api.feeds.orderPins).withOptimisticUpdate((store, { ids }) => {
-    const feeds = store.getQuery(api.feeds.manage, {});
-    if (!feeds) return;
-    const rank = new Map(ids.map((id, i) => [id, i]));
-    const pinned = feeds.filter((feed) => feed.pinned).sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
-    store.setQuery(api.feeds.manage, {}, [...pinned, ...feeds.filter((feed) => !feed.pinned)]);
-  });
   return {
     rename: async (id, title) => {
       const result = await rename({ id, title }).catch(() => null);
@@ -285,9 +247,6 @@ function useManageActions(): ManageActions {
       return result.ok ? 'ok' : result.reason;
     },
     remove: async (id) => ((await remove({ id }).catch(() => null)) ? 'ok' : 'failed'),
-    orderPins: async (ids) => {
-      await orderPins({ ids }).catch(() => null);
-    },
   };
 }
 
@@ -301,8 +260,6 @@ const convexFeeds: FeedsData = {
   useChips,
   useSaved,
   useSavedActions,
-  useSetPinned,
-  useRestorePin,
   useManage,
   useManageActions,
   useArticle,

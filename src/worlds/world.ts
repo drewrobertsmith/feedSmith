@@ -17,27 +17,21 @@ import {
   FIXTURE_EXTRACTING_ARTICLE,
   FIXTURE_LONG_FEED_ARTICLE,
   FIXTURE_MANAGE,
-  FIXTURE_MANAGE_PINNED,
   FIXTURE_MANY_CHIPS,
   FIXTURE_NO_AUTHOR_ARTICLE,
   FIXTURE_NO_LEAD_IMAGE_ARTICLE,
   FIXTURE_NOW,
   FIXTURE_OMITTED_ARTICLE,
   FIXTURE_READ_ROWS,
-  FIXTURE_NO_PINS,
-  FIXTURE_QUIET_PINS,
   FIXTURE_ROWS,
   FIXTURE_BUSY_ROWS,
   FIXTURE_KEPT_ROWS,
   FIXTURE_SAVED_ROWS,
-  FIXTURE_THREE_PINS,
-  FIXTURE_TWO_PINS,
   FIXTURE_SEVERAL_AUTHORS_ARTICLE,
   FIXTURE_UNEXTRACTED_ARTICLE,
 } from '@/worlds/fixtures';
 import type { ThemeName } from '@/theme/tokens';
 import { accountInitial } from '../../convex/lib/account';
-import { PINNED } from '../../convex/lib/pinned';
 
 /** Searching for a site's name, as a world shows it (FEE-80). */
 type FindWorld = 'find-searching' | 'find-arriving' | 'find-known' | 'find-following' | 'find-nothing' | 'find-failed' | 'find-limited';
@@ -98,15 +92,8 @@ export type WorldSpec = {
   savedWrites?: 'fail';
   /** The chosen Feed's chip, by id: All shows only its Articles (P5). */
   feed?: string;
-  /**
-   * `full`: three Feeds are Pinned already, so another Pin is refused (P9). `two`: The Verge and Calm
-   * Notes are Pinned, so the Pinned chip shows (FEE-59). `quiet`: two Pinned Feeds with nothing new.
-   */
-  pins?: 'full' | 'two' | 'three' | 'quiet' | 'none';
-  /** With Pinned chosen, its group starts hidden (FEE-84; the state gallery; tests tap the chip). */
-  pinnedGroup?: 'hidden';
-  /** What Manage Feeds lists. Defaults to `some`: one Pinned Feed, one not working. */
-  manage?: 'some' | 'pinned' | 'none' | 'loading';
+  /** What Manage Feeds lists. Defaults to `some`: three Feeds, one not working. */
+  manage?: 'some' | 'none' | 'loading';
   /** Calm Notes' rename sheet starts open over Manage Feeds (the state gallery; tests tap Rename). */
   renameSheet?: 'open';
   /** Manage Feeds' writes don't reach the server, or the server refuses the name. */
@@ -136,28 +123,22 @@ export type FeedsLog = {
   added: string[];
   refreshes: number;
   read: string[];
-  pins: { id: string; pinned: boolean }[];
   renames: { id: string; title: string }[];
   removed: string[];
-  pinOrders: string[][];
   saves: string[];
   dones: string[];
   restores: { id: string; before: SavedBefore }[];
-  restoredPins: { id: string; place?: number }[];
 };
 
 const emptyLog = (): FeedsLog => ({
   added: [],
   refreshes: 0,
   read: [],
-  pins: [],
   renames: [],
   removed: [],
-  pinOrders: [],
   saves: [],
   dones: [],
   restores: [],
-  restoredPins: [],
 });
 
 /**
@@ -229,20 +210,7 @@ export function worldFeeds(
   const manage = spec.manage ?? 'some';
   const feeds = spec.feeds ?? 'none';
   /** The chips a world with Feeds shows: a few, or enough to run off the screen (FEE-44). */
-  const someChips =
-    spec.chips === 'many'
-      ? FIXTURE_MANY_CHIPS
-      : spec.pins === 'two'
-        ? FIXTURE_TWO_PINS
-        : spec.pins === 'three'
-          ? FIXTURE_THREE_PINS
-          : spec.pins === 'quiet'
-            ? FIXTURE_QUIET_PINS
-            : spec.pins === 'none'
-              ? FIXTURE_NO_PINS
-              : FIXTURE_CHIPS;
-  /** The Feeds the Pinned view reads (FEE-59). */
-  const pinnedIds = new Set(someChips.filter((chip) => chip.pinned).map((chip) => chip.id));
+  const someChips = spec.chips === 'many' ? FIXTURE_MANY_CHIPS : FIXTURE_CHIPS;
   const addFeed = spec.addFeed ?? 'idle';
   const article = spec.article ?? 'full';
   const addView: AddFeedView =
@@ -312,17 +280,13 @@ export function worldFeeds(
       const state = useStore();
       if (feeds === 'loading') return { status: 'loading' };
       return viewOf(state, `all:${feedId}`, () => {
-        // All and Pinned are the last 30 days; a Feed's page adds its kept older posts (FEE-93), as the backend does.
+        // All is the last 30 days; a Feed's page adds its kept older posts (FEE-93), as the backend does.
         const recent =
           feeds === 'some' ? FIXTURE_ROWS : feeds === 'busy' ? [...FIXTURE_ROWS, ...FIXTURE_BUSY_ROWS] : feeds === 'read' ? FIXTURE_READ_ROWS : [];
         const kept = feeds === 'some' || feeds === 'busy' ? FIXTURE_KEPT_ROWS : [];
         const newestFirst = (list: ArticleRow[]) => [...list].sort((x, y) => y.publishedAt - x.publishedAt).map((row) => live(row, state));
         const shown =
-          feedId === null
-            ? newestFirst(recent)
-            : feedId === PINNED
-              ? newestFirst(recent.filter((row) => row.feedId !== undefined && pinnedIds.has(row.feedId)))
-              : newestFirst([...recent, ...kept].filter((row) => row.feedId === feedId));
+          feedId === null ? newestFirst(recent) : newestFirst([...recent, ...kept].filter((row) => row.feedId === feedId));
         return { status: 'ready' as const, articles: shown };
       });
     },
@@ -357,7 +321,7 @@ export function worldFeeds(
     useManage: () =>
       manage === 'loading'
         ? { status: 'loading' }
-        : { status: 'ready', feeds: manage === 'none' ? [] : manage === 'pinned' ? FIXTURE_MANAGE_PINNED : FIXTURE_MANAGE },
+        : { status: 'ready', feeds: manage === 'none' ? [] : FIXTURE_MANAGE },
     useManageActions: () => ({
       rename: async (id, title) => {
         if (spec.manageWrites === 'fail') return 'failed';
@@ -370,21 +334,7 @@ export function worldFeeds(
         log.removed.push(id);
         return 'ok';
       },
-      orderPins: async (ids) => {
-        log.pinOrders.push(ids);
-      },
     }),
-    useSetPinned: () => async (id, pinned) => {
-      if (pinned && spec.pins === 'full') return { outcome: 'pins-full' };
-      log.pins.push({ id, pinned });
-      // An Unpin says where the Feed was among the Pins, for Undo.
-      const place = someChips.filter((chip) => chip.pinned).findIndex((chip) => chip.id === id);
-      return pinned || place < 0 ? { outcome: 'ok' } : { outcome: 'ok', place };
-    },
-    useRestorePin: () => async (id, place) => {
-      log.restoredPins.push({ id, place });
-      return 'ok';
-    },
     useArticle: (id) => {
       const state = useStore();
       if (articleView.status !== 'ready') return articleView;
