@@ -28,6 +28,8 @@ const THEMES = ['dark', 'light'] as const;
 const TOLERANCE = 0.001;
 /** Pixels cropped off the right edge, where a scroll indicator sometimes lingers; content keeps its margin clear of it. */
 const SCROLL_INDICATOR = 16;
+/** agent-device's invisible input method, the one keyboard allowed during a check. */
+const TEST_KEYBOARD = 'com.callstack.agentdevice.imehelper/';
 const ANIMATION_SETTINGS = ['animator_duration_scale', 'transition_animation_scale', 'window_animation_scale'];
 
 const WORLD_IDS: string[] = Object.values(catalog).flatMap((worlds) => worlds.map((world) => world.id));
@@ -44,10 +46,14 @@ const shell = (...args: string[]) => adb(['shell', ...args]).toString();
 const demo = (command: string, extras: string[] = []) =>
   shell('am', 'broadcast', '-a', 'com.android.systemui.demo', '-e', 'command', command, ...extras);
 
-/** Turns animations off and fixes the status bar; returns what puts the device back. */
+/** Turns animations and on-screen keyboards off and fixes the status bar; returns what puts the device back. */
 function prepareDevice(): () => void {
   // Read everything first, so whatever happens next, the device can be put back as it was.
   const before = [...ANIMATION_SETTINGS, 'sysui_demo_allowed'].map((name) => [name, shell('settings', 'get', 'global', name)] as const);
+  // Keyboards that draw on screen (Gboard's floating bar) leak into sheet worlds' pictures; only the invisible test one stays.
+  const keyboards = shell('ime', 'list', '-s').split('\n').map((line) => line.trim()).filter(Boolean);
+  const visibleKeyboards = keyboards.filter((id) => !id.startsWith(TEST_KEYBOARD));
+  const defaultKeyboard = shell('settings', 'get', 'secure', 'default_input_method').trim();
   let restored = false;
   const restore = () => {
     if (restored) return;
@@ -58,6 +64,8 @@ function prepareDevice(): () => void {
       ...before.map(([name, value]) => () =>
         value === 'null' ? shell('settings', 'delete', 'global', name) : shell('settings', 'put', 'global', name, value),
       ),
+      ...visibleKeyboards.map((id) => () => shell('ime', 'enable', id)),
+      () => (defaultKeyboard && defaultKeyboard !== 'null' ? shell('ime', 'set', defaultKeyboard) : ''),
     ];
     for (const step of steps) {
       try {
@@ -70,6 +78,7 @@ function prepareDevice(): () => void {
 
   try {
     for (const name of ANIMATION_SETTINGS) shell('settings', 'put', 'global', name, '0');
+    for (const id of visibleKeyboards) shell('ime', 'disable', id);
     shell('settings', 'put', 'global', 'sysui_demo_allowed', '1');
     demo('enter');
     demo('clock', ['-e', 'hhmm', '1200']);
