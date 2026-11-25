@@ -164,7 +164,7 @@ export const cleanup = internalMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const page = await ctx.db.query('feeds').paginate({ cursor: args.cursor ?? null, numItems: FEEDS_PER_RUN });
-    for (const feed of page.page) await ctx.scheduler.runAfter(0, internal.refresh.cleanupFeed, { feedId: feed._id, cursor: null });
+    await Promise.all(page.page.map((feed) => ctx.scheduler.runAfter(0, internal.refresh.cleanupFeed, { feedId: feed._id, cursor: null })));
     // Once per run: Articles left by a removed Feed (kept while Saved, T23) belong to no Feed above.
     if (!args.cursor) await ctx.scheduler.runAfter(0, internal.refresh.cleanupOrphans, { cursor: null });
     if (!page.isDone) await ctx.scheduler.runAfter(0, internal.refresh.cleanup, { cursor: page.continueCursor });
