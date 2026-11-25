@@ -62,6 +62,16 @@ This project uses the expo-dev-loop plugin: `/expo-dev-loop:feature` for every c
 
 These adapt `/expo-dev-loop:feature` to this app. Where they differ from the skill, they win.
 
+**Experiment: a lighter loop (D37, from 2026-11-24, for the next three tickets).** The owner merges without reading PRs, and in three tickets no reviewer found a bug: what goes wrong is an implementation the owner doesn't like the look of. So, until D37 is reviewed, these win over the rest of this section and over the skill:
+
+- **Kept, unchanged:** tests first (world tests typed by world ID), the gates, the state table and gallery, the visual check with every difference read before approving, motion frame by frame, the emulator rules, the decision log.
+- **Taste, guaranteed:** every UI ticket plans with `design-with-taste` (the Stop hook requires it) and checks the design against it before building.
+- **Plan:** load other skills only for an area or API this session hasn't touched yet; no fan-out by default.
+- **Review:** no reviewer agents and no separate quality-bar walk (the three-axis review below is suspended). The quality bar still decides which tests and device checks the plan includes.
+- **No screen changed:** skip Verify's device steps.
+- **Writing:** the PR body is one line, the ticket link, and "Not seen" and "Needs your call" when there are any. The Linear note and the hand-off to the owner carry only those two lists. Decision entries: three sentences at most.
+- **Add-backs:** when something deleted here turns out to be needed, add it back and log it in D37's add-back line, as a fact, not a failure. No add-backs after three tickets means we didn't delete enough.
+
 - **Android only.** Verify on Android; skip every iOS step (T3). Say "iOS: skipped (Android-only v1)" in the hand-off.
 - **No translation.** feedSmith has no Lingui or other localisation; skip the pseudo-locale captures and the Lingui steps.
 - **Emulator first.** Verify on an Android emulator with agent-device (`android-emulator` skill). Use the owner's Pixel 10 only for what an emulator can't show (the performance budgets in `docs/quality-bar.md`, haptics), and only when the owner says it's plugged in. Leave the emulator (the `Pixel_10` AVD) running when Verify ends, even if this session booted it; the skill's "shut down when you finish" step doesn't apply here. If it isn't running, boot it detached and reuse it. Do reset any settings changed for checks (dark mode, font size, display size, animation scales) so the next feature starts from defaults.
@@ -71,7 +81,7 @@ These adapt `/expo-dev-loop:feature` to this app. Where they differ from the ski
 - **Motion, frame by frame (T34).** Any ticket that adds or changes motion is watched slowly before review, since the bugs hide in the in-between frames: a chip that hops a few points, a frame where everything has faded out, two things in one place. Slow the motion about 10× by temporarily editing `src/theme/motion.ts` (durations, delays and exits ×10; springs: `stiffness` ÷100 and `damping` ÷10, which keeps their shape), never committed. Then capture a burst while triggering it: `mkdir -p .visual-check/frames; for i in $(seq 40); do adb exec-out screencap -p > .visual-check/frames/$i.png; done`. `adb screenrecord` drops most frames on the emulator. Read the frames in order. Feedback names the knob: delay, duration or easing. Put the tokens back, and check the Remove animations form too.
 - **Convex.** A change under `convex/` plans with the `convex` skill and the relevant `convex-*` skills (`convex-design`, `convex-auth`, `convex-crons`, …), tests through `convex-test` (`convex-test` skill), and in Review also runs `convex-reviewer`, plus `convex-authz` when it adds or changes a public function.
 - **Effect.** Code that uses Effect follows the `effect-ts` skill when it's planned, built and reviewed.
-- **Three-axis code review.** Work is always ticketed, so Review step 4.6 always runs. `mattpocock-skills:code-review` runs three `reviewer` agents in parallel, not two, all on the same diff (`origin/<base>...HEAD`):
+- **Three-axis code review** (suspended while D37's experiment runs). Work is always ticketed, so Review step 4.6 always runs. `mattpocock-skills:code-review` runs three `reviewer` agents in parallel, not two, all on the same diff (`origin/<base>...HEAD`):
   - **Spec** lists every acceptance criterion in the ticket, or every requirement if the ticket has no acceptance-criteria section. Each one gets a verdict: met, partial, missing or wrong, with `path:line` evidence and the ticket line quoted. Scope creep and, for UI tickets, the state-table coverage come after that list.
   - **Standards** works as the skill describes, but without the quality bar. That belongs to the third axis.
   - **Quality bar** reads `docs/quality-bar.md`, picks the items whose "Applies to" column matches this ticket (`every change` items always apply), and gives each one a verdict: pass, fail, or "needs device check" when its "Checked by" column names a device check. Each verdict comes with `path:line` evidence or the test that proves it, and the report stays under 400 words.

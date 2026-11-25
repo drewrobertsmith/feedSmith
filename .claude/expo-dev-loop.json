@@ -44,10 +44,7 @@
     }
   ],
   "requiredReviewSkills": [
-    "vercel-composition-patterns",
-    "react-native-best-practices",
-    "react-doctor",
-    "security-and-hardening"
+    "design-with-taste"
   ],
   "sourceFiles": "\\.(ts|tsx|js|jsx|mjs|cjs|kt|swift|m|mm)$",
   "ignoredPaths": "^(docs/|\\.claude/|\\.agents/|scripts/|example/)",
