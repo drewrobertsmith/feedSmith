@@ -1,7 +1,6 @@
 import { faceOf } from '../../../test/depth';
 import { act, fireEvent, userEvent, waitFor, within } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
-import { router } from 'expo-router';
 import { screen } from 'expo-router/testing-library';
 import { useState } from 'react';
 import { Animated, Dimensions, ScrollView, ToastAndroid } from 'react-native';
@@ -20,15 +19,9 @@ import { themes } from '@/theme/tokens';
 import {
   ADD_FEED_WORLDS,
   ALL_WORLDS,
-  PINNED_GROUP_WORLDS,
-  PINNED_STACK_WORLDS,
-  PINNED_WORLDS,
   READING_WORLDS,
   type AddFeedWorldId,
   type AllWorldId,
-  type PinnedGroupWorldId,
-  type PinnedStackWorldId,
-  type PinnedWorldId,
   type ReadingWorldId,
 } from '@/worlds/catalog';
 import {
@@ -92,7 +85,7 @@ describe('All', () => {
     'all-loading': { rows: 0, read: 0, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: '', feedNames: 0, updated: null, manage: false },
     'all-refreshing': { rows: ROWS, read: READ, empty: false, refreshing: true, theme: 'light', titleSize: 24, selected: 'All', feedNames: ROWS, updated: 'Updating…', manage: false },
     'all-largest-font': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 48, selected: 'All', feedNames: ROWS, updated: 'Updated 5 min ago', manage: false },
-    'all-feed': { rows: VERGE_ROWS, read: 1, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'The Verge, Pinned', feedNames: 0, updated: 'Updated 5 min ago', manage: false },
+    'all-feed': { rows: VERGE_ROWS, read: 1, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'The Verge', feedNames: 0, updated: 'Updated 5 min ago', manage: false },
     'all-feed-light': { rows: 1, read: 0, empty: false, refreshing: false, theme: 'light', titleSize: 24, selected: 'Calm Notes', feedNames: 0, updated: 'Updated 5 min ago', manage: false },
     // FEE-93: empty only for a Feed that has never had an Article.
     'all-feed-empty': { rows: 0, read: 0, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'Farnam Street', feedNames: 0, updated: 'Updated 5 min ago', manage: true },
@@ -100,7 +93,7 @@ describe('All', () => {
     'feed-rare': { rows: 2, read: 1, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'Daring Fireball', feedNames: 0, updated: 'Updated 5 min ago', manage: false },
     'feed-rare-light': { rows: 2, read: 1, empty: false, refreshing: false, theme: 'light', titleSize: 24, selected: 'Daring Fireball', feedNames: 0, updated: 'Updated 5 min ago', manage: false },
     // FEE-93: a frequent site shows its whole last 30 days, more than five.
-    'feed-frequent': { rows: VERGE_ROWS + 4, read: 1, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'The Verge, Pinned', feedNames: 0, updated: 'Updated 5 min ago', manage: false },
+    'feed-frequent': { rows: VERGE_ROWS + 4, read: 1, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'The Verge', feedNames: 0, updated: 'Updated 5 min ago', manage: false },
     'all-many-feeds': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All', feedNames: ROWS, updated: 'Updated 5 min ago', manage: false },
     'all-many-feeds-largest-font': {
       rows: ROWS,
@@ -140,14 +133,25 @@ describe('All', () => {
     expect(Uniwind.currentTheme).toBe(shows.theme);
   });
 
-  test('the chip row: All, the Pinned Feed, then the rest; only Feeds, no + chip (P5, P9, FEE-44)', async () => {
-    await open({ colorScheme: 'dark', feeds: 'some' });
-    const tabs = await screen.findAllByRole('tab');
-    const names = ['All', 'The Verge, Pinned', 'Calm Notes', 'Daring Fireball'];
-    expect(tabs).toHaveLength(names.length);
-    tabs.forEach((tab, i) => expect(tab).toHaveAccessibleName(names[i]));
-    expect(screen.queryByText('+')).not.toBeOnTheScreen();
-  });
+  // FEE-94: Pinned is gone. A chip is a Feed's name and nothing more: no Pinned chip, group or tray, no long-press.
+  test.each(['dark', 'light'] as const)(
+    'the chip row in %s: All, then one chip per Feed, named by the Feed alone; no + chip and no Pinned (P5, P9, FEE-44, FEE-94)',
+    async (colorScheme) => {
+      await open({ colorScheme, feeds: 'some' });
+      const tabs = await screen.findAllByRole('tab');
+      const names = ['All', 'The Verge', 'Calm Notes', 'Daring Fireball'];
+      expect(tabs).toHaveLength(names.length);
+      tabs.forEach((tab, i) => expect(tab).toHaveAccessibleName(names[i]));
+      expect(screen.queryByText('+')).not.toBeOnTheScreen();
+      expect(screen.queryByRole('tab', { name: /Pinned/ })).not.toBeOnTheScreen();
+      expect(screen.queryByTestId('pinned-tray', { includeHiddenElements: true })).not.toBeOnTheScreen();
+      expect(screen.queryByTestId('pinned-glyph', { includeHiddenElements: true })).not.toBeOnTheScreen();
+      for (const tab of tabs) {
+        expect(tab.props.onLongPress).toBeUndefined();
+        expect(tab.props.accessibilityActions ?? []).toEqual([]);
+      }
+    },
+  );
 
   test('the top bar: the Feeds title, then Add a Feed, then the account circle; one way to add (Q31, D17)', async () => {
     await open({ colorScheme: 'dark', feeds: 'some' });
@@ -162,7 +166,7 @@ describe('All', () => {
 
   test("a long Feed name is short on its chip, but TalkBack hears all of it (FEE-44)", async () => {
     await open({ colorScheme: 'dark', feeds: 'some', chips: 'many' });
-    const chip = await screen.findByRole('tab', { name: 'The Verge - Full RSS for subscribers | The Verge, Pinned' });
+    const chip = await screen.findByRole('tab', { name: 'The Verge - Full RSS for subscribers | The Verge' });
     expect(chip).toBeOnTheScreen();
     expect(screen.getByText('The Verge - Full…')).toBeOnTheScreen();
   });
@@ -201,21 +205,6 @@ describe('All', () => {
     scrollTo.mockRestore();
   });
 
-  // FEE-85: a chip in the Pinned group's tray is measured from the tray, so its place in the row is the tray's plus its own.
-  test('a Pinned Feed chosen by a link, in the tray past the edge of the row, scrolls into view', async () => {
-    await open({ colorScheme: 'dark', feeds: 'some', pins: 'two' }, '/?feed=f3');
-    await screen.findAllByRole('tab');
-    const row = screen.getByTestId('chip-row');
-    const scrollTo = jest.spyOn(ScrollView.prototype, 'scrollTo');
-    const layout = (width: number, x = 0) => ({ nativeEvent: { layout: { x, y: 0, width, height: 48 } } });
-    // The tray starts at 80; Daring Fireball sits 300 into it, so at 380 of a 700-wide row that shows 360.
-    await fireEvent(screen.getByTestId('pinned-tray'), 'layout', layout(420, 80));
-    await fireEvent(screen.getByRole('tab', { name: 'Daring Fireball, Pinned' }).parent!, 'layout', layout(110, 300));
-    await fireEvent(row, 'layout', layout(360));
-    await fireEvent(row, 'contentSizeChange', 700, 48);
-    expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ x: 380 - spacing.edge }));
-    scrollTo.mockRestore();
-  });
 
   // FEE-74: chips are objects with depth, not outlines (D27). Each is checked as its level from the theme.
   test.each(['dark', 'light'] as const)('in %s, the chosen chip is raised, the rest soft, and none has an outline', async (colorScheme) => {
@@ -286,59 +275,11 @@ describe('All', () => {
     ['not one of yours', '/?feed=someone-elses'],
     ['malformed', '/?feed=%3Cscript%3E'],
     ['oversized', `/?feed=${'a'.repeat(500)}`],
+    // FEE-94: Pinned is gone; an old link to it lands on All.
+    ['the old Pinned view', '/?feed=pinned'],
   ])('a link to a Feed that is %s opens All (Q25)', async (_case, url) => {
     await open({ colorScheme: 'dark', feeds: 'some' }, url);
     expect(await screen.findByRole('tab', { selected: true })).toHaveAccessibleName('All');
-  });
-
-  describe('Pinning by long-press (P9)', () => {
-    test('long-pressing a Feed Pins it, says so, and Undo unpins it (Q35)', async () => {
-      const user = userEvent.setup();
-      const w = await open({ colorScheme: 'dark', feeds: 'some' });
-      await user.longPress(await screen.findByRole('tab', { name: 'Calm Notes' }));
-      expect(w.feedsLog.pins).toEqual([{ id: 'f2', pinned: true }]);
-      const toast = await screen.findByTestId('undo-toast');
-      expect(within(toast).getByText('Pinned Calm Notes.')).toBeOnTheScreen();
-      await user.press(within(toast).getByRole('button', { name: 'Undo' }));
-      await waitFor(() => expect(w.feedsLog.pins).toEqual([{ id: 'f2', pinned: true }, { id: 'f2', pinned: false }]));
-    });
-
-    test('long-pressing a Pinned Feed unpins it, and Undo puts it back in its place (Q35)', async () => {
-      const user = userEvent.setup();
-      const w = await open({ colorScheme: 'dark', feeds: 'some' });
-      await user.longPress(await screen.findByRole('tab', { name: 'The Verge, Pinned' }));
-      expect(w.feedsLog.pins).toEqual([{ id: 'f1', pinned: false }]);
-      const toast = await screen.findByTestId('undo-toast');
-      expect(within(toast).getByText('Unpinned The Verge.')).toBeOnTheScreen();
-      await user.press(within(toast).getByRole('button', { name: 'Undo' }));
-      await waitFor(() => expect(w.feedsLog.restoredPins).toEqual([{ id: 'f1', place: 0 }]));
-    });
-
-    test('a fourth Pin is refused, saying why, with nothing to Undo', async () => {
-      const user = userEvent.setup();
-      await open({ colorScheme: 'dark', feeds: 'some', pins: 'full' });
-      await user.longPress(await screen.findByRole('tab', { name: 'Calm Notes' }));
-      const toast = await screen.findByTestId('undo-toast');
-      expect(within(toast).getByText('You can Pin up to 3 Feeds. Unpin one first.')).toBeOnTheScreen();
-      expect(within(toast).queryByRole('button', { name: 'Undo' })).not.toBeOnTheScreen();
-    });
-
-    test('TalkBack can Pin and unpin without a long-press (Q15)', async () => {
-      const w = await open({ colorScheme: 'dark', feeds: 'some' });
-      const calm = await screen.findByRole('tab', { name: 'Calm Notes' });
-      expect(calm.props.accessibilityActions).toEqual([{ name: 'pin', label: 'Pin' }]);
-      await act(async () => fireEvent(calm, 'accessibilityAction', { nativeEvent: { actionName: 'pin' } }));
-      expect(w.feedsLog.pins).toEqual([{ id: 'f2', pinned: true }]);
-      const verge = screen.getByRole('tab', { name: 'The Verge, Pinned' });
-      expect(verge.props.accessibilityActions).toEqual([{ name: 'pin', label: 'Unpin' }]);
-    });
-
-    test('All has nothing to Pin', async () => {
-      const user = userEvent.setup();
-      const w = await open({ colorScheme: 'dark', feeds: 'some' });
-      await user.longPress(await screen.findByRole('tab', { name: 'All' }));
-      expect(w.feedsLog.pins).toEqual([]);
-    });
   });
 
   describe('selecting a chip moves (D7, Q17)', () => {
@@ -606,344 +547,6 @@ describe('All', () => {
   });
 });
 
-/**
- * The Pinned group's recessed tray (FEE-85): an inset face holding exactly these chips, by TalkBack name, in order; or
- * no tray at all. It isn't a control: TalkBack passes over it to the chips, and taps go through to them.
- */
-function expectTray(scheme: 'dark' | 'light', holds: string[] | null) {
-  const tray = screen.queryByTestId('pinned-tray');
-  if (holds === null) {
-    expect(tray).not.toBeOnTheScreen();
-    return;
-  }
-  expect(faceOf(tray!)).toMatchObject(depthStyle(scheme, 'inset'));
-  expect(within(tray!).getAllByRole('tab').map((tab) => tab.props.accessibilityLabel)).toEqual(holds);
-  expect(tray!.props.accessible).toBeFalsy();
-  expect(tray!.props.accessibilityLabel ?? tray!.props['aria-label']).toBeUndefined();
-  expect(tray).toHaveProp('pointerEvents', 'box-none');
-}
-
-describe('the Pinned view (FEE-59)', () => {
-  type Shows = {
-    /** The chips in order, by TalkBack name. */
-    chips: string[];
-    /** The chosen chip's TalkBack name. */
-    selected: string;
-    /** The rows' Feeds, in order. */
-    rows: string[];
-    empty: boolean;
-    /** What the Pinned group's tray holds (FEE-85), or null with no Pinned chip. */
-    tray: string[] | null;
-  };
-  const PINNED_CHIP = 'Pinned: The Verge, Daring Fireball';
-  const TWO_PIN_CHIPS = ['All', PINNED_CHIP, 'The Verge, Pinned', 'Daring Fireball, Pinned', 'Calm Notes'];
-  const FOLDED_CHIPS = ['All', PINNED_CHIP, 'Calm Notes'];
-  const ALL_ROWS = FIXTURE_ROWS.map((row) => row.feedTitle);
-  // The Verge's Articles, and not Calm Notes': Pinned is narrower than All.
-  const PINNED_ROWS = FIXTURE_ROWS.filter((row) => row.feedId === 'f1').map((row) => row.feedTitle);
-  const SHOWS: Record<PinnedWorldId, Shows> = {
-    'pinned-dark': { chips: TWO_PIN_CHIPS, selected: PINNED_CHIP, rows: PINNED_ROWS, empty: false, tray: TWO_PIN_CHIPS.slice(1, 4) },
-    'pinned-light': { chips: TWO_PIN_CHIPS, selected: PINNED_CHIP, rows: PINNED_ROWS, empty: false, tray: TWO_PIN_CHIPS.slice(1, 4) },
-    'pinned-empty': {
-      chips: ['All', 'Pinned: Daring Fireball, Kottke', 'Daring Fireball, Pinned', 'Kottke, Pinned', 'The Verge', 'Calm Notes'],
-      selected: 'Pinned: Daring Fireball, Kottke',
-      rows: [],
-      empty: true,
-      tray: ['Pinned: Daring Fireball, Kottke', 'Daring Fireball, Pinned', 'Kottke, Pinned'],
-    },
-    // All chosen: the group folds into the Pinned chip (FEE-60).
-    'pinned-all': { chips: FOLDED_CHIPS, selected: 'All', rows: ALL_ROWS, empty: false, tray: [PINNED_CHIP] },
-    // One Pin makes no Pinned chip, so a link to Pinned lands on All (Q25).
-    'pinned-one-pin': { chips: ['All', 'The Verge, Pinned', 'Calm Notes', 'Daring Fireball'], selected: 'All', rows: ALL_ROWS, empty: false, tray: null },
-    'pinned-hostile-link': { chips: FOLDED_CHIPS, selected: 'All', rows: ALL_ROWS, empty: false, tray: [PINNED_CHIP] },
-    'pinned-largest-font': { chips: TWO_PIN_CHIPS, selected: PINNED_CHIP, rows: PINNED_ROWS, empty: false, tray: TWO_PIN_CHIPS.slice(1, 4) },
-  };
-
-  test.each(PINNED_WORLDS)('$label', async ({ id, spec }) => {
-    const shows = SHOWS[id];
-    await open(spec);
-    const tabs = await screen.findAllByRole('tab');
-    expect(tabs.map((tab) => tab.props.accessibilityLabel)).toEqual(shows.chips);
-    expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName(shows.selected);
-    const rows = screen.queryAllByRole('link').filter((row) => /ago|yesterday/.test(row.props.accessibilityLabel));
-    expect(rows).toHaveLength(shows.rows.length);
-    expect(screen.queryAllByText('No Articles from your Pinned Feeds in the last 30 days.')).toHaveLength(shows.empty ? 1 : 0);
-    expect(screen.queryAllByRole('button', { name: 'Manage Feeds' })).toHaveLength(shows.empty ? 1 : 0);
-    expectTray(spec.colorScheme, shows.tray);
-  });
-
-  test('tapping the Pinned chip chooses Pinned, in the link, and All chooses everything again', async () => {
-    const user = userEvent.setup();
-    await open({ colorScheme: 'dark', feeds: 'some', pins: 'two' });
-    await user.press(await screen.findByRole('tab', { name: PINNED_CHIP }));
-    expect(screen).toHavePathname('/');
-    expect(screen).toHaveSearchParams({ feed: 'pinned' });
-    expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName(PINNED_CHIP);
-    await user.press(screen.getByRole('tab', { name: 'All' }));
-    expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName('All');
-  });
-
-  test('switching to and from Pinned tells the rows which way to slide, as other chips do (P20)', async () => {
-    const user = userEvent.setup();
-    await open({ colorScheme: 'dark', feeds: 'some', pins: 'two' });
-    await screen.findAllByRole('link');
-    expect(screen.getByTestId('chip-switch')).toHaveProp('index', 0);
-    // Pinned sits second, right after All.
-    await user.press(screen.getByRole('tab', { name: PINNED_CHIP }));
-    expect(screen.getByTestId('chip-switch')).toHaveProp('index', 1);
-    // Calm Notes isn't Pinned: choosing it folds the group, and it sits after the Pinned Feeds' places.
-    await user.press(screen.getByRole('tab', { name: 'Calm Notes' }));
-    expect(screen.getByTestId('chip-switch')).toHaveProp('index', 4);
-  });
-
-  test('empty Pinned leads to Manage Feeds (Q34)', async () => {
-    const user = userEvent.setup();
-    await open({ colorScheme: 'dark', feeds: 'some', pins: 'quiet', feed: 'pinned' });
-    await user.press(await screen.findByRole('button', { name: 'Manage Feeds' }));
-    expect(screen).toHavePathname('/manage-feeds');
-  });
-});
-
-describe('the Pinned group (FEE-60)', () => {
-  const PINNED_CHIP = 'Pinned: The Verge, Daring Fireball';
-  const OPEN = ['All', PINNED_CHIP, 'The Verge, Pinned', 'Daring Fireball, Pinned', 'Calm Notes'];
-  const FOLDED = ['All', PINNED_CHIP, 'Calm Notes'];
-  /** The Pinned chip's push-pin glyph (FEE-84): muted, full-strength while a Pinned Feed is chosen, Gold when Pinned is. */
-  type Glyph = 'textMuted' | 'text' | 'accent';
-  type Shows = { chips: string[]; selected: string; expanded: boolean | null; glyph: Glyph | null; tray: string[] | null };
-  // The tray holds the Pinned chip, and its Feeds' chips while the group is open (FEE-85).
-  const TRAY_OPEN = [PINNED_CHIP, 'The Verge, Pinned', 'Daring Fireball, Pinned'];
-  const TRAY_FOLDED = [PINNED_CHIP];
-  const SHOWS: Record<PinnedGroupWorldId, Shows> = {
-    'group-open': { chips: OPEN, selected: 'The Verge, Pinned', expanded: true, glyph: 'text', tray: TRAY_OPEN },
-    'group-folded-all': { chips: FOLDED, selected: 'All', expanded: false, glyph: 'textMuted', tray: TRAY_FOLDED },
-    'group-folded-other': { chips: FOLDED, selected: 'Calm Notes', expanded: false, glyph: 'textMuted', tray: TRAY_FOLDED },
-    // With fewer than two Pins there's no group: the row is as it was before Pinned, with no tray.
-    'group-one-pin': { chips: ['All', 'The Verge, Pinned', 'Calm Notes', 'Daring Fireball'], selected: 'All', expanded: null, glyph: null, tray: null },
-    'group-no-pins': { chips: ['All', 'The Verge', 'Calm Notes', 'Daring Fireball'], selected: 'All', expanded: null, glyph: null, tray: null },
-    'group-link': { chips: OPEN, selected: 'Daring Fireball, Pinned', expanded: true, glyph: 'text', tray: TRAY_OPEN },
-    'group-remove-animations': { chips: OPEN, selected: PINNED_CHIP, expanded: true, glyph: 'accent', tray: TRAY_OPEN },
-    // Hidden while you keep reading Pinned (FEE-84): folded, and still chosen; the tray holds just the Pinned chip.
-    'group-hidden': { chips: FOLDED, selected: PINNED_CHIP, expanded: false, glyph: 'accent', tray: TRAY_FOLDED },
-  };
-
-  test.each(PINNED_GROUP_WORLDS)('$label', async ({ id, spec }) => {
-    const shows = SHOWS[id];
-    await open(spec);
-    await screen.findAllByRole('tab');
-    // The gallery starts this world hidden; here, as a person would, by tapping the chosen Pinned chip.
-    if ('pinnedGroup' in spec && spec.pinnedGroup === 'hidden') await userEvent.press(screen.getByRole('tab', { name: PINNED_CHIP }));
-    expect(screen.getAllByRole('tab').map((tab) => tab.props.accessibilityLabel)).toEqual(shows.chips);
-    expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName(shows.selected);
-    const pinned = screen.queryByRole('tab', { name: PINNED_CHIP });
-    if (shows.expanded === null) expect(pinned).not.toBeOnTheScreen();
-    else if (shows.expanded) expect(pinned).toBeExpanded();
-    else expect(pinned).toBeCollapsed();
-    if (pinned && shows.glyph) {
-      // A push-pin and the stacked icons, with no visible word (FEE-84); TalkBack still hears its name.
-      const glyph = within(pinned).getByTestId('pinned-glyph', { includeHiddenElements: true });
-      expect(glyph).toHaveProp('tintColor', themes[spec.colorScheme][shows.glyph]);
-      expect(within(pinned).queryByText('Pinned', { includeHiddenElements: true })).not.toBeOnTheScreen();
-    }
-    expectTray(spec.colorScheme, shows.tray);
-  });
-
-  test('choosing Pinned opens the group; moving among its Feeds keeps it open; All folds it', async () => {
-    const user = userEvent.setup();
-    await open({ colorScheme: 'dark', feeds: 'some', pins: 'two' });
-    const names = () => screen.getAllByRole('tab').map((tab) => tab.props.accessibilityLabel);
-    expect(names()).toEqual(FOLDED);
-    await user.press(await screen.findByRole('tab', { name: PINNED_CHIP }));
-    expect(names()).toEqual(OPEN);
-    await user.press(screen.getByRole('tab', { name: 'Daring Fireball, Pinned' }));
-    expect(names()).toEqual(OPEN);
-    await user.press(screen.getByRole('tab', { name: 'The Verge, Pinned' }));
-    expect(names()).toEqual(OPEN);
-    await user.press(screen.getByRole('tab', { name: 'All' }));
-    expect(names()).toEqual(FOLDED);
-  });
-
-  // FEE-84: a tap from each starting state.
-  describe('tapping the Pinned chip', () => {
-    const names = () => screen.getAllByRole('tab').map((tab) => tab.props.accessibilityLabel);
-    const rowTitles = () => screen.queryAllByRole('link').map((row) => row.props.accessibilityLabel);
-
-    test.each([
-      ['All', undefined],
-      ["a Feed that isn't Pinned", 'f2'],
-      ['a Pinned Feed', 'f1'],
-    ])('from %s, chooses Pinned with its group open', async (_from, feed) => {
-      const user = userEvent.setup();
-      await open({ colorScheme: 'dark', feeds: 'some', pins: 'two', feed });
-      await user.press(await screen.findByRole('tab', { name: PINNED_CHIP }));
-      expect(screen).toHaveSearchParams({ feed: 'pinned' });
-      expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName(PINNED_CHIP);
-      expect(names()).toEqual(OPEN);
-      expect(screen.getByRole('tab', { name: PINNED_CHIP })).toBeExpanded();
-    });
-
-    test('from Pinned with its group shown, hides the group and keeps you reading Pinned', async () => {
-      const user = userEvent.setup();
-      await open({ colorScheme: 'dark', feeds: 'some', pins: 'two', feed: 'pinned' });
-      const before = rowTitles();
-      await user.press(await screen.findByRole('tab', { name: PINNED_CHIP }));
-      expect(names()).toEqual(FOLDED);
-      expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName(PINNED_CHIP);
-      expect(screen.getByRole('tab', { name: PINNED_CHIP })).toBeCollapsed();
-      expect(screen).toHaveSearchParams({ feed: 'pinned' });
-      expect(rowTitles()).toEqual(before);
-    });
-
-    test('from Pinned with its group hidden, shows it again', async () => {
-      const user = userEvent.setup();
-      await open({ colorScheme: 'dark', feeds: 'some', pins: 'two', feed: 'pinned' });
-      await user.press(await screen.findByRole('tab', { name: PINNED_CHIP }));
-      await user.press(screen.getByRole('tab', { name: PINNED_CHIP }));
-      expect(names()).toEqual(OPEN);
-      expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName(PINNED_CHIP);
-      expect(screen.getByRole('tab', { name: PINNED_CHIP })).toBeExpanded();
-    });
-
-    test('hidden is screen state only: leaving Pinned and choosing it again opens the group', async () => {
-      const user = userEvent.setup();
-      await open({ colorScheme: 'dark', feeds: 'some', pins: 'two', feed: 'pinned' });
-      await user.press(await screen.findByRole('tab', { name: PINNED_CHIP }));
-      await user.press(screen.getByRole('tab', { name: 'All' }));
-      await user.press(screen.getByRole('tab', { name: PINNED_CHIP }));
-      expect(names()).toEqual(OPEN);
-    });
-
-    test('hidden, then a link to Pinned from elsewhere opens the group', async () => {
-      const user = userEvent.setup();
-      await open({ colorScheme: 'dark', feeds: 'some', pins: 'two', feed: 'pinned' });
-      await user.press(await screen.findByRole('tab', { name: PINNED_CHIP }));
-      await act(async () => router.setParams({ feed: 'f2' }));
-      await act(async () => router.setParams({ feed: 'pinned' }));
-      expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName(PINNED_CHIP);
-      expect(names()).toEqual(OPEN);
-    });
-  });
-
-  test('a Pinned Feed chosen: its chip is Gold, and the Pinned chip only shows the group is active (D5)', async () => {
-    await open({ colorScheme: 'dark', feeds: 'some', pins: 'two', feed: 'f1' });
-    const pinned = await screen.findByRole('tab', { name: PINNED_CHIP });
-    expect(pinned).not.toBeSelected();
-    // A full-strength glyph on a soft face, not Gold and not raised: active, without competing with the chosen Feed (D27, FEE-84).
-    expect(within(pinned).getByTestId('pinned-glyph', { includeHiddenElements: true })).toHaveProp('tintColor', themes.dark.text);
-    expect(faceOf(pinned)).toMatchObject(depthStyle('dark', 'soft'));
-    expect(faceOf(screen.getByRole('tab', { name: 'The Verge, Pinned' }))).toMatchObject(depthStyle('dark', 'raised'));
-    expect(within(screen.getByRole('tab', { name: 'The Verge, Pinned' })).getByText('The Verge', { includeHiddenElements: true })).toHaveProp(
-      'className',
-      'text-accent',
-    );
-  });
-
-  test('TalkBack can expand and collapse the group without gestures (Q15)', async () => {
-    await open({ colorScheme: 'dark', feeds: 'some', pins: 'two' });
-    const folded = await screen.findByRole('tab', { name: PINNED_CHIP });
-    expect(folded.props.accessibilityActions).toEqual([{ name: 'expand', label: 'Expand' }]);
-    await act(async () => fireEvent(folded, 'accessibilityAction', { nativeEvent: { actionName: 'expand' } }));
-    expect(screen).toHaveSearchParams({ feed: 'pinned' });
-    const opened = screen.getByRole('tab', { name: PINNED_CHIP });
-    expect(opened).toBeExpanded();
-    expect(opened.props.accessibilityActions).toEqual([{ name: 'collapse', label: 'Collapse' }]);
-    // On the chosen Pinned chip, Collapse hides the group and keeps you on Pinned, as a tap does (FEE-84).
-    await act(async () => fireEvent(opened, 'accessibilityAction', { nativeEvent: { actionName: 'collapse' } }));
-    expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName(PINNED_CHIP);
-    expect(screen).toHaveSearchParams({ feed: 'pinned' });
-    const hidden = screen.getByRole('tab', { name: PINNED_CHIP });
-    expect(hidden).toBeCollapsed();
-    expect(screen.getAllByRole('tab').map((tab) => tab.props.accessibilityLabel)).toEqual(FOLDED);
-    expect(hidden.props.accessibilityActions).toEqual([{ name: 'expand', label: 'Expand' }]);
-    // And Expand shows it again, still on Pinned.
-    await act(async () => fireEvent(hidden, 'accessibilityAction', { nativeEvent: { actionName: 'expand' } }));
-    expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName(PINNED_CHIP);
-    expect(screen.getByRole('tab', { name: PINNED_CHIP })).toBeExpanded();
-  });
-
-  test('with a Pinned Feed chosen, Collapse still chooses All (D24)', async () => {
-    await open({ colorScheme: 'dark', feeds: 'some', pins: 'two', feed: 'f1' });
-    const chip = await screen.findByRole('tab', { name: PINNED_CHIP });
-    await act(async () => fireEvent(chip, 'accessibilityAction', { nativeEvent: { actionName: 'collapse' } }));
-    expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName('All');
-    expect(screen.getByRole('tab', { name: PINNED_CHIP })).toBeCollapsed();
-  });
-});
-
-describe("the Pinned chip's stacked icons (FEE-61)", () => {
-  type Shows = {
-    name: string;
-    /** Each circle in order: an icon, or the initial a Feed without one shows (D14). */
-    circles: ('icon' | 'initial')[];
-    ids: string[];
-    iconSize: number;
-  };
-  const SHOWS: Record<PinnedStackWorldId, Shows> = {
-    'stack-three-dark': {
-      name: 'Pinned: The Verge, Daring Fireball, Calm Notes',
-      circles: ['icon', 'icon', 'initial'],
-      ids: ['f1', 'f3', 'f2'],
-      iconSize: 16,
-    },
-    'stack-three-light': {
-      name: 'Pinned: The Verge, Daring Fireball, Calm Notes',
-      circles: ['icon', 'icon', 'initial'],
-      ids: ['f1', 'f3', 'f2'],
-      iconSize: 16,
-    },
-    'stack-initial': { name: 'Pinned: Daring Fireball, Kottke', circles: ['icon', 'initial'], ids: ['f3', 'f9'], iconSize: 16 },
-    'stack-two': { name: 'Pinned: The Verge, Daring Fireball', circles: ['icon', 'icon'], ids: ['f1', 'f3'], iconSize: 16 },
-    // Icons beside text grow with it (Q16).
-    'stack-largest-font': {
-      name: 'Pinned: The Verge, Daring Fireball, Calm Notes',
-      circles: ['icon', 'icon', 'initial'],
-      ids: ['f1', 'f3', 'f2'],
-      iconSize: 32,
-    },
-  };
-
-  test.each(PINNED_STACK_WORLDS)('$label', async ({ id, spec }) => {
-    const shows = SHOWS[id];
-    await open(spec);
-    const chip = await screen.findByRole('tab', { name: shows.name });
-    const circles = within(chip).getAllByTestId(/^pinned-stack-(?!ring)/, { includeHiddenElements: true });
-    expect(circles.map((circle) => circle.props.testID)).toEqual(
-      shows.ids.map((feedId, i) => (shows.circles[i] === 'icon' ? `pinned-stack-${feedId}` : `pinned-stack-${feedId}-initial`)),
-    );
-    // 16 points, grown with Android's font size and the world's, as every icon beside text is (Q16).
-    const side = shows.iconSize * Dimensions.get('window').fontScale;
-    for (const circle of circles) expect(circle).toHaveStyle({ width: side });
-    // The push-pin beside them grows the same way, in a box that grows with it (FEE-84, D31).
-    expect(within(chip).getByTestId('pinned-glyph', { includeHiddenElements: true })).toHaveStyle({ width: side, height: side });
-    // TalkBack hears the Feeds by name, with its role and state, never the icons (Q15).
-    expect(chip).toBeCollapsed();
-    // All is chosen, so the tray holds just the Pinned chip (FEE-85).
-    expectTray(spec.colorScheme, [shows.name]);
-  });
-
-  test('each circle is a ringed disc, and every one after the first overlaps the one before', async () => {
-    await open({ colorScheme: 'dark', feeds: 'some', pins: 'three' });
-    const chip = await screen.findByRole('tab', { name: /^Pinned:/ });
-    const rings = within(chip).getAllByTestId('pinned-stack-ring', { includeHiddenElements: true });
-    expect(rings).toHaveLength(3);
-    // Ringed in the chip's own face since FEE-74 (chip-row.test.tsx checks the colour).
-    for (const ring of rings) expect(ring).toHaveProp('className', expect.stringContaining('border-2'));
-    expect(rings[0].props.className).not.toContain('-ml-');
-    for (const ring of rings.slice(1)) expect(ring.props.className).toContain('-ml-inside');
-  });
-
-  test('TalkBack hears the Feeds by name, never the icons (Q15)', async () => {
-    await open({ colorScheme: 'dark', feeds: 'some', pins: 'three' });
-    const chip = await screen.findByRole('tab', { name: 'Pinned: The Verge, Daring Fireball, Calm Notes' });
-    expect(within(chip).getAllByTestId('pinned-stack-ring', { includeHiddenElements: true })).toHaveLength(3);
-    // Hidden from accessibility: the default query, which skips hidden elements, finds none of them.
-    expect(within(chip).queryAllByTestId('pinned-stack-ring')).toHaveLength(0);
-    // Nor the push-pin (FEE-84): the chip's name says Pinned.
-    expect(within(chip).getByTestId('pinned-glyph', { includeHiddenElements: true })).toBeOnTheScreen();
-    expect(within(chip).queryByTestId('pinned-glyph')).not.toBeOnTheScreen();
-  });
-});
-
 describe('Add a Feed, in its sheet over Feeds (FEE-45)', () => {
   const FIELD = 'Website, feed URL or name';
   /** Opens a world on Feeds and taps Add a Feed (the + or the empty state's button): the sheet rises. */
@@ -1063,7 +666,7 @@ describe('Add a Feed, in its sheet over Feeds (FEE-45)', () => {
     const w = await openSheet({ colorScheme: 'dark', feeds: 'some', addFeed: 'find-following' });
     await user.press(await screen.findByRole('button', { name: FOLLOWING }));
     sheetOpen(false);
-    expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName('The Verge, Pinned');
+    expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName('The Verge');
     expect(toast).toHaveBeenCalledWith('You already follow The Verge.', ToastAndroid.SHORT);
     expect(w.feedsLog.added).toEqual([]);
     toast.mockRestore();
@@ -1117,7 +720,7 @@ describe('Add a Feed, in its sheet over Feeds (FEE-45)', () => {
     await user.type(await screen.findByLabelText(FIELD), 'theverge.com');
     await user.press(screen.getByRole('button', { name: 'Add Feed' }));
     sheetOpen(false);
-    expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName('The Verge, Pinned');
+    expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName('The Verge');
     expect(toast).toHaveBeenCalledWith('You already follow The Verge.', ToastAndroid.SHORT);
     expect(screen.queryByRole('alert')).not.toBeOnTheScreen();
     toast.mockRestore();
@@ -1266,7 +869,7 @@ describe('the Reading view', () => {
     const user = userEvent.setup();
     await open({ colorScheme: 'dark', feeds: 'some' }, `/article/${FIXTURE_ROWS[0].id}`);
     await user.press(await screen.findByRole('link', { name: 'The Verge, open its Articles' }));
-    expect(await screen.findByRole('tab', { name: 'The Verge, Pinned', selected: true })).toBeOnTheScreen();
+    expect(await screen.findByRole('tab', { name: 'The Verge', selected: true })).toBeOnTheScreen();
     expect(screen.queryByRole('heading', { name: ARTICLE })).not.toBeOnTheScreen();
   });
 

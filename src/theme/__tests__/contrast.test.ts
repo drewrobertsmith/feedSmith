@@ -1,5 +1,4 @@
 import { DEPTH_LEVELS, depth, depthStyle, rippleColor } from '@/theme/depth';
-import { chipTone } from '@/screens/chip-row-layout';
 import { googleButton } from '@/theme/google';
 import { contrastRatio, palette, TEXT_ROLES, SURFACE_ROLES, themes } from '@/theme/tokens';
 
@@ -138,21 +137,5 @@ describe.each(['dark', 'light'] as const)('depth in %s', (scheme) => {
   test('the ripple is the text colour at Material\'s pressed-state strength', () => {
     // Cream on Midnight, Midnight on cream, each at 10%.
     expect(rippleColor(scheme)).toBe({ dark: 'rgba(243, 236, 221, 0.1)', light: 'rgba(29, 37, 50, 0.1)' }[scheme]);
-  });
-});
-
-// Q14 (FEE-84): the Pinned chip has no word, so its push-pin is an icon that helps identify it, at 3:1 on every face
-// a chip can take, in each colour it takes: muted, full-strength while a Pinned Feed is chosen, and Gold when chosen.
-describe.each(['dark', 'light'] as const)("the Pinned chip's glyph in %s", (scheme) => {
-  const tones = [
-    chipTone({ selected: false }),
-    chipTone({ selected: false, active: true }),
-    chipTone({ selected: true }),
-  ];
-  test('takes the three label colours', () => {
-    expect(tones).toEqual(['textMuted', 'text', 'accent']);
-  });
-  test.each(DEPTH_LEVELS)('reaches 3:1 on the %s face in every colour', (level) => {
-    for (const tone of tones) expect(contrastRatio(themes[scheme][tone], depth[scheme][level].face)).toBeGreaterThanOrEqual(3);
   });
 });

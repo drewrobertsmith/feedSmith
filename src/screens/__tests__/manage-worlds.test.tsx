@@ -1,4 +1,4 @@
-import { act, fireEvent, userEvent, waitFor, within } from '@testing-library/react-native';
+import { act, userEvent, within } from '@testing-library/react-native';
 import { renderRouter, screen } from 'expo-router/testing-library';
 import { Alert } from 'react-native';
 import { Uniwind } from 'uniwind';
@@ -11,7 +11,7 @@ import ManageFeedsRoute from '@/app/manage-feeds';
 import { NativeSheet } from '@/components/native-sheet';
 import { AppRoot } from '@/navigation/app-root';
 import { MANAGE_WORLDS, type ManageWorldId } from '@/worlds/catalog';
-import { FIXTURE_MANAGE, FIXTURE_MANAGE_PINNED } from '@/worlds/fixtures';
+import { FIXTURE_MANAGE } from '@/worlds/fixtures';
 import { createWorld, type World, type WorldSpec } from '@/worlds/world';
 
 let world: World | undefined;
@@ -43,8 +43,6 @@ describe('Manage Feeds worlds', () => {
   type Rename = { titleSize: number; problem: string | null };
   type Shows = {
     feeds: number;
-    pinned: number;
-    handles: number;
     empty: boolean;
     theme: 'dark' | 'light';
     titleSize: number;
@@ -52,18 +50,15 @@ describe('Manage Feeds worlds', () => {
   };
   const SAVED: Rename = { titleSize: 24, problem: null };
   const SHOWS: Record<ManageWorldId, Shows> = {
-    'manage-dark': { feeds: 3, pinned: 1, handles: 1, empty: false, theme: 'dark', titleSize: 24, rename: null },
-    'manage-light': { feeds: 3, pinned: 1, handles: 1, empty: false, theme: 'light', titleSize: 24, rename: null },
-    'manage-pinned': { feeds: 4, pinned: 3, handles: 3, empty: false, theme: 'dark', titleSize: 24, rename: null },
-    'manage-empty': { feeds: 0, pinned: 0, handles: 0, empty: true, theme: 'dark', titleSize: 24, rename: null },
-    'manage-loading': { feeds: 0, pinned: 0, handles: 0, empty: false, theme: 'dark', titleSize: 24, rename: null },
-    'manage-largest-font': { feeds: 4, pinned: 3, handles: 3, empty: false, theme: 'dark', titleSize: 48, rename: null },
-    'manage-rename': { feeds: 3, pinned: 1, handles: 1, empty: false, theme: 'dark', titleSize: 24, rename: SAVED },
-    'manage-rename-light': { feeds: 3, pinned: 1, handles: 1, empty: false, theme: 'light', titleSize: 24, rename: SAVED },
+    'manage-dark': { feeds: 3, empty: false, theme: 'dark', titleSize: 24, rename: null },
+    'manage-light': { feeds: 3, empty: false, theme: 'light', titleSize: 24, rename: null },
+    'manage-empty': { feeds: 0, empty: true, theme: 'dark', titleSize: 24, rename: null },
+    'manage-loading': { feeds: 0, empty: false, theme: 'dark', titleSize: 24, rename: null },
+    'manage-largest-font': { feeds: 3, empty: false, theme: 'dark', titleSize: 48, rename: null },
+    'manage-rename': { feeds: 3, empty: false, theme: 'dark', titleSize: 24, rename: SAVED },
+    'manage-rename-light': { feeds: 3, empty: false, theme: 'light', titleSize: 24, rename: SAVED },
     'manage-rename-largest-font': {
       feeds: 3,
-      pinned: 1,
-      handles: 1,
       empty: false,
       theme: 'dark',
       titleSize: 48,
@@ -71,8 +66,6 @@ describe('Manage Feeds worlds', () => {
     },
     'manage-rename-invalid': {
       feeds: 3,
-      pinned: 1,
-      handles: 1,
       empty: false,
       theme: 'dark',
       titleSize: 24,
@@ -80,8 +73,6 @@ describe('Manage Feeds worlds', () => {
     },
     'manage-rename-failed': {
       feeds: 3,
-      pinned: 1,
-      handles: 1,
       empty: false,
       theme: 'light',
       titleSize: 24,
@@ -94,8 +85,9 @@ describe('Manage Feeds worlds', () => {
     await open(spec);
     expect(await screen.findByRole('heading', { name: 'Manage Feeds' })).toHaveStyle({ fontSize: shows.titleSize });
     expect(screen.queryAllByRole('button', { name: /^Rename / })).toHaveLength(shows.feeds);
-    expect(screen.queryAllByRole('button', { name: /^Unpin / })).toHaveLength(shows.pinned);
-    expect(screen.queryAllByRole('adjustable', { name: /^Reorder / })).toHaveLength(shows.handles);
+    // Pinning and ordering Pins are gone (FEE-94).
+    expect(screen.queryAllByRole('button', { name: /^(Pin|Unpin) / })).toHaveLength(0);
+    expect(screen.queryAllByRole('adjustable', { name: /^Reorder / })).toHaveLength(0);
     if (shows.empty) expect(screen.getByText('No Feeds yet. Add one from the + on Feeds.')).toBeOnTheScreen();
     expect(Uniwind.currentTheme).toBe(shows.theme);
 
@@ -199,47 +191,6 @@ describe('Manage Feeds', () => {
     alert.mockRestore();
   });
 
-  test('Pin and Unpin act at once, each with Undo (Q35)', async () => {
-    const user = userEvent.setup();
-    const w = await open({ colorScheme: 'dark', section: 'manage' });
-    await user.press(await screen.findByRole('button', { name: 'Pin Calm Notes' }));
-    expect(within(await screen.findByTestId('undo-toast')).getByText('Pinned Calm Notes.')).toBeOnTheScreen();
-    await user.press(screen.getByRole('button', { name: 'Unpin The Verge' }));
-    expect(w.feedsLog.pins).toEqual([
-      { id: 'f2', pinned: true },
-      { id: 'f1', pinned: false },
-    ]);
-    // One note at a time: the Unpin's replaces the Pin's, and its Undo puts The Verge back.
-    const toast = await screen.findByTestId('undo-toast');
-    expect(within(toast).getByText('Unpinned The Verge.')).toBeOnTheScreen();
-    await user.press(within(toast).getByRole('button', { name: 'Undo' }));
-    await waitFor(() => expect(w.feedsLog.restoredPins).toEqual([{ id: 'f1', place: 0 }]));
-  });
-
-  test('a fourth Pin is refused, saying why, with nothing to Undo', async () => {
-    const user = userEvent.setup();
-    await open({ colorScheme: 'dark', section: 'manage', manage: 'pinned', pins: 'full' });
-    await user.press(await screen.findByRole('button', { name: 'Pin Daring Fireball' }));
-    const toast = await screen.findByTestId('undo-toast');
-    expect(within(toast).getByText('You can Pin up to 3 Feeds. Unpin one first.')).toBeOnTheScreen();
-    expect(within(toast).queryByRole('button', { name: 'Undo' })).not.toBeOnTheScreen();
-  });
-
-  test('TalkBack orders the Pinned Feeds from their handles: Move up and Move down (Q15)', async () => {
-    const w = await open({ colorScheme: 'dark', section: 'manage', manage: 'pinned' });
-    const [first, second, third] = FIXTURE_MANAGE_PINNED;
-    const middle = await screen.findByRole('adjustable', { name: `Reorder ${second.title}` });
-    expect(middle).toHaveAccessibilityValue({ text: '2 of 3' });
-    expect(middle.props.accessibilityActions).toEqual([
-      { name: 'increment', label: 'Move up' },
-      { name: 'decrement', label: 'Move down' },
-    ]);
-    await act(async () => fireEvent(middle, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } }));
-    expect(w.feedsLog.pinOrders).toEqual([[second.id, first.id, third.id]]);
-    const top = screen.getByRole('adjustable', { name: `Reorder ${first.title}` });
-    expect(top.props.accessibilityActions).toEqual([{ name: 'decrement', label: 'Move down' }]);
-  });
-
   test("a save that finishes after its sheet was closed doesn't close the next Feed's sheet", async () => {
     const user = userEvent.setup();
     const w = await open({ colorScheme: 'dark', section: 'manage' });
@@ -258,7 +209,7 @@ describe('Manage Feeds', () => {
     expect(within(screen.getByTestId('rename-sheet')).getByRole('heading', { name: 'Rename The Verge' })).toBeOnTheScreen();
   });
 
-  test("a row's actions are Rename, Pin, then Remove last (Q32)", async () => {
+  test("a row's actions are Rename, then Remove last; no Pin (Q32, FEE-94)", async () => {
     await open({ colorScheme: 'dark', section: 'manage' });
     await screen.findByText('Calm Notes');
     // TalkBack meets them in this order, by these names (Q15). Remove's brick and its divider are
@@ -266,11 +217,11 @@ describe('Manage Feeds', () => {
     const actions = screen
       .getAllByRole('button', { name: /^(Rename|Pin|Unpin|Remove) Calm Notes$/ })
       .map((button) => button.props.accessibilityLabel);
-    expect(actions).toEqual(['Rename Calm Notes', 'Pin Calm Notes', 'Remove Calm Notes']);
+    expect(actions).toEqual(['Rename Calm Notes', 'Remove Calm Notes']);
   });
 
   test("a row's actions each stay reachable on their own, not folded into the row (Q15)", async () => {
-    await open({ colorScheme: 'dark', section: 'manage', manage: 'pinned' });
+    await open({ colorScheme: 'dark', section: 'manage', });
     const rename = await screen.findByRole('button', { name: 'Rename The Verge' });
     // No ancestor groups the row into one TalkBack stop that would swallow its buttons.
     for (let node = rename.parent; node; node = node.parent) expect(node.props.accessible).not.toBe(true);
@@ -303,15 +254,6 @@ describe('Manage Feeds', () => {
     await user.press(await screen.findByRole('button', { name: 'Rename Calm Notes' }));
     await user.press(screen.getByRole('button', { name: 'Save name' }));
     expect(await screen.findByText('Give the Feed a name of up to 100 characters.')).toBeOnTheScreen();
-  });
-
-  test("dragging a Pinned Feed's handle reorders it", async () => {
-    const w = await open({ colorScheme: 'dark', section: 'manage', manage: 'pinned' });
-    const [first, second, third] = FIXTURE_MANAGE_PINNED;
-    // The drag adapter reports where a row was dropped; the screen turns that into the new order.
-    const handle = await screen.findByRole('adjustable', { name: `Reorder ${third.title}` });
-    await act(async () => handle.props.onDrop(0));
-    expect(w.feedsLog.pinOrders).toEqual([[third.id, first.id, second.id]]);
   });
 
   test('every Feed in the list is there, by name', async () => {

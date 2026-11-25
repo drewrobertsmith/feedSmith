@@ -70,24 +70,18 @@ export type SavedActions = {
 export type LastUpdatedView = { status: 'loading' } | { status: 'ready'; at: number | null };
 
 /** One Feed's chip (P5, P9). Never carries a feed URL (Q9). */
-export type FeedChip = { id: string; title: string; faviconUrl?: string; pinned: boolean };
+export type FeedChip = { id: string; title: string; faviconUrl?: string };
 export type ChipsView = { status: 'loading' } | { status: 'ready'; chips: FeedChip[] };
 /** One Feed in Manage Feeds (D13): its site host, never its URL (Q9), and whether it works (P15). */
-export type ManagedFeed = { id: string; title: string; faviconUrl?: string; host: string; pinned: boolean; working: boolean };
+export type ManagedFeed = { id: string; title: string; faviconUrl?: string; host: string; working: boolean };
 export type ManageView = { status: 'loading' } | { status: 'ready'; feeds: ManagedFeed[] };
 export type ManageActions = {
   /** `failed`: it didn't reach the server (offline, or an error), so the name can be tried again (Q5). */
   rename: (id: string, title: string) => Promise<'ok' | 'invalid-name' | 'not-found' | 'failed'>;
   /** `ok` once the Feed is gone (or already was); `failed` when it didn't reach the server. */
   remove: (id: string) => Promise<'ok' | 'failed'>;
-  /** The Pinned Feeds' ids in their new order. */
-  orderPins: (ids: string[]) => Promise<void>;
 };
 
-/** What Pinning or unpinning came to: a fourth Pin is refused (P9). */
-export type PinOutcome = 'ok' | 'pins-full' | 'not-found';
-/** Pinning or unpinning, and for an Unpin, where the Feed was among the Pins (from 0), for Undo (Q35). */
-export type PinResult = { outcome: PinOutcome; place?: number };
 /**
  * The Article the Reading view opens. While it loads, `title` is the one a list already showed for it, when
  * there was one, so the headline is there from the first frame for the row's title to travel into (FEE-48).
@@ -144,13 +138,9 @@ export type FeedsData = {
   useSaved: () => SavedView;
   /** Saving, marking Done, and Undo. */
   useSavedActions: () => SavedActions;
-  /** Pins or unpins a Feed, at once (optimistic). */
-  useSetPinned: () => (id: string, pinned: boolean) => Promise<PinResult>;
-  /** Undo for Unpin: Pins a Feed again at its old place among the Pins, or last with none (Q35). */
-  useRestorePin: () => (id: string, place?: number) => Promise<PinOutcome>;
-  /** Manage Feeds' list, Pinned first in order (D13). */
+  /** Manage Feeds' list (D13). */
   useManage: () => ManageView;
-  /** Renaming, removing and ordering Pinned Feeds. */
+  /** Renaming and removing Feeds. */
   useManageActions: () => ManageActions;
   useArticle: (id: string) => ArticleView;
   /**
@@ -208,21 +198,9 @@ export function useManage(): ManageView {
   return read();
 }
 
-/** Renaming, removing and ordering. */
+/** Renaming and removing. */
 export function useManageActions(): ManageActions {
   const { useManageActions: read } = useFeedsData();
-  return read();
-}
-
-/** Undo for Unpin. */
-export function useRestorePin(): ReturnType<FeedsData['useRestorePin']> {
-  const { useRestorePin: read } = useFeedsData();
-  return read();
-}
-
-/** Pinning and unpinning. */
-export function useSetPinned(): ReturnType<FeedsData['useSetPinned']> {
-  const { useSetPinned: read } = useFeedsData();
   return read();
 }
 

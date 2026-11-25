@@ -21,24 +21,6 @@ jest.mock('@/components/chip-switch', () => {
   };
 });
 
-// The drag gesture (D13) is a plain row in tests whose handle
-// carries `onDrop`, so tests drop a row where a drag would.
-jest.mock('@/components/drag-row', () => {
-  const { View } = require('react-native');
-  return {
-    DragList: ({ gap, children }) => <View style={{ gap }}>{children}</View>,
-    // A drag can't be driven through Jest's renderer, so the handle keeps its TalkBack props, and `onDrop` stands in for one.
-    DragRow: ({ index, count, handle, handleLabel, onDrop, children }) => (
-      <View style={{ flexDirection: 'row' }}>
-        <View {...require('@/components/reorder-handle').reorderHandleProps({ index, count, label: handleLabel, onDrop })} onDrop={onDrop}>
-          {handle}
-        </View>
-        <View style={{ flex: 1 }}>{children}</View>
-      </View>
-    ),
-  };
-});
-
 // Android's bottom sheet is Jetpack Compose (Expo UI), which has no Jest renderer: its one
 // adapter shows its content while open, as the real sheet does (FEE-35).
 jest.mock('@/components/native-sheet', () => ({

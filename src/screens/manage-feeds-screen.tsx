@@ -3,22 +3,18 @@ import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/app-button';
-import { AppSymbol } from '@/components/app-symbol';
 import { AppText } from '@/components/app-text';
-import { DragList, DragRow } from '@/components/drag-row';
 import { FeedIcon } from '@/components/feed-icon';
 import { NativeSheet } from '@/components/native-sheet';
 import { NativeTextField } from '@/components/native-text-field';
 import { UndoToastHost, useUndo } from '@/components/undo-toast';
 import { useEnvironment } from '@/environment';
 import { useManage, useManageActions, type ManagedFeed } from '@/feeds/feeds-data';
-import { usePin } from '@/feeds/use-pin';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
 import { MAX_FEED_NAME } from '../../convex/lib/feedName';
 
 const ICON = 20;
-const HANDLE = 24;
 
 /** A small text action on a Feed's row; TalkBack hears its full name, e.g. "Rename The Verge" (Q15). */
 function RowAction({
@@ -107,12 +103,10 @@ function RenameForm({ feed, onDone }: { feed: ManagedFeed; onDone: () => void })
 }
 
 function FeedRow({ feed, onRename }: { feed: ManagedFeed; onRename: () => void }) {
-  const pin = usePin();
   const note = useUndo();
   const { colorScheme } = useEnvironment();
   const { remove } = useManageActions();
 
-  const togglePin = () => void pin(feed);
   const confirmRemove = () =>
     Alert.alert(`Remove ${feed.title}?`, 'Its Articles go too. Articles you’ve Saved stay in Saved.', [
       { text: 'Cancel', style: 'cancel' },
@@ -148,11 +142,6 @@ function FeedRow({ feed, onRename }: { feed: ManagedFeed; onRename: () => void }
       ) : null}
       <View className="flex-row flex-wrap items-center gap-related">
         <RowAction label="Rename" accessibleName={`Rename ${feed.title}`} onPress={onRename} />
-        <RowAction
-          label={feed.pinned ? 'Unpin' : 'Pin'}
-          accessibleName={`${feed.pinned ? 'Unpin' : 'Pin'} ${feed.title}`}
-          onPress={() => void togglePin()}
-        />
         {/* Remove comes last, behind a divider (Q32), and wraps with it at large text. */}
         <View className="flex-row items-center gap-related">
           <View
@@ -174,17 +163,13 @@ function FeedRow({ feed, onRename }: { feed: ManagedFeed; onRename: () => void }
 type Renaming = { feed: ManagedFeed; open: boolean; openCount: number };
 
 /**
- * Manage Feeds (D13): rename, remove, Pin and order Feeds, and see which have stopped working (P15).
+ * Manage Feeds (D13): rename and remove Feeds, and see which have stopped working (P15). Pinning is gone (FEE-94).
  * `renaming`, a Feed's id, opens its rename sheet at once, for the state gallery.
  */
 export function ManageFeedsScreen({ renaming: initiallyRenaming }: { renaming?: string }) {
   const insets = useSafeAreaInsets();
-  const { colorScheme } = useEnvironment();
   const view = useManage();
-  const { orderPins } = useManageActions();
   const feeds = view.status === 'ready' ? view.feeds : [];
-  const pinned = feeds.filter((feed) => feed.pinned);
-  const others = feeds.filter((feed) => !feed.pinned);
 
   // `tapped` is null until the User taps Rename; till then the gallery's Feed, if any, is shown.
   const [tapped, setTapped] = useState<Renaming | null>(null);
@@ -198,13 +183,6 @@ export function ManageFeedsScreen({ renaming: initiallyRenaming }: { renaming?: 
       const shown = current ?? renaming;
       return shown?.openCount === openCount ? { ...shown, open: false } : current;
     });
-
-  const move = (from: number, to: number) => {
-    const ids = pinned.map((feed) => feed.id);
-    const [moved] = ids.splice(from, 1);
-    ids.splice(to, 0, moved);
-    void orderPins(ids);
-  };
 
   return (
     <View className="flex-1 bg-background">
@@ -223,47 +201,9 @@ export function ManageFeedsScreen({ renaming: initiallyRenaming }: { renaming?: 
             No Feeds yet. Add one from the + on Feeds.
           </AppText>
         ) : null}
-        {pinned.length > 0 ? (
+        {feeds.length > 0 ? (
           <View className="gap-related">
-            <AppText variant="label" className="text-text-muted">
-              Pinned
-            </AppText>
-            <DragList ids={pinned.map((feed) => feed.id)} gap={spacing.related}>
-              {pinned.map((feed, index) => (
-                <DragRow
-                  key={feed.id}
-                  id={feed.id}
-                  index={index}
-                  count={pinned.length}
-                  handleLabel={`Reorder ${feed.title}`}
-                  onDrop={(to) => move(index, to)}
-                  handle={
-                    <View className="pr-related">
-                      <AppSymbol
-                        name={{
-                          ios: 'line.3.horizontal',
-                          android: 'drag_indicator',
-                        }}
-                        size={HANDLE}
-                        tintColor={themes[colorScheme].textMuted}
-                      />
-                    </View>
-                  }
-                >
-                  <FeedRow feed={feed} onRename={() => startRenaming(feed)} />
-                </DragRow>
-              ))}
-            </DragList>
-          </View>
-        ) : null}
-        {others.length > 0 ? (
-          <View className="gap-related">
-            {pinned.length > 0 ? (
-              <AppText variant="label" className="text-text-muted">
-                Feeds
-              </AppText>
-            ) : null}
-            {others.map((feed) => (
+            {feeds.map((feed) => (
               <FeedRow key={feed.id} feed={feed} onRename={() => startRenaming(feed)} />
             ))}
           </View>
@@ -279,7 +219,7 @@ export function ManageFeedsScreen({ renaming: initiallyRenaming }: { renaming?: 
           />
         </NativeSheet>
       ) : null}
-      {/* Pin and Unpin's Undo, above the gesture bar (Q35). */}
+      {/* A Remove that didn't reach the server says so here, above the gesture bar (Q5). */}
       <UndoToastHost bottom={insets.bottom} />
     </View>
   );

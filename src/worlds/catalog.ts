@@ -152,13 +152,12 @@ export type ReadingWorldId = (typeof READING_WORLDS)[number]['id'];
 export const MANAGE_WORLDS = [
   { id: 'manage-dark', label: 'Manage Feeds, dark', spec: { colorScheme: 'dark', section: 'manage' } },
   { id: 'manage-light', label: 'Manage Feeds, light', spec: { colorScheme: 'light', section: 'manage' } },
-  { id: 'manage-pinned', label: 'Three Pinned to order', spec: { colorScheme: 'dark', section: 'manage', manage: 'pinned' } },
   { id: 'manage-empty', label: 'No Feeds to manage', spec: { colorScheme: 'dark', section: 'manage', manage: 'none' } },
   { id: 'manage-loading', label: 'Manage Feeds, loading', spec: { colorScheme: 'dark', section: 'manage', manage: 'loading' } },
   {
     id: 'manage-largest-font',
     label: 'Manage Feeds, largest font size',
-    spec: { colorScheme: 'dark', section: 'manage', manage: 'pinned', fontScale: 2 },
+    spec: { colorScheme: 'dark', section: 'manage', fontScale: 2 },
   },
   // Renaming in a sheet over the list (FEE-43, Q32). The refused and failed worlds show their
   // message once Save is tapped: the tests tap it, and so does the device walk.
@@ -258,57 +257,4 @@ export const SAVED_WORLDS = [
 
 export type SavedWorldId = (typeof SAVED_WORLDS)[number]['id'];
 
-/** The Pinned view (FEE-59): the Pinned Feeds' Articles together, chosen by the Pinned chip or a link. */
-export const PINNED_WORLDS = [
-  { id: 'pinned-dark', label: 'Pinned, dark', spec: { colorScheme: 'dark', feeds: 'some', pins: 'two', feed: 'pinned' } },
-  { id: 'pinned-light', label: 'Pinned, light', spec: { colorScheme: 'light', feeds: 'some', pins: 'two', feed: 'pinned' } },
-  { id: 'pinned-empty', label: 'Pinned, nothing new', spec: { colorScheme: 'dark', feeds: 'some', pins: 'quiet', feed: 'pinned' } },
-  { id: 'pinned-all', label: 'Two Pins, All chosen', spec: { colorScheme: 'dark', feeds: 'some', pins: 'two' } },
-  { id: 'pinned-one-pin', label: 'One Pin: no Pinned chip', spec: { colorScheme: 'dark', feeds: 'some', feed: 'pinned' } },
-  { id: 'pinned-hostile-link', label: 'A hostile link', spec: { colorScheme: 'dark', feeds: 'some', pins: 'two', feed: 'pinned"><b>' } },
-  {
-    id: 'pinned-largest-font',
-    label: 'Pinned, largest font size',
-    spec: { colorScheme: 'dark', feeds: 'some', pins: 'two', feed: 'pinned', fontScale: 2 },
-  },
-] as const satisfies readonly CatalogWorld[];
 
-export type PinnedWorldId = (typeof PINNED_WORLDS)[number]['id'];
-
-/** The Pinned group (FEE-60): the Pinned Feeds' chips show inline after Pinned while it, or one of them, is chosen. */
-export const PINNED_GROUP_WORLDS = [
-  { id: 'group-open', label: 'Group open, a Pinned Feed chosen', spec: { colorScheme: 'dark', feeds: 'some', pins: 'two', feed: 'f1' } },
-  { id: 'group-folded-all', label: 'Folded, All chosen', spec: { colorScheme: 'dark', feeds: 'some', pins: 'two' } },
-  {
-    id: 'group-folded-other',
-    label: 'Folded, a Feed that isn\'t Pinned chosen',
-    spec: { colorScheme: 'light', feeds: 'some', pins: 'two', feed: 'f2' },
-  },
-  { id: 'group-one-pin', label: 'One Pin: no group', spec: { colorScheme: 'dark', feeds: 'some' } },
-  { id: 'group-no-pins', label: 'No Pins', spec: { colorScheme: 'dark', feeds: 'some', pins: 'none' } },
-  { id: 'group-link', label: 'Opened from a link to a Pinned Feed', spec: { colorScheme: 'dark', feeds: 'some', pins: 'two', feed: 'f3' } },
-  {
-    id: 'group-remove-animations',
-    label: 'Group open, Remove animations',
-    spec: { colorScheme: 'dark', feeds: 'some', pins: 'two', feed: 'pinned', reduceMotion: true },
-  },
-  // Tapping the chosen Pinned chip hides its group while you keep reading Pinned (FEE-84).
-  {
-    id: 'group-hidden',
-    label: 'Pinned chosen, group hidden',
-    spec: { colorScheme: 'dark', feeds: 'some', pins: 'two', feed: 'pinned', pinnedGroup: 'hidden' },
-  },
-] as const satisfies readonly CatalogWorld[];
-
-export type PinnedGroupWorldId = (typeof PINNED_GROUP_WORLDS)[number]['id'];
-
-/** The Pinned chip's stacked icons (FEE-61): one overlapping, ringed circle per Pinned Feed, in Pin order. */
-export const PINNED_STACK_WORLDS = [
-  { id: 'stack-three-dark', label: 'Three Pins, dark', spec: { colorScheme: 'dark', feeds: 'some', pins: 'three' } },
-  { id: 'stack-three-light', label: 'Three Pins, light', spec: { colorScheme: 'light', feeds: 'some', pins: 'three' } },
-  { id: 'stack-initial', label: 'A Pinned Feed with no icon', spec: { colorScheme: 'dark', feeds: 'some', pins: 'quiet' } },
-  { id: 'stack-two', label: 'Two Pins', spec: { colorScheme: 'dark', feeds: 'some', pins: 'two' } },
-  { id: 'stack-largest-font', label: 'Three Pins, largest font size', spec: { colorScheme: 'dark', feeds: 'some', pins: 'three', fontScale: 2 } },
-] as const satisfies readonly CatalogWorld[];
-
-export type PinnedStackWorldId = (typeof PINNED_STACK_WORLDS)[number]['id'];
