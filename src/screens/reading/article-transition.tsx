@@ -28,6 +28,8 @@ const { duration, close, easing, rise, scrim } = motion.articleOpen;
 const EMPHASIZED = Easing.bezier(...easing);
 /** How long opening waits for the page to lay out its lead image before it goes without it (FEE-114). */
 const LEAD_WAIT = 120;
+/** How long a landed picture waits for the lead image to draw before handing over anyway (FEE-114). */
+const LEAD_DRAW_WAIT = 600;
 
 /**
  * How the page comes and goes (FEE-114): `row` grows from the tapped row and shrinks back into it,
@@ -35,8 +37,11 @@ const LEAD_WAIT = 120;
  * no row to use; `cut` just appears and goes, with Remove animations on (Q17).
  */
 type Path = 'row' | 'axis' | 'cut';
-/** The thumbnail travelling between the row and the lead image, when both are there. */
-type Flight = { thumb: Rect; lead: Rect; read: boolean };
+/**
+ * The row's thumbnail, the one picture the transition draws (FEE-114): it travels to the lead image when the
+ * page has placed one (`lead`), else rides in the row and fades with it.
+ */
+type Flight = { thumb: Rect; lead?: Rect; read: boolean };
 
 /**
  * The page's frame now (FEE-114). The shared values come in as arguments, not from this function's closure,
@@ -94,11 +99,13 @@ type MoveValues = {
   size: SharedValue<Size>;
   closing: SharedValue<boolean>;
   flying: SharedValue<boolean>;
+  /** False until the move starts: the transition stays unseen over the real row while its picture loads. */
+  revealed: SharedValue<boolean>;
 };
 
 /** Every part of the move, each drawn from the same frame (`frameOf`), so they never disagree. */
 function useMoveStyles({ values, rowPath, flight }: { values: MoveValues; rowPath: boolean; flight?: Flight }) {
-  const { progress, back, edge, rowRect, size, closing, flying } = values;
+  const { progress, back, edge, rowRect, size, closing, flying, revealed } = values;
   const scrimStyle = useAnimatedStyle(() => ({
     opacity: scrim * progress.get(),
   }));
@@ -110,7 +117,7 @@ function useMoveStyles({ values, rowPath, flight }: { values: MoveValues; rowPat
       width: rect.width,
       height: rect.height,
       borderRadius: radius,
-      opacity: rowPath ? 1 : progress.get(),
+      opacity: rowPath ? (revealed.get() ? 1 : 0) : progress.get(),
     };
   });
   /** Opening, the page is what arrives; closing, what leaves. */
@@ -136,6 +143,20 @@ function useMoveStyles({ values, rowPath, flight }: { values: MoveValues; rowPat
     if (!flight) return { opacity: 0 };
     const p = progress.get();
     const { rect } = frameOf(progress, back, edge, rowRect, size, rowPath);
+    const dim = flight.read ? READ_IMAGE_OPACITY : 1;
+    if (!flight.lead) {
+      // No lead to go to: it rides in the row, where the row is now, and fades with it.
+      const row = rowRect.get();
+      const s = rect.width / row.width;
+      const shown = closing.get() ? fadeThrough(1 - p).incoming : fadeThrough(p).outgoing;
+      return {
+        left: rect.x + (flight.thumb.x - row.x) * s,
+        top: rect.y + (flight.thumb.y - row.y) * s,
+        width: flight.thumb.width * s,
+        height: flight.thumb.height * s,
+        opacity: dim * shown,
+      };
+    }
     // The lead travels with the page: where it is in the page's frame now.
     const s = rect.width / size.get().width;
     const landing = closing.get()
@@ -152,7 +173,7 @@ function useMoveStyles({ values, rowPath, flight }: { values: MoveValues; rowPat
       top: box.y,
       width: box.width,
       height: box.height,
-      opacity: flight.read ? READ_IMAGE_OPACITY + (1 - READ_IMAGE_OPACITY) * p : 1,
+      opacity: dim + (1 - dim) * p,
     };
   });
   const leadStyle = useAnimatedStyle(() => ({ opacity: flying.get() ? 0 : 1 }));
@@ -193,8 +214,11 @@ export function ArticleTransition({
 
   const [path, setPath] = useState<Path>(reduceMotion ? 'cut' : origin ? 'row' : 'axis');
   const [phase, setPhase] = useState<'waiting' | 'opening' | 'open' | 'closing'>(reduceMotion ? 'open' : 'waiting');
-  const [flight, setFlight] = useState<Flight | undefined>();
-  // Whether the travelling picture is on screen yet: until it is, the row and the page keep their own.
+  // Mounted at once, unseen over the real row's own, so it's drawn before anything covers that row.
+  const [flight, setFlight] = useState<Flight | undefined>(() =>
+    origin?.thumb && origin.article.imageUrl ? { thumb: origin.thumb, read: origin.article.read } : undefined,
+  );
+  // Whether the picture is drawn yet: a freshly mounted image takes a few frames, even from the cache.
   const [flightShown, setFlightShown] = useState(false);
   const [rowShown, setRowShown] = useState(origin);
 
@@ -215,6 +239,7 @@ export function ArticleTransition({
   const edge = useSharedValue<Edge>('left');
   const closing = useSharedValue(false);
   const flying = useSharedValue(false);
+  const revealed = useSharedValue(phase !== 'waiting');
   const size = useSharedValue(screen);
   const rowRect = useSharedValue<Rect>(origin?.row ?? { x: 0, y: 0, ...screen });
 
@@ -226,10 +251,31 @@ export function ArticleTransition({
     setRowShown(undefined);
     setPhase('open');
   };
+  // The travelling picture hands over to the lead only once it has landed and the lead is drawn: the lead
+  // shows first, beneath the identical picture, and the picture goes two frames later, so there's never a
+  // frame with neither. A lead that never draws (a broken image) doesn't hold the page up for long.
+  const handover = useRef({ flight: false, landed: false, leadDrawn: false, done: false });
+  const handOver = () => {
+    if (handover.current.done) return;
+    handover.current.done = true;
+    flying.set(false);
+    requestAnimationFrame(() => requestAnimationFrame(finishOpening));
+  };
+  const onLanded = () => {
+    handover.current.landed = true;
+    if (!handover.current.flight || handover.current.leadDrawn) handOver();
+    else setTimeout(handOver, LEAD_DRAW_WAIT);
+  };
+  const onLeadDrawn = () => {
+    handover.current.leadDrawn = true;
+    if (handover.current.landed) handOver();
+  };
   const startOpening = useEffectEvent(() => {
-    if (path === 'row' && origin?.thumb && lead) {
-      setFlight({ thumb: origin.thumb, lead, read: origin.article.read });
+    if (flight && lead) {
+      setFlight({ ...flight, lead });
+      handover.current.flight = true;
     }
+    revealed.set(true);
     setPhase('opening');
     progress.set(
       withTiming(
@@ -239,26 +285,26 @@ export function ArticleTransition({
           easing: EMPHASIZED,
         },
         (done) => {
-          if (done) scheduleOnRN(finishOpening);
+          if (done) scheduleOnRN(onLanded);
         },
       ),
     );
   });
   const waiting = phase === 'waiting';
   const pageSettled = path !== 'row' || (articleReady && leadSettled);
+  const ready = pageSettled && (!flight || flightShown);
   useEffect(() => {
     if (!waiting) return;
-    // At once when the page is placed, else never longer than this: the text matters more than the
-    // thumbnail's flight (300 ms tap to text).
-    const timer = setTimeout(startOpening, pageSettled ? 0 : LEAD_WAIT);
+    // At once when the page is placed and the picture drawn, else never longer than this: the text matters
+    // more than the thumbnail's flight (300 ms tap to text).
+    const timer = setTimeout(startOpening, ready ? 0 : LEAD_WAIT);
     return () => clearTimeout(timer);
-  }, [waiting, pageSettled]);
+  }, [waiting, ready]);
 
-  // The lead shows again as its travelling copy goes. It hides only once the copy is on screen (`onDisplay`),
-  // so the picture is never missing for a frame while the copy loads.
+  // The lead hides only while its picture, drawn, is travelling to or from it, so it's never missing a frame.
   useLayoutEffect(() => {
-    if (!flight) flying.set(false);
-  }, [flight, flying]);
+    flying.set(flight?.lead !== undefined && flightShown);
+  }, [flight, flightShown, flying]);
 
   /** Back: into the row where it is now, else away on the axis; the navigator then drops the page at once. */
   const closeArticle = () => {
@@ -273,8 +319,9 @@ export function ArticleTransition({
     if (into && toRow) {
       rowRect.set(into.row);
       setRowShown(toRow);
-      if (into.thumb && leadNow && isOnScreen(leadNow, screen)) {
-        setFlight({ thumb: into.thumb, lead: leadNow, read });
+      if (into.thumb && origin?.article.imageUrl) {
+        // To the row's thumbnail from the lead when it's in view, else riding in the row as it fades in.
+        setFlight({ thumb: into.thumb, lead: leadNow && isOnScreen(leadNow, screen) ? leadNow : undefined, read });
         setFlightShown(false);
       }
     }
@@ -317,7 +364,7 @@ export function ArticleTransition({
 
   const rowPath = path === 'row';
   const { scrimStyle, containerStyle, pageStyle, rowStyle, flightStyle, leadStyle } = useMoveStyles({
-    values: { progress, back, edge, rowRect, size, closing, flying },
+    values: { progress, back, edge, rowRect, size, closing, flying, revealed },
     rowPath,
     flight,
   });
@@ -355,7 +402,7 @@ export function ArticleTransition({
             pageStyle,
           ]}
         >
-          <LeadSlotContext value={{ register: registerLead, laidOut: onLeadLayout, style: leadStyle }}>
+          <LeadSlotContext value={{ register: registerLead, laidOut: onLeadLayout, displayed: onLeadDrawn, style: leadStyle }}>
             {children}
           </LeadSlotContext>
         </Animated.View>
@@ -380,7 +427,7 @@ export function ArticleTransition({
             <ArticleRowContent
               article={rowShown.article}
               feedNamed={rowShown.feedNamed}
-              image={flightShown ? 'space' : 'show'}
+              image={flight ? 'space' : 'show'}
             />
           </Animated.View>
         ) : null}
@@ -392,10 +439,7 @@ export function ArticleTransition({
             accessible={false}
             contentFit="cover"
             recyclingKey={id}
-            onDisplay={() => {
-              flying.set(true);
-              setFlightShown(true);
-            }}
+            onDisplay={() => setFlightShown(true)}
             style={StyleSheet.absoluteFill}
           />
         </Animated.View>

@@ -5,6 +5,7 @@ import { AppText } from '@/components/app-text';
 import type { Block, OmittedKind, Span } from '@/feeds/feeds-data';
 import { openLink } from '@/feeds/open-link';
 import { LeadSlot } from '@/screens/reading/lead-slot';
+import { useLeadDisplayed } from '@/screens/reading/lead-slot-context';
 
 const OMITTED: Record<OmittedKind, string> = {
   video: 'A video isn’t shown here.',
@@ -40,6 +41,7 @@ function OpenOriginal({ link }: { link: string }) {
 }
 
 function BlockView({ block, link, lead }: { block: Block; link?: string; lead?: boolean }) {
+  const leadDisplayed = useLeadDisplayed(!!lead && block.type === 'image');
   switch (block.type) {
     case 'paragraph':
       return (
@@ -93,6 +95,7 @@ function BlockView({ block, link, lead }: { block: Block; link?: string; lead?: 
               role={block.alt ? 'img' : undefined}
               aria-label={block.alt}
               contentFit="cover"
+              onDisplay={leadDisplayed}
               className="w-full rounded-lg bg-surface"
               style={{ aspectRatio: block.width && block.height ? block.width / block.height : 16 / 9 }}
             />
