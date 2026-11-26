@@ -93,6 +93,12 @@ export const NEW_ARTICLES_WORLDS = [
     spec: { colorScheme: 'dark', feeds: 'busy', arrivals: 'later', scrolled: true, reduceMotion: true },
   },
   { id: 'arrive-top', label: 'New Articles, at the top', spec: { colorScheme: 'dark', feeds: 'busy', arrivals: 'later' } },
+  // FEE-104: at the top, with Remove animations on, the rows and the line change without moving (Q17).
+  {
+    id: 'arrive-top-remove-animations',
+    label: 'New Articles, at the top, Remove animations',
+    spec: { colorScheme: 'dark', feeds: 'busy', arrivals: 'later', reduceMotion: true },
+  },
   {
     id: 'arrive-feed-scrolled',
     label: "New Articles on a Feed's page, scrolled down",

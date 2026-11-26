@@ -20,20 +20,20 @@ import { AccountButton } from '@/screens/account/account-sheet';
 import { AddFeedSheet } from '@/screens/add-feed-sheet';
 import { ChipRow } from '@/screens/chip-row';
 import { NewArticlesNote } from '@/screens/new-articles-note';
+import { UpdatedLine } from '@/screens/updated-line';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
 
 /**
  * The line under the Feeds title (FEE-47): how fresh All is, so you know whether pulling down is
  * worth it. Information, not a count (P7). Nothing until there's something to say. "Updating…" lasts until
- * a pull's results are on screen (FEE-103).
+ * a pull's results are on screen (FEE-103), and only the part that changes moves (FEE-104).
  */
-function useUpdatedLine(refreshing: boolean): string | undefined {
+function useUpdatedLine(refreshing: boolean) {
   const lastUpdated = useLastUpdated();
   const now = useMinuteClock();
   const parts = updatedLine(refreshing, lastUpdated.status === 'ready' ? lastUpdated.at : null, now);
-  // One span, so the line keeps its kerning; FEE-104 splits it where only part of it moves (owner's call).
-  return parts && parts.still + parts.change + parts.time;
+  return parts && <UpdatedLine {...parts} />;
 }
 
 /**

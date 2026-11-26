@@ -29,4 +29,9 @@ export const motion = {
    * shares a place.
    */
   rowsArrive: { duration: 300, easing: [0.2, 0, 0, 1], fadeIn: 150 },
+  /**
+   * The "Updated" line, in the same moment (FEE-104): only the part whose words change moves, the old words
+   * fading out fully before the new ones fade in, so two never share a place.
+   */
+  lineChange: { out: 100, in: 150 },
 } as const;

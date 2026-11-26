@@ -33,15 +33,15 @@ export function usePull(run: () => Promise<number | null>, at: number | null | u
   return { refreshing, refresh };
 }
 
-/** The "Updated" line's parts (FEE-103): `still` never changes, `change` does between updating and updated, `time` as it ages. */
-export type UpdatedLine = { still: 'Updat'; change: 'ing…' | 'ed'; time: string };
-
 /**
- * The line under the Feeds title (D20): how fresh All is, or that it's updating. Split so only what changes
- * changes (FEE-104 moves only `change` and `time`). Nothing until there's something to say.
+ * The "Updated" line's parts (FEE-104): `still` ("Updated", or "Updating…" during a pull) and the `time` as
+ * it ages. Split after the word, so the time changes while "Updated" stays put, and the line keeps its kerning.
  */
+export type UpdatedLine = { still: 'Updated' | 'Updating…'; time: string };
+
+/** The line under the Feeds title (D20): how fresh All is, or that it's updating. Nothing until there's something to say. */
 export function updatedLine(refreshing: boolean, at: number | null | undefined, now: number): UpdatedLine | undefined {
-  if (refreshing) return { still: 'Updat', change: 'ing…', time: '' };
+  if (refreshing) return { still: 'Updating…', time: '' };
   if (at === null || at === undefined) return undefined;
-  return { still: 'Updat', change: 'ed', time: ` ${publishedAgo(at, now)}` };
+  return { still: 'Updated', time: ` ${publishedAgo(at, now)}` };
 }
