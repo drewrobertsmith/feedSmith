@@ -66,6 +66,48 @@ describe('extracting an Article from its page (FEE-25, T8)', () => {
   });
 });
 
+describe('the paywall check reads JSON-LD through Effect Schema (FEE-112, Q6)', () => {
+  /** The Article page, declaring `json` (its text, as the page carries it) the way publishers do for search engines. */
+  const declaring = (...json: string[]) =>
+    article.replace('</head>', `${json.map((text) => `<script type="application/ld+json">${text}</script>`).join('')}</head>`);
+  /** `inner` wrapped in `levels` objects, each one level deeper. */
+  const nested = (levels: number, inner: string) => '{"hasPart":'.repeat(levels) + inner + '}'.repeat(levels);
+
+  test.each([
+    ['says so at the top', '{"@type":"NewsArticle","isAccessibleForFree":false}'],
+    ['says so as the string "False"', '{"@type":"NewsArticle","isAccessibleForFree":"False"}'],
+    ['says so in a part', '{"@type":"NewsArticle","hasPart":{"@type":"WebPageElement","isAccessibleForFree":false}}'],
+    ['says so inside an array', '[{"@type":"WebSite"},{"@type":"NewsArticle","isAccessibleForFree":false}]'],
+    ['says so in its graph', '{"@context":"https://schema.org","@graph":[{"@type":"NewsArticle","isAccessibleForFree":"false"}]}'],
+    ['says so at the depth limit', nested(7, '{"isAccessibleForFree":false}')],
+  ])('a page whose JSON-LD %s is paywalled, so it falls back', (_, json) => {
+    expect(extractFromPage(declaring(json), URL)._tag).toBe('Failed');
+  });
+
+  test('one paywalled script among others is enough', () => {
+    expect(extractFromPage(declaring('{oops', '{"@type":"NewsArticle","isAccessibleForFree":false}'), URL)._tag).toBe('Failed');
+  });
+
+  test.each([
+    ['is malformed', '{"@type":"NewsArticle","isAccessibleForFree":false'],
+    ['is empty', ''],
+    ['is a bare value', 'false'],
+    ['never mentions access', '{"@type":"NewsArticle","headline":"Slow reading"}'],
+    ['says the Article is free', '{"@type":"NewsArticle","isAccessibleForFree":true}'],
+    ['says "True"', '{"@type":"NewsArticle","isAccessibleForFree":"True"}'],
+    ['says so only past the depth limit', nested(9, '{"isAccessibleForFree":false}')],
+  ])('a page whose JSON-LD %s is read normally', (_, json) => {
+    expect(extractFromPage(declaring(json), URL)._tag).toBe('Extracted');
+  });
+
+  test('JSON-LD nested 100,000 deep is read normally, quickly, and never throws (Q8)', () => {
+    const page = declaring('['.repeat(100_000) + '{"isAccessibleForFree":false}' + ']'.repeat(100_000));
+    const start = performance.now();
+    expect(extractFromPage(page, URL)._tag).toBe('Extracted');
+    expect(performance.now() - start).toBeLessThan(500);
+  });
+});
+
 test('a page nested 50,000 deep is read in well under a second, never at the parser\'s quadratic cost (FEE-57)', () => {
   const page = `<html><body>${'<div>'.repeat(50_000)}deep${'</div>'.repeat(50_000)}</body></html>`;
   const start = performance.now();
