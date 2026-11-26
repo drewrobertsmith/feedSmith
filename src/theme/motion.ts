@@ -10,10 +10,11 @@ export const motion = {
    */
   chipSelect: { duration: 150, easing: [0.2, 0, 0, 1] },
   /**
-   * Choosing another chip slides the list's rows in from that side, a short way and a little
-   * faded, on the fast-start, gentle-settle curve (FEE-42). The header stays still.
+   * Choosing another chip (FEE-116) moves the list on Material's shared axis X: the old chip's rows slide
+   * `distance` away from the new chip's side and fade out over `out`, accelerating away, and only then do the
+   * new chip's rows slide in from that side and fade up over `in`, settling. The header stays still.
    */
-  chipSwitch: { distance: 24, duration: 200, fadeFrom: 0.6, easing: [0.16, 1, 0.3, 1] },
+  chipSwitch: { distance: 30, out: 90, in: 210, outEasing: [0.3, 0, 0.8, 0.15], inEasing: [0.05, 0.7, 0.1, 1] },
   /**
    * Opening an Article (FEE-114): the tapped row grows into the page, Material's container transform, in
    * `duration` on Material's emphasized curve, and shrinks back into it in `close`. The row's content fades
