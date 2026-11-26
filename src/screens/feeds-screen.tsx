@@ -97,6 +97,14 @@ export function FeedsScreen({
   // Scrolled down, new Articles wait above you, and the list holds your place (FEE-102); at the top they're in view.
   const list = useRef<LegendListRef>(null);
   const [atTop, setAtTop] = useState(startAtRow === undefined);
+  // Scrolling sets state only when it crosses the top, never on every frame (FEE-102).
+  const atTopRef = useRef(atTop);
+  const trackTop = (offset: number) => {
+    const top = offset <= AT_TOP;
+    if (top === atTopRef.current) return;
+    atTopRef.current = top;
+    setAtTop(top);
+  };
   const newArticles = useNewArticles(order[shown.index] ?? '', shown.articles, atTop);
   const goToTop = () => {
     newArticles.clear();
@@ -170,7 +178,7 @@ export function FeedsScreen({
           // Your place holds when Articles arrive above you; at the top they push in, in view (FEE-102).
           maintainVisibleContentPosition={{ data: !atTop }}
           initialScrollIndex={startAtRow}
-          onScroll={(event) => setAtTop(event.nativeEvent.contentOffset.y <= AT_TOP)}
+          onScroll={(event) => trackTop(event.nativeEvent.contentOffset.y)}
           keyExtractor={(article) => article.id}
           renderItem={({ item }) => (
             <SlideRow>
