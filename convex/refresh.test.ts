@@ -341,6 +341,20 @@ describe('pulling down fetches every Feed now', () => {
     expect(most).toBeLessThanOrEqual(4);
   });
 
+  test("one Feed that fails doesn't stop the others, and the pull still answers (FEE-108)", async () => {
+    const s = await setup();
+    await insertFeeds(s, 6, START + DAY);
+    network.mockImplementation(async (url) =>
+      url.includes('f2.') ? new Response('gone', { status: 404 }) : new Response(rss([{ guid: `g-${url}`, ago: HOUR }])),
+    );
+    vi.setSystemTime(START + HOUR);
+    expect(await s.a.action(api.feeds.refreshAll, {})).toBe(START + HOUR);
+    expect(network).toHaveBeenCalledTimes(6);
+    const schedules = await s.t.run((ctx) => ctx.db.query('feedSchedules').collect());
+    expect(schedules.filter((schedule) => schedule.lastFetchedAt === START + HOUR)).toHaveLength(6);
+    expect(schedules.filter((schedule) => schedule.failures === 1)).toHaveLength(1);
+  });
+
   test("repeated pulls don't refetch a Feed fetched in the last two minutes", async () => {
     const s = await setup();
     await follow(s, [{ guid: 'g1', ago: HOUR }]);
