@@ -2,7 +2,14 @@ import { Image } from 'expo-image';
 import { router, useIsFocused } from 'expo-router';
 import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { StyleSheet, useWindowDimensions, View, type LayoutChangeEvent } from 'react-native';
-import Animated, { Easing, useAnimatedStyle, useSharedValue, type SharedValue, withSpring, withTiming } from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  type SharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { ArticleRowContent } from '@/components/article-row';
@@ -34,9 +41,9 @@ const LEAD_DRAW_WAIT = 600;
 /**
  * How the page comes and goes (FEE-114): `row` grows from the tapped row and shrinks back into it,
  * Material's container transform; `axis` fades from and to slightly smaller, Material's shared axis Z, with
- * no row to use; `cut` just appears and goes, with Remove animations on (Q17).
+ * no row to use.
  */
-type Path = 'row' | 'axis' | 'cut';
+type Path = 'row' | 'axis';
 /**
  * The row's thumbnail, the one picture the transition draws (FEE-114): it travels to the lead image when the
  * page has placed one (`lead`), else rides in the row and fades with it.
@@ -180,26 +187,25 @@ function useMoveStyles({ values, rowPath, flight }: { values: MoveValues; rowPat
   return { scrimStyle, containerStyle, pageStyle, rowStyle, flightStyle, leadStyle };
 }
 
+type TransitionProps = { id: string; articleReady: boolean; hasLead: boolean; children: ReactNode };
+
 /**
  * The Reading view's way in and out (FEE-114, D47). Opened from a row, the row's surface grows into the
  * page, its content fading out before the page's fades in, while its thumbnail travels to the lead image.
  * Back shrinks the page into the row where it is now; Android's predictive back gesture shrinks and leans
- * it as the finger moves first. The page is drawn at full size throughout and only clipped and scaled, so
- * its text never reflows mid-move.
+ * it as the finger moves first. With Remove animations on (Q17), the page just appears and goes, and back
+ * stays the navigator's.
  */
-export function ArticleTransition({
-  id,
-  articleReady,
-  hasLead,
-  children,
-}: {
-  id: string;
-  articleReady: boolean;
-  hasLead: boolean;
-  children: ReactNode;
-}) {
-  const { reduceMotion, colorScheme } = useEnvironment();
-  const theme = themes[colorScheme];
+export function ArticleTransition(props: TransitionProps) {
+  const { reduceMotion } = useEnvironment();
+  return reduceMotion ? <View style={StyleSheet.absoluteFill}>{props.children}</View> : <MovingArticle {...props} />;
+}
+
+/**
+ * The move's state (FEE-114): where it came from, which way it goes (`row` or the `axis`), what stage it's
+ * at, the travelling picture and its hand-over to the lead, and Back. `MovingArticle` only draws it.
+ */
+function useContainerTransform({ id, articleReady, hasLead }: Omit<TransitionProps, 'children'>) {
   const focused = useIsFocused();
   const window = useWindowDimensions();
   const [screen, setScreen] = useState({
@@ -208,12 +214,12 @@ export function ArticleTransition({
   });
   // Read once: the row this Article was opened from, while it's still on screen.
   const [origin] = useState<Origin | undefined>(() => {
-    const found = reduceMotion ? undefined : getOrigin(id);
+    const found = getOrigin(id);
     return found && isOnScreen(found.row, window) ? found : undefined;
   });
 
-  const [path, setPath] = useState<Path>(reduceMotion ? 'cut' : origin ? 'row' : 'axis');
-  const [phase, setPhase] = useState<'waiting' | 'opening' | 'open' | 'closing'>(reduceMotion ? 'open' : 'waiting');
+  const [path, setPath] = useState<Path>(origin ? 'row' : 'axis');
+  const [phase, setPhase] = useState<'waiting' | 'opening' | 'open' | 'closing'>('waiting');
   // Mounted at once, unseen over the real row's own, so it's drawn before anything covers that row.
   const [flight, setFlight] = useState<Flight | undefined>(() =>
     origin?.thumb && origin.article.imageUrl ? { thumb: origin.thumb, read: origin.article.read } : undefined,
@@ -234,12 +240,12 @@ export function ArticleTransition({
   const [lead, setLead] = useState<Rect | undefined>();
 
   // 1 is the page, 0 the row (or nothing, on the axis). `back` is how far the back gesture has gone.
-  const progress = useSharedValue(phase === 'open' ? 1 : 0);
+  const progress = useSharedValue(0);
   const back = useSharedValue(0);
   const edge = useSharedValue<Edge>('left');
   const closing = useSharedValue(false);
   const flying = useSharedValue(false);
-  const revealed = useSharedValue(phase !== 'waiting');
+  const revealed = useSharedValue(false);
   const size = useSharedValue(screen);
   const rowRect = useSharedValue<Rect>(origin?.row ?? { x: 0, y: 0, ...screen });
 
@@ -308,7 +314,6 @@ export function ArticleTransition({
 
   /** Back: into the row where it is now, else away on the axis; the navigator then drops the page at once. */
   const closeArticle = () => {
-    if (path === 'cut') return goBack(id);
     const place = measureRow(id);
     const into = place && isOnScreen(place.row, screen) ? place : undefined;
     const leadNow = measureLead.current?.();
@@ -341,7 +346,7 @@ export function ArticleTransition({
     );
   };
 
-  useBackGesture(focused && phase === 'open' && path !== 'cut', { back, edge }, closeArticle);
+  useBackGesture(focused && phase === 'open', { back, edge }, closeArticle);
 
   const onLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
@@ -363,29 +368,38 @@ export function ArticleTransition({
   };
 
   const rowPath = path === 'row';
-  const { scrimStyle, containerStyle, pageStyle, rowStyle, flightStyle, leadStyle } = useMoveStyles({
+  const { leadStyle, ...styles } = useMoveStyles({
     values: { progress, back, edge, rowRect, size, closing, flying, revealed },
     rowPath,
     flight,
   });
 
+  return {
+    onLayout,
+    screen,
+    rowPath,
+    rowShown,
+    flight,
+    onFlightDrawn: () => setFlightShown(true),
+    pageRef,
+    leadSlot: { register: registerLead, laidOut: onLeadLayout, displayed: onLeadDrawn, style: leadStyle },
+    styles,
+  };
+}
+
+/** The page drawn at full size throughout and only clipped and scaled, so its text never reflows mid-move. */
+function MovingArticle({ children, ...props }: TransitionProps) {
+  const theme = themes[useEnvironment().colorScheme];
+  const { onLayout, screen, rowPath, rowShown, flight, onFlightDrawn, pageRef, leadSlot, styles } =
+    useContainerTransform(props);
   return (
     <View style={StyleSheet.absoluteFill} onLayout={onLayout}>
-      {path === 'cut' ? null : (
-        <Animated.View
-          pointerEvents="none"
-          style={[StyleSheet.absoluteFill, { backgroundColor: palette.black }, scrimStyle]}
-        />
-      )}
       <Animated.View
-        style={[
-          {
-            position: 'absolute',
-            overflow: 'hidden',
-            backgroundColor: theme.background,
-          },
-          containerStyle,
-        ]}
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, { backgroundColor: palette.black }, styles.scrimStyle]}
+      />
+      <Animated.View
+        style={[{ position: 'absolute', overflow: 'hidden', backgroundColor: theme.background }, styles.containerStyle]}
       >
         <Animated.View
           ref={pageRef}
@@ -399,12 +413,10 @@ export function ArticleTransition({
               height: screen.height,
               transformOrigin: 'left top',
             },
-            pageStyle,
+            styles.pageStyle,
           ]}
         >
-          <LeadSlotContext value={{ register: registerLead, laidOut: onLeadLayout, displayed: onLeadDrawn, style: leadStyle }}>
-            {children}
-          </LeadSlotContext>
+          <LeadSlotContext value={leadSlot}>{children}</LeadSlotContext>
         </Animated.View>
         {rowShown && rowPath ? (
           <Animated.View
@@ -414,14 +426,8 @@ export function ArticleTransition({
             accessibilityElementsHidden
             className={ROW_CLASS}
             style={[
-              {
-                position: 'absolute',
-                left: 0,
-                top: 0,
-                width: rowShown.row.width,
-                transformOrigin: 'left top',
-              },
-              rowStyle,
+              { position: 'absolute', left: 0, top: 0, width: rowShown.row.width, transformOrigin: 'left top' },
+              styles.rowStyle,
             ]}
           >
             <ArticleRowContent
@@ -433,13 +439,13 @@ export function ArticleTransition({
         ) : null}
       </Animated.View>
       {flight && rowShown?.article.imageUrl ? (
-        <Animated.View pointerEvents="none" className="absolute overflow-hidden rounded-lg" style={flightStyle}>
+        <Animated.View pointerEvents="none" className="absolute overflow-hidden rounded-lg" style={styles.flightStyle}>
           <Image
             source={{ uri: rowShown.article.imageUrl }}
             accessible={false}
             contentFit="cover"
-            recyclingKey={id}
-            onDisplay={() => setFlightShown(true)}
+            recyclingKey={props.id}
+            onDisplay={onFlightDrawn}
             style={StyleSheet.absoluteFill}
           />
         </Animated.View>
