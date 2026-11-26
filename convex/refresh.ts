@@ -49,15 +49,6 @@ export async function refreshOne(ctx: ActionCtx, feedId: Id<'feeds'>): Promise<n
   return now;
 }
 
-/** Runs `work` over `items`, at most `limit` at a time. */
-export async function inBatches<T>(items: T[], limit: number, work: (item: T) => Promise<void>) {
-  let next = 0;
-  const lane = async () => {
-    while (next < items.length) await work(items[next++]);
-  };
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, lane));
-}
-
 /** What a fetch needs to know about a Feed. Internal: the URL never leaves the server (Q9). */
 export const forRefresh = internalQuery({
   args: { feedId: v.id('feeds') },
