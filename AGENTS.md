@@ -83,6 +83,16 @@ These adapt `/expo-dev-loop:feature` to this app. Where they differ from the ski
 - **Convex.** A change under `convex/` plans with the `convex` skill and the relevant `convex-*` skills (`convex-design`, `convex-auth`, `convex-crons`, …), tests through `convex-test` (`convex-test` skill), and in Review also runs `convex-reviewer`, plus `convex-authz` when it adds or changes a public function.
 - **Effect.** Code that uses Effect follows the `effect-ts` skill when it's planned, built and reviewed.
 
+## Reading Convex's source
+
+Convex isn't vendored: its npm packages already ship their TypeScript source at the exact installed version. For an exact Convex API signature or behaviour, read it there rather than guessing, even though `node_modules` is gitignored:
+
+- `node_modules/convex/src/`: the server API (`server/`), validators (`values/`), the React client (`react/`).
+- `node_modules/@convex-dev/auth/src/` and `node_modules/@convex-dev/rate-limiter/src/`: the components feedSmith uses.
+- `node_modules/convex-test/dist/`: compiled JavaScript only, still readable.
+
+For patterns (limits, indexes, auth checks), the `convex` skills come first; for the live deployment (functions, data, logs), use the Convex MCP tools.
+
 ## Learning more about Effect
 
 This repository uses the Effect Typescript library. Its source, at the exact version installed, is vendored in `repos/effect/` (T38).
