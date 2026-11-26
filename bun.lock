@@ -67,6 +67,9 @@
       },
     },
   },
+  "patchedDependencies": {
+    "rnsec@1.3.0": "patches/rnsec@1.3.0.patch",
+  },
   "overrides": {
     "htmlparser2": "12.0.0",
   },

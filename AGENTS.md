@@ -85,10 +85,15 @@ These adapt `/expo-dev-loop:feature` to this app. Where they differ from the ski
 
 ## Learning more about Effect
 
-This repository uses the Effect Typescript library.
+This repository uses the Effect Typescript library. Its source, at the exact version installed, is vendored in `repos/effect/` (T38).
 
-Before writing any Effect code, first read `node_modules/effect/AGENTS.md`
-**completely**, and follow the links in the file when required.
+Before writing any Effect code, first read `repos/effect/LLMS.md` **completely**, and follow the links in it when required.
 
-If you need to learn more about particular Effect apis and concepts that the
-guide doesn't cover, search through the source code in `node_modules/effect/src`.
+Then treat `repos/effect/` as the source of truth for Effect patterns: before using an API, read its module in `repos/effect/packages/effect/src/` and how its tests use it in `repos/effect/packages/effect/test/`. Topic guides sit beside them (`SCHEMA.md`, `CONFIG.md`, `HTTPAPI.md`, …), and `repos/effect/ai-docs/` holds worked examples. Prefer what you find there over memory, web search or `node_modules`.
+
+## Vendored repositories
+
+- External repositories are vendored under `repos/` with `git subtree --squash`. They're read-only reference material for working with those libraries.
+- Prefer their examples and patterns over generated guesses or web search results.
+- Never edit files under `repos/` unless the owner asks, and never import from `repos/`: app code keeps importing the installed packages.
+- Each one is pinned to the version in `package.json`. After bumping `effect`, run `bun run repos:effect` so the source matches, and commit the squash it makes with the bump.

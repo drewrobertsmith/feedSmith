@@ -1,0 +1,15 @@
+diff --git a/dist/cli/index.js b/dist/cli/index.js
+index 6fafcfd991ffef0ccbbb986ce99ea140383a4029..014b08d306ac5f33f5c664c79babc9ce8c0311d0 100644
+--- a/dist/cli/index.js
++++ b/dist/cli/index.js
+@@ -136,7 +136,9 @@ program
+         }
+         let scanResult;
+         if (options.changedFiles) {
+-            const changedFiles = await getChangedFiles(options.changedFiles, targetPath);
++            // feedSmith patch: --changed-files ignored the config's `exclude` (T38).
++            const { matchesGlob, relative } = await import('path');
++            const changedFiles = (await getChangedFiles(options.changedFiles, targetPath)).filter((file) => !engine.getExcludedPaths().some((pattern) => matchesGlob(relative(targetPath, file), pattern)));
+             if (changedFiles.length === 0) {
+                 if (!options.silent) {
+                     console.log(chalk.yellow('No files changed since the specified reference.'));
