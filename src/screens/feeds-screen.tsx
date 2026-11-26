@@ -6,7 +6,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/app-button';
 import { AppText } from '@/components/app-text';
-import { SharedTitleScreen } from '@/components/shared-title';
 import { ChipSwitch, SlideRow } from '@/components/chip-switch';
 import { ArticleRow } from '@/components/article-row';
 import { ArrivalProvider, ArrivingRow, useArrival } from '@/components/arriving-row';
@@ -171,9 +170,7 @@ export function FeedsScreen({
   }
 
   return (
-    // Only the screen in front carries titles (FEE-48).
-    <SharedTitleScreen>
-      <View className="flex-1 bg-background">
+    <View className="flex-1 bg-background">
       <ChipSwitch index={shown.index}>
         <ArrivalProvider value={arrival}>
         <LegendList
@@ -212,7 +209,6 @@ export function FeedsScreen({
       </ChipSwitch>
       {newArticles.waiting ? <NewArticlesNote onPress={goToTop} /> : null}
       {addSheet}
-      </View>
-    </SharedTitleScreen>
+    </View>
   );
 }

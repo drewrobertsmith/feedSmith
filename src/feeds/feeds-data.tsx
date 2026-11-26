@@ -63,7 +63,7 @@ export type RemoveFeed = (id: string) => Promise<'ok' | 'failed'>;
 
 /**
  * The Article the Reading view opens. While it loads, `title` is the one a list already showed for it, when
- * there was one, so the headline is there from the first frame for the row's title to travel into (FEE-48).
+ * there was one, so the page fades in with its headline as it grows from the row (FEE-48, FEE-114).
  */
 export type ArticleView = { status: 'loading'; title?: string } | { status: 'missing' } | { status: 'ready'; article: ReadingArticle };
 /**
@@ -98,6 +98,11 @@ export type FeedsData = {
   /** Removing a Feed, from its chip (FEE-97). */
   useRemoveFeed: () => RemoveFeed;
   useArticle: (id: string) => ArticleView;
+  /**
+   * Starts loading an Article as its row is touched (FEE-114), so the page can grow into its lead image
+   * rather than open before it's there. Kept loading briefly, then let go.
+   */
+  usePrefetchArticle: () => (id: string) => void;
   /**
    * Adding a Feed: where it's up to, and `add`, which resolves to what happened. Only an address is
    * added (T21); any other text is the invalid-address error, with nothing sent (FEE-96).
@@ -144,6 +149,12 @@ export function useRemoveFeed(): RemoveFeed {
 export function useArticle(id: string): ArticleView {
   const { useArticle: read } = useFeedsData();
   return read(id);
+}
+
+/** Starting to load an Article before it's opened. */
+export function usePrefetchArticle(): (id: string) => void {
+  const { usePrefetchArticle: read } = useFeedsData();
+  return read();
 }
 
 /** Adding a Feed. */

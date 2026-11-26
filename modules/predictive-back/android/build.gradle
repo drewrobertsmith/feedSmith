@@ -1,0 +1,24 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.predictiveback'
+version = '0.1.0'
+
+android {
+  namespace "expo.modules.predictiveback"
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
+  lintOptions {
+    abortOnError false
+  }
+}
+
+dependencies {
+  implementation 'com.facebook.react:react-android'
+  // BackEventCompat (predictive back) arrived in 1.8; the app already resolves 1.8.2, so this adds nothing at runtime.
+  implementation 'androidx.activity:activity:1.8.2'
+}

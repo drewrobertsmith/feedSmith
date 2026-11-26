@@ -11,12 +11,23 @@ export const motion = {
    */
   chipSwitch: { distance: 24, duration: 200, fadeFrom: 0.6, easing: [0.16, 1, 0.3, 1] },
   /**
-   * Opening an Article (FEE-48): the row's title box travels into the headline's place in `duration`, on
-   * Material's emphasized curve. The row's words fade over the whole way (`fadeOutEnd` 1: an earlier end left
-   * the box travelling empty, seen frame by frame), and the headline's fade in over `fadeIn` as it lands.
-   * Short enough to stay inside the 300 ms tap-to-text budget.
+   * Opening an Article (FEE-114): the tapped row grows into the page, Material's container transform, in
+   * `duration` on Material's emphasized curve, and shrinks back into it in `close`. The row's content fades
+   * out by `fadeThrough` of the way, and only then does the page's fade in, rising `rise` points; the list
+   * dims under a scrim of black at `scrim`. Opening stays inside the 300 ms tap-to-text budget.
    */
-  articleOpen: { duration: 300, easing: [0.2, 0, 0, 1], fadeOutEnd: 1, fadeIn: 150 },
+  articleOpen: { duration: 300, close: 250, easing: [0.2, 0, 0, 1], fadeThrough: 0.35, rise: 8, scrim: 0.32 },
+  /**
+   * With no row to grow from (an Article opened from a link) or to go back into (scrolled away, or gone),
+   * the page comes and goes on Material's shared axis Z: a fade, from or to slightly smaller (FEE-114).
+   */
+  articleAxis: { scale: 0.92, duration: 250, close: 200 },
+  /**
+   * Android's predictive back on a page (FEE-114), as Material draws it: at the end of the gesture the
+   * page is `scale` of its size, rounded by `radius`, and leans `width / 20 - inset` away from the edge.
+   * Cancelling springs it back with no overshoot.
+   */
+  predictiveBack: { scale: 0.9, inset: 8, radius: 28, cancel: { duration: 250, dampingRatio: 1 } },
   /**
    * The New Articles note (FEE-102) arrives because something did: it fades in, dropping a short way
    * from where the new Articles are, on Material's emphasized-decelerate curve, and fades out quicker

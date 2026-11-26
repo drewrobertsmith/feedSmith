@@ -1,4 +1,4 @@
-import { useAction, useConvexAuth, useMutation, useQuery } from 'convex/react';
+import { useAction, useConvex, useConvexAuth, useMutation, useQuery } from 'convex/react';
 import type { FunctionArgs, FunctionReference } from 'convex/server';
 import { useEffect, useState, type ReactNode } from 'react';
 
@@ -68,6 +68,22 @@ function useArticle(id: string): ArticleView {
   return article === null ? { status: 'missing' } : { status: 'ready', article };
 }
 
+/** How long a touched row's Article keeps loading for the Reading view to pick up (FEE-114). */
+const PREFETCH_KEPT = 5000;
+
+function usePrefetchArticle() {
+  const client = useConvex();
+  const { isAuthenticated } = useConvexAuth();
+  const { deletion } = useAuth();
+  return (id: string) => {
+    // Only while signed in, as every query here (`useSignedInQuery`).
+    if (!isAuthenticated || deletion === 'deleting') return;
+    // Watched briefly: the Reading view's own query shares it if it opens, and it's let go either way (Q20).
+    const stop = client.watchQuery(api.articles.get, { id }).onUpdate(() => {});
+    setTimeout(stop, PREFETCH_KEPT);
+  };
+}
+
 function useAddFeed() {
   const addFeed = useAction(api.feeds.add);
   const [view, setView] = useState<AddFeedView>({ status: 'idle' });
@@ -134,6 +150,7 @@ const convexFeeds: FeedsData = {
   useChips,
   useRemoveFeed,
   useArticle,
+  usePrefetchArticle,
   useAddFeed,
   useRefresh,
   useMarkRead,

@@ -4,6 +4,8 @@ import { Text, View } from 'react-native';
 import { AppText } from '@/components/app-text';
 import type { Block, OmittedKind, Span } from '@/feeds/feeds-data';
 import { openLink } from '@/feeds/open-link';
+import { LeadSlot } from '@/screens/reading/lead-slot';
+import { useLeadDisplayed } from '@/screens/reading/lead-slot-context';
 
 const OMITTED: Record<OmittedKind, string> = {
   video: 'A video isn’t shown here.',
@@ -38,7 +40,8 @@ function OpenOriginal({ link }: { link: string }) {
   );
 }
 
-function BlockView({ block, link }: { block: Block; link?: string }) {
+function BlockView({ block, link, lead }: { block: Block; link?: string; lead?: boolean }) {
+  const leadDisplayed = useLeadDisplayed(!!lead && block.type === 'image');
   switch (block.type) {
     case 'paragraph':
       return (
@@ -83,16 +86,20 @@ function BlockView({ block, link }: { block: Block; link?: string }) {
     case 'image':
       return (
         <View className="gap-related">
-          <Image
-            testID="block-image"
-            source={{ uri: block.src }}
-            accessible={!!block.alt}
-            role={block.alt ? 'img' : undefined}
-            aria-label={block.alt}
-            contentFit="cover"
-            className="w-full rounded-lg bg-surface"
-            style={{ aspectRatio: block.width && block.height ? block.width / block.height : 16 / 9 }}
-          />
+          {/* The page's first image is where a row's thumbnail lands as the Article opens (FEE-114). */}
+          <LeadSlot active={!!lead}>
+            <Image
+              testID="block-image"
+              source={{ uri: block.src }}
+              accessible={!!block.alt}
+              role={block.alt ? 'img' : undefined}
+              aria-label={block.alt}
+              contentFit="cover"
+              onDisplay={leadDisplayed}
+              className="w-full rounded-lg bg-surface"
+              style={{ aspectRatio: block.width && block.height ? block.width / block.height : 16 / 9 }}
+            />
+          </LeadSlot>
           {block.caption ? (
             <AppText variant="label" className="text-text-muted">
               {block.caption}
@@ -116,11 +123,12 @@ function BlockView({ block, link }: { block: Block; link?: string }) {
  * An Article's blocks, drawn with the app's own components; never a WebView (T17, Q8). `link`
  * is offered beside anything left out; the way to the original at the end is the screen's.
  */
-export function ArticleBlocks({ blocks, link }: { blocks: Block[]; link?: string }) {
+/** `lead`: the first block, an image, is the page's lead (FEE-114). */
+export function ArticleBlocks({ blocks, link, lead }: { blocks: Block[]; link?: string; lead?: boolean }) {
   return (
     <View className="gap-group">
       {blocks.map((block, i) => (
-        <BlockView key={i} block={block} link={link} />
+        <BlockView key={i} block={block} link={link} lead={lead && i === 0} />
       ))}
     </View>
   );
