@@ -107,6 +107,8 @@ export type FeedsLog = {
   refreshes: number;
   read: string[];
   removed: string[];
+  /** Articles whose loading began as a row was touched (FEE-114). */
+  prefetched: string[];
 };
 
 const emptyLog = (): FeedsLog => ({
@@ -114,6 +116,7 @@ const emptyLog = (): FeedsLog => ({
   refreshes: 0,
   read: [],
   removed: [],
+  prefetched: [],
 });
 
 /** What a world's fake auth was asked to do. */
@@ -236,6 +239,9 @@ export function worldFeeds(
       log.removed.push(id);
       dropChip(id);
       return 'ok';
+    },
+    usePrefetchArticle: () => (id) => {
+      log.prefetched.push(id);
     },
     useArticle: (id) => {
       // Every Reading world shows one Article, whatever the id.

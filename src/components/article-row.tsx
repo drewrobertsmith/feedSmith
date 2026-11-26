@@ -6,7 +6,7 @@ import { Pressable, View } from 'react-native';
 import { AppText } from '@/components/app-text';
 import { FeedIcon } from '@/components/feed-icon';
 import { useEnvironment } from '@/environment';
-import type { ArticleRow as Row } from '@/feeds/feeds-data';
+import { usePrefetchArticle, type ArticleRow as Row } from '@/feeds/feeds-data';
 import { byline, publishedAgo } from '@/feeds/format';
 import { recordOrigin, registerRow } from '@/navigation/article-origin';
 import type { Rect } from '@/navigation/container-transform';
@@ -124,6 +124,7 @@ export function ArticleRow({ article, feedNamed }: { article: Row; feedNamed: bo
   const theme = themes[colorScheme];
   const rowRef = useRef<ViewRef>(null);
   const thumbRef = useRef<ViewRef>(null);
+  const prefetch = usePrefetchArticle();
   useEffect(
     () =>
       registerRow(article.id, () => {
@@ -147,6 +148,8 @@ export function ArticleRow({ article, feedNamed }: { article: Row; feedNamed: bo
       ref={rowRef}
       role="link"
       aria-label={label}
+      // Touching the row starts loading its Article, a moment before the tap lands (FEE-114).
+      onPressIn={() => prefetch(article.id)}
       onPress={() => {
         // With Remove animations on, the Reading view just appears (Q17): nothing to grow from.
         if (!reduceMotion) recordOrigin(article, feedNamed);

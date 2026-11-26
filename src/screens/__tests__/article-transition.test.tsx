@@ -56,6 +56,12 @@ describe('opening an Article grows it from its row (FEE-114)', () => {
     expect(record).toHaveBeenCalledWith(first, true);
   });
 
+  test('touching a row starts loading its Article, so its page is ready to grow into', async () => {
+    const w = await open({ colorScheme: 'dark', feeds: 'some' });
+    await userEvent.setup().press(screen.getAllByRole('link')[0]);
+    expect(w.feedsLog.prefetched).toEqual([first.id]);
+  });
+
   test('with Remove animations on, nothing is noted: the page just appears (Q17)', async () => {
     const record = jest.spyOn(articleOrigin, 'recordOrigin');
     await open({ colorScheme: 'dark', feeds: 'some', reduceMotion: true });
