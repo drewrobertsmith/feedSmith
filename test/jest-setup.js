@@ -18,6 +18,8 @@ jest.mock('@/components/chip-switch', () => {
       </View>
     ),
     SlideRow: ({ children }) => children,
+    // The rows switch at once here; the real hook's timing is tested on its own (chip-switch.test.tsx).
+    useChipSwitch: (shown) => ({ shown, slide: null }),
   };
 });
 

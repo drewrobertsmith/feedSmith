@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/app-button';
 import { AppText } from '@/components/app-text';
-import { ChipSwitch, SlideRow } from '@/components/chip-switch';
+import { ChipSwitch, SlideRow, useChipSwitch } from '@/components/chip-switch';
 import { ArticleRow } from '@/components/article-row';
 import { ArrivalProvider, ArrivingRow, useArrival } from '@/components/arriving-row';
 import { TopBar, TopBarIcon } from '@/components/top-bar';
@@ -91,10 +91,11 @@ export function FeedsScreen({
   const order = ['', ...chips.map((chip) => chip.id)];
   const chipIndex = order.indexOf(selection ?? '');
   // What the list shows: the last ready rows while a newly chosen Feed's load (FEE-42).
-  const shown = useShownRows(all, chipIndex);
+  const { colorScheme, reduceMotion } = useEnvironment();
+  // The rows on screen: the old chip's stay while they leave, so everything below reads what's shown (FEE-116).
+  const { shown, slide } = useChipSwitch(useShownRows(all, chipIndex), reduceMotion);
   // All mixes Feeds, so its rows name theirs; one Feed's chip already names it (P20).
   const rowsNameFeeds = order[shown.index] === '';
-  const { colorScheme, reduceMotion } = useEnvironment();
   // Scrolled down, new Articles wait above you, and the list holds your place (FEE-102); at the top they're in view.
   const list = useRef<LegendListRef>(null);
   const [atTop, setAtTop] = useState(startAtRow === undefined);
@@ -171,7 +172,7 @@ export function FeedsScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ChipSwitch index={shown.index}>
+      <ChipSwitch index={shown.index} slide={slide}>
         <ArrivalProvider value={arrival}>
         <LegendList
           ref={list}
