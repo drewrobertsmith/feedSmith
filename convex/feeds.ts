@@ -1,4 +1,5 @@
 import { v } from 'convex/values';
+import { Effect } from 'effect';
 
 import { internal } from './_generated/api';
 import { DELETE_BATCH } from './lib/feed/blocks';
@@ -13,7 +14,7 @@ import { fetchFeed, type FetchOutcome } from './lib/feed/fetch';
 import { safeUrl } from './lib/feed/http';
 import { markWorking, scheduleOf, storeNewArticles } from './lib/feed/record';
 import { vAddFeedReason, vFeedChoice, vStoredArticle, vValidators, type AddFeedReason } from './lib/feed/validators';
-import { inBatches, refreshOne } from './refresh';
+import { refreshOne } from './refresh';
 
 const MAX_URL = 2048;
 /** Pulling down skips a Feed fetched this recently, so repeated pulls can't hammer a site. */
@@ -119,12 +120,12 @@ export const refreshAll = action({
   handler: async (ctx): Promise<number | null> => {
     const userId = await ctx.runQuery(internal.feeds.viewer, {});
     const feedIds = await ctx.runQuery(internal.feeds.toRefresh, { userId, now: Date.now() });
-    let newest: number | null = null;
-    await inBatches(feedIds, PULL_CONCURRENCY, async (feedId) => {
-      const recorded = await refreshOne(ctx, feedId);
-      if (recorded !== null) newest = Math.max(newest ?? 0, recorded);
-    });
-    return newest;
+    // `refreshOne` records every outcome itself, failures included, so one Feed never stops the rest (FEE-108).
+    const recorded = await Effect.runPromise(
+      Effect.forEach(feedIds, (feedId) => Effect.promise(() => refreshOne(ctx, feedId)), { concurrency: PULL_CONCURRENCY }),
+    );
+    const times = recorded.filter((at) => at !== null);
+    return times.length > 0 ? Math.max(...times) : null;
   },
 });
 
