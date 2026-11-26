@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { useEffect, useRef, type ComponentRef, type Ref } from 'react';
+import { useEffect, useRef, type Ref } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { AppText } from '@/components/app-text';
@@ -9,23 +9,12 @@ import { useEnvironment } from '@/environment';
 import { usePrefetchArticle, type ArticleRow as Row } from '@/feeds/feeds-data';
 import { byline, publishedAgo } from '@/feeds/format';
 import { recordOrigin, registerRow } from '@/navigation/article-origin';
-import type { Rect } from '@/navigation/container-transform';
+import { rectOf, type ViewRef } from '@/navigation/measure';
+import { READ_IMAGE_OPACITY, ROW_CLASS } from '@/components/article-row-style';
 import { themes } from '@/theme/tokens';
 
-/** A Read row's image fades back with its text (P7); text dims by colour, so contrast holds (Q14). */
-export const READ_IMAGE_OPACITY = 0.55;
 const THUMBNAIL = 72;
 const FAVICON = 16;
-
-export type ViewRef = ComponentRef<typeof View>;
-
-/** Where a view is drawn now, in window coordinates; undefined where it can't be measured (Jest has no layout). */
-export function rectOf(view: ViewRef | null): Rect | undefined {
-  const box = view?.getBoundingClientRect?.();
-  return box && box.width > 0 && box.height > 0
-    ? { x: box.x, y: box.y, width: box.width, height: box.height }
-    : undefined;
-}
 
 /**
  * What a row shows (P12). Its parts each have one voice (Q29): muted sans meta, the title in Literata, a
@@ -110,9 +99,6 @@ export function ArticleRowContent({
     </>
   );
 }
-
-/** The row's own layout, shared by the row and the copy the Reading view grows from (FEE-114). */
-export const ROW_CLASS = 'flex-row gap-group bg-background px-edge py-group';
 
 /**
  * One Article in a list (P12). Opening it is its one action: Save and Done are gone (FEE-95). Tapped, it

@@ -5,7 +5,9 @@ import { StyleSheet, useWindowDimensions, View, type LayoutChangeEvent } from 'r
 import Animated, { Easing, useAnimatedStyle, useSharedValue, type SharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
-import { ArticleRowContent, READ_IMAGE_OPACITY, ROW_CLASS, rectOf, type ViewRef } from '@/components/article-row';
+import { ArticleRowContent } from '@/components/article-row';
+import { READ_IMAGE_OPACITY, ROW_CLASS } from '@/components/article-row-style';
+import { rectOf, type ViewRef } from '@/navigation/measure';
 import { useEnvironment } from '@/environment';
 import { clearOrigin, getOrigin, measureRow, type Origin } from '@/navigation/article-origin';
 import {
@@ -18,7 +20,7 @@ import {
   type Size,
 } from '@/navigation/container-transform';
 import { usePredictiveBack, type BackEvent } from '@/navigation/predictive-back';
-import { LeadSlotContext } from '@/screens/reading/lead-slot';
+import { LeadSlotContext } from '@/screens/reading/lead-slot-context';
 import { motion } from '@/theme/motion';
 import { palette, themes } from '@/theme/tokens';
 
@@ -65,6 +67,97 @@ const goBack = (id: string) => {
   clearOrigin(id);
   router.back();
 };
+
+/**
+ * Android's back gesture, while `enabled` (FEE-114): `back` follows the finger, a cancel springs it home with
+ * no overshoot, and a commit (or a back button) calls `onCommit` to finish the move.
+ */
+function useBackGesture(
+  enabled: boolean,
+  { back, edge }: { back: SharedValue<number>; edge: SharedValue<Edge> },
+  onCommit: () => void,
+) {
+  usePredictiveBack(enabled, (event: BackEvent) => {
+    if (event.type === 'started') edge.set(event.edge);
+    if (event.type === 'started' || event.type === 'progress') back.set(event.progress);
+    else if (event.type === 'cancelled') back.set(withSpring(0, motion.predictiveBack.cancel));
+    else onCommit();
+  });
+}
+
+/** The shared values one move runs on (FEE-114). */
+type MoveValues = {
+  progress: SharedValue<number>;
+  back: SharedValue<number>;
+  edge: SharedValue<Edge>;
+  rowRect: SharedValue<Rect>;
+  size: SharedValue<Size>;
+  closing: SharedValue<boolean>;
+  flying: SharedValue<boolean>;
+};
+
+/** Every part of the move, each drawn from the same frame (`frameOf`), so they never disagree. */
+function useMoveStyles({ values, rowPath, flight }: { values: MoveValues; rowPath: boolean; flight?: Flight }) {
+  const { progress, back, edge, rowRect, size, closing, flying } = values;
+  const scrimStyle = useAnimatedStyle(() => ({
+    opacity: scrim * progress.get(),
+  }));
+  const containerStyle = useAnimatedStyle(() => {
+    const { rect, radius } = frameOf(progress, back, edge, rowRect, size, rowPath);
+    return {
+      left: rect.x,
+      top: rect.y,
+      width: rect.width,
+      height: rect.height,
+      borderRadius: radius,
+      opacity: rowPath ? 1 : progress.get(),
+    };
+  });
+  /** Opening, the page is what arrives; closing, what leaves. */
+  const pageStyle = useAnimatedStyle(() => {
+    const { rect } = frameOf(progress, back, edge, rowRect, size, rowPath);
+    const p = progress.get();
+    const shown = !rowPath ? 1 : closing.get() ? fadeThrough(1 - p).outgoing : fadeThrough(p).incoming;
+    return {
+      opacity: shown,
+      transform: [{ scale: rect.width / size.get().width }, { translateY: closing.get() ? 0 : rise * (1 - shown) }],
+    };
+  });
+  const rowStyle = useAnimatedStyle(() => {
+    const { rect } = frameOf(progress, back, edge, rowRect, size, rowPath);
+    const p = progress.get();
+    const shown = closing.get() ? fadeThrough(1 - p).incoming : fadeThrough(p).outgoing;
+    return {
+      opacity: shown,
+      transform: [{ scale: rect.width / rowRect.get().width }],
+    };
+  });
+  const flightStyle = useAnimatedStyle(() => {
+    if (!flight) return { opacity: 0 };
+    const p = progress.get();
+    const { rect } = frameOf(progress, back, edge, rowRect, size, rowPath);
+    // The lead travels with the page: where it is in the page's frame now.
+    const s = rect.width / size.get().width;
+    const landing = closing.get()
+      ? flight.lead
+      : {
+          x: rect.x + flight.lead.x * s,
+          y: rect.y + flight.lead.y * s,
+          width: flight.lead.width * s,
+          height: flight.lead.height * s,
+        };
+    const box = lerpRect(flight.thumb, landing, p);
+    return {
+      left: box.x,
+      top: box.y,
+      width: box.width,
+      height: box.height,
+      opacity: flight.read ? READ_IMAGE_OPACITY + (1 - READ_IMAGE_OPACITY) * p : 1,
+    };
+  });
+  const leadStyle = useAnimatedStyle(() => ({ opacity: flying.get() ? 0 : 1 }));
+  return { scrimStyle, containerStyle, pageStyle, rowStyle, flightStyle, leadStyle };
+}
 
 /**
  * The Reading view's way in and out (FEE-114, D47). Opened from a row, the row's surface grows into the
@@ -201,14 +294,7 @@ export function ArticleTransition({
     );
   };
 
-  usePredictiveBack(focused && phase === 'open' && path !== 'cut', (event: BackEvent) => {
-    if (event.type === 'started') {
-      edge.set(event.edge);
-      back.set(event.progress);
-    } else if (event.type === 'progress') back.set(event.progress);
-    else if (event.type === 'cancelled') back.set(withSpring(0, motion.predictiveBack.cancel));
-    else closeArticle();
-  });
+  useBackGesture(focused && phase === 'open' && path !== 'cut', { back, edge }, closeArticle);
 
   const onLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
@@ -230,63 +316,11 @@ export function ArticleTransition({
   };
 
   const rowPath = path === 'row';
-  const scrimStyle = useAnimatedStyle(() => ({
-    opacity: scrim * progress.get(),
-  }));
-  const containerStyle = useAnimatedStyle(() => {
-    const { rect, radius } = frameOf(progress, back, edge, rowRect, size, rowPath);
-    return {
-      left: rect.x,
-      top: rect.y,
-      width: rect.width,
-      height: rect.height,
-      borderRadius: radius,
-      opacity: rowPath ? 1 : progress.get(),
-    };
+  const { scrimStyle, containerStyle, pageStyle, rowStyle, flightStyle, leadStyle } = useMoveStyles({
+    values: { progress, back, edge, rowRect, size, closing, flying },
+    rowPath,
+    flight,
   });
-  /** Opening, the page is what arrives; closing, what leaves. */
-  const pageStyle = useAnimatedStyle(() => {
-    const { rect } = frameOf(progress, back, edge, rowRect, size, rowPath);
-    const p = progress.get();
-    const shown = !rowPath ? 1 : closing.get() ? fadeThrough(1 - p).outgoing : fadeThrough(p).incoming;
-    return {
-      opacity: shown,
-      transform: [{ scale: rect.width / size.get().width }, { translateY: closing.get() ? 0 : rise * (1 - shown) }],
-    };
-  });
-  const rowStyle = useAnimatedStyle(() => {
-    const { rect } = frameOf(progress, back, edge, rowRect, size, rowPath);
-    const p = progress.get();
-    const shown = closing.get() ? fadeThrough(1 - p).incoming : fadeThrough(p).outgoing;
-    return {
-      opacity: shown,
-      transform: [{ scale: rect.width / rowRect.get().width }],
-    };
-  });
-  const flightStyle = useAnimatedStyle(() => {
-    if (!flight) return { opacity: 0 };
-    const p = progress.get();
-    const { rect } = frameOf(progress, back, edge, rowRect, size, rowPath);
-    // The lead travels with the page: where it is in the page's frame now.
-    const s = rect.width / size.get().width;
-    const landing = closing.get()
-      ? flight.lead
-      : {
-          x: rect.x + flight.lead.x * s,
-          y: rect.y + flight.lead.y * s,
-          width: flight.lead.width * s,
-          height: flight.lead.height * s,
-        };
-    const box = lerpRect(flight.thumb, landing, p);
-    return {
-      left: box.x,
-      top: box.y,
-      width: box.width,
-      height: box.height,
-      opacity: flight.read ? READ_IMAGE_OPACITY + (1 - READ_IMAGE_OPACITY) * p : 1,
-    };
-  });
-  const leadStyle = useAnimatedStyle(() => ({ opacity: flying.get() ? 0 : 1 }));
 
   return (
     <View style={StyleSheet.absoluteFill} onLayout={onLayout}>
