@@ -30,6 +30,8 @@ export function NativeTextField({
   onChangeText,
   onSubmitEditing,
   editable = true,
+  onFocus,
+  onBlur,
 }: {
   /** What TalkBack hears (Q15). */
   label: string;
@@ -39,6 +41,9 @@ export function NativeTextField({
   onSubmitEditing: () => void;
   /** False while what was typed is being sent (Adding…). */
   editable?: boolean;
+  /** It has taken focus, or lost it: `DepthField` shows which (FEE-81). */
+  onFocus?: () => void;
+  onBlur?: () => void;
 }) {
   const { colorScheme, fontScale } = useEnvironment();
   const theme = themes[colorScheme];
@@ -55,25 +60,19 @@ export function NativeTextField({
         defaultValue={defaultValue}
         onChangeText={onChangeText}
         onSubmitEditing={onSubmitEditing}
+        onFocus={onFocus}
+        onBlur={onBlur}
         placeholder={placeholder}
         placeholderTextColor={theme.textMuted}
         editable={editable}
         {...ADDRESS}
         // Whatever's there is selected, so typing replaces it; without it the cursor lands at the start.
         selectTextOnFocus
-        cursorColor={theme.text}
+        // Gold, like the line under the field while it has focus (FEE-81, D5).
+        cursorColor={theme.accent}
         selectionHandleColor={theme.text}
-        // As the field it replaces: outlined in muted text, `rounded-lg`, `px-group py-related` (Q24).
-        // On Android a rounded border is the border colour filled, with the background laid inside it,
-        // so the sheet's surface (NativeSheet's) has to be given, or the field reads as a solid block.
-        style={{
-          backgroundColor: theme.surface,
-          borderWidth: 1,
-          borderColor: theme.textMuted,
-          borderRadius: 8,
-          paddingHorizontal: spacing.group,
-          paddingVertical: spacing.related,
-        }}
+        // Clear, with no outline: its face and shadow are `DepthField`'s, around it (FEE-81). `px-group py-related` (Q24).
+        style={{ paddingHorizontal: spacing.group, paddingVertical: spacing.related }}
         textStyle={{
           color: theme.text,
           fontFamily: typeScale.reading.fontFamily,

@@ -60,7 +60,7 @@ jest.mock('@/components/native-menu', () => {
 jest.mock('@/components/native-text-field', () => {
   const { TextInput } = jest.requireActual('react-native');
   return {
-    NativeTextField: ({ label, placeholder, defaultValue, onChangeText, onSubmitEditing, editable }) => (
+    NativeTextField: ({ label, placeholder, defaultValue, onChangeText, onSubmitEditing, editable, onFocus, onBlur }) => (
       <TextInput
         aria-label={label}
         placeholder={placeholder}
@@ -68,6 +68,8 @@ jest.mock('@/components/native-text-field', () => {
         onChangeText={onChangeText}
         onSubmitEditing={onSubmitEditing}
         editable={editable}
+        onFocus={onFocus}
+        onBlur={onBlur}
       />
     ),
   };

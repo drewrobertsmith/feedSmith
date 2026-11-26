@@ -2,7 +2,7 @@ import { createContext, use, useState, type ReactNode } from 'react';
 import { Pressable, View, type GestureResponderEvent, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useEnvironment } from '@/environment';
-import { depth, depthStyle, rippleColor, type DepthLevel } from '@/theme/depth';
+import { depth, depthStyle, rippleColor, SHAPE_RADIUS, type DepthLevel, type DepthShape } from '@/theme/depth';
 
 /** The face colour of the control something is drawn on, so it can ring itself in that colour (D25). */
 const ControlFace = createContext<string | undefined>(undefined);
@@ -12,12 +12,9 @@ export function useControlFace(): string | undefined {
   return use(ControlFace);
 }
 
-/** Every control with depth is a pill or a circle, so its face is fully rounded. */
-const ROUND = 9999;
-
 /**
- * A pressable control with depth (D27), in Android's terms (D29): a rounded face at its `level` at
- * rest, sinking to pressed, flat, while the finger is down, with Android's ripple over the face.
+ * A pressable control with depth (D27), in Android's terms (D29): a face of its `shape` (a pill unless
+ * it's a `card`, FEE-81) at its `level` at rest, sinking to pressed, flat, while the finger is down, with Android's ripple over the face.
  *
  * Three layers, because Android draws a ripple as the pressable's own square drawable, and only a
  * clipping parent rounds it, while a clipping parent also cuts off any touch area beyond its edge:
@@ -34,6 +31,7 @@ const ROUND = 9999;
  */
 export function DepthPressable({
   level,
+  shape = 'round',
   frameClassName,
   className,
   style,
@@ -47,6 +45,8 @@ export function DepthPressable({
 }: Omit<PressableProps, 'style' | 'children'> & {
   /** How it sits at rest: soft for buttons and chips, raised for the chosen chip (D27). */
   level: Exclude<DepthLevel, 'pressed'>;
+  /** A pill or circle (`round`), or a card's corners for a control holding a few lines. */
+  shape?: DepthShape;
   /** Classes placing the control in its parent, such as `self-start`. */
   frameClassName?: string;
   /** Classes laying out the control's content inside its face. */
@@ -72,7 +72,7 @@ export function DepthPressable({
   };
   return (
     <Pressable {...props} {...handlers} className={frameClassName}>
-      <View style={[depthStyle(colorScheme, shown), { borderRadius: ROUND, overflow: 'hidden' }]}>
+      <View style={[depthStyle(colorScheme, shown), { borderRadius: SHAPE_RADIUS[shape], overflow: 'hidden' }]}>
         <Pressable
           {...handlers}
           accessible={false}
