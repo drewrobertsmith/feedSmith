@@ -5,7 +5,7 @@ const expoConfig = require('eslint-config-expo/flat');
 module.exports = defineConfig([
   expoConfig,
   {
-    ignores: ['dist/*', 'example/*', '.agents/*', '.claude/*'],
+    ignores: ['dist/*', 'example/*', 'repos/**', '.agents/*', '.claude/*'],
   },
   {
     // Symbols are drawn by AppSymbol, which sizes the box to the glyph Android grows (D31, FEE-39).
