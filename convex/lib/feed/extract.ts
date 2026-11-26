@@ -1,5 +1,5 @@
 import { Readability } from '@mozilla/readability';
-import { Effect } from 'effect';
+import { Effect, Option, Schema } from 'effect';
 import { parseHTML } from 'linkedom';
 
 import { htmlToBlocks, httpsUrl } from './blocks';
@@ -28,26 +28,25 @@ function pageImage(document: Document, base: string): string | undefined {
   return url && url.length <= MAX_IMAGE_URL ? url : undefined;
 }
 
-/** Whether a JSON-LD value says the content isn't free to read anywhere inside it. */
-function saysPaywalled(value: unknown, depth = 0): boolean {
+/** A JSON-LD script's text, decoded as JSON: untrusted, so anything else is no answer at all (FEE-112). */
+const decodeJsonLd = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Json));
+
+/** Whether a JSON-LD value says the content isn't free to read anywhere inside it, at most `MAX_JSON_DEPTH` deep. */
+function saysPaywalled(value: Schema.Json, depth = 0): boolean {
   if (depth > MAX_JSON_DEPTH || value === null || typeof value !== 'object') return false;
-  if (Array.isArray(value)) return value.some((item) => saysPaywalled(item, depth + 1));
-  for (const [key, inner] of Object.entries(value)) {
-    if (key === 'isAccessibleForFree' && (inner === false || String(inner).toLowerCase() === 'false')) return true;
-    if (saysPaywalled(inner, depth + 1)) return true;
-  }
-  return false;
+  if (Array.isArray(value)) return value.some((item: Schema.Json) => saysPaywalled(item, depth + 1));
+  return Object.entries(value).some(
+    ([key, inner]) =>
+      (key === 'isAccessibleForFree' && (inner === false || String(inner).toLowerCase() === 'false')) ||
+      saysPaywalled(inner, depth + 1),
+  );
 }
 
 /** A page that declares, the way publishers do for search engines, that it's behind a paywall. */
 function paywalled(document: Document): boolean {
-  return [...document.querySelectorAll('script[type="application/ld+json"]')].some((script) => {
-    try {
-      return saysPaywalled(JSON.parse(script.textContent ?? ''));
-    } catch {
-      return false;
-    }
-  });
+  return [...document.querySelectorAll('script[type="application/ld+json"]')].some((script) =>
+    Option.exists(decodeJsonLd(script.textContent ?? ''), (json) => saysPaywalled(json)),
+  );
 }
 
 /**
