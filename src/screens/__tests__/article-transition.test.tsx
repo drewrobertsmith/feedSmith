@@ -148,3 +148,36 @@ describe('Back follows Android’s predictive back gesture (FEE-114)', () => {
     expect(mockBack.enabled).toBe(false);
   });
 });
+
+// FEE-115: every way out of an Article moves; the Feed link and "Back to All" leave on the axis, then go.
+describe('leaving an Article by its Feed link or Back to All (FEE-115)', () => {
+  const feedLink = () => screen.findByRole('link', { name: 'The Verge, open its Articles' });
+  const headline = () => screen.queryByRole('heading', { name: first.title });
+
+  test('the Feed link closes the page first, then the list shows that Feed chosen', async () => {
+    world = createWorld({ colorScheme: 'dark', feeds: 'some' });
+    await renderWorld(world, `/article/${first.id}`);
+    await userEvent.setup().press(await feedLink());
+    // Still leaving: the page goes before the list changes, so they never move at once.
+    expect(headline()).toBeOnTheScreen();
+    expect(await screen.findByRole('tab', { name: 'The Verge', selected: true })).toBeOnTheScreen();
+    expect(headline()).not.toBeOnTheScreen();
+  });
+
+  test('with Remove animations on, the Feed link leaves at once (Q17)', async () => {
+    world = createWorld({ colorScheme: 'dark', feeds: 'some', reduceMotion: true });
+    await renderWorld(world, `/article/${first.id}`);
+    await userEvent.setup().press(await feedLink());
+    expect(headline()).not.toBeOnTheScreen();
+    expect(await screen.findByRole('tab', { name: 'The Verge', selected: true })).toBeOnTheScreen();
+  });
+
+  test('Back to All from a missing Article closes the page, then lands on All', async () => {
+    world = createWorld({ colorScheme: 'dark', feeds: 'some', section: 'article', article: 'missing' });
+    await renderWorld(world);
+    await userEvent.setup().press(await screen.findByRole('button', { name: 'Back to All' }));
+    expect(screen.getByRole('button', { name: 'Back to All' })).toBeOnTheScreen();
+    expect(await screen.findByRole('tab', { name: 'All', selected: true })).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'Back to All' })).not.toBeOnTheScreen();
+  });
+});
