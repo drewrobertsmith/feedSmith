@@ -33,11 +33,18 @@ export const motion = {
    */
   predictiveBack: { scale: 0.9, inset: 8, radius: 28, cancel: { duration: 250, dampingRatio: 1 } },
   /**
-   * The New Articles note (FEE-102) arrives because something did: it fades in, dropping a short way
-   * from where the new Articles are, on Material's emphasized-decelerate curve, and fades out quicker
-   * when you reach them.
+   * The New Articles note (FEE-102) arrives because something did, as Material moves a small floating button
+   * (FEE-118): it grows in from `from` of its size while fading in, on the emphasized-decelerate curve, and
+   * when you reach the new Articles shrinks to `to` while fading out, quicker, on emphasized-accelerate.
    */
-  newArticlesNote: { distance: 8, duration: 200, exit: 150, easing: [0.05, 0.7, 0.1, 1] },
+  newArticlesNote: {
+    from: 0.8,
+    to: 0.9,
+    duration: 200,
+    exit: 150,
+    easing: [0.05, 0.7, 0.1, 1],
+    exitEasing: [0.3, 0, 0.8, 0.15],
+  },
   /**
    * New Articles arriving at the top of Feeds (FEE-104): the rows below ease down together on Material's
    * emphasized curve, then, once the space is open, the new rows fade in where they live, so nothing ever
