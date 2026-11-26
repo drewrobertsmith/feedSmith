@@ -124,8 +124,8 @@ describe('All', () => {
     if (!shows.empty && shows.rows > 0) {
       expect(screen.getByTestId('all-list').props.refreshControl.props.refreshing).toBe(shows.refreshing);
     }
-    if (shows.updated) expect(screen.getByText(shows.updated)).toBeOnTheScreen();
-    else expect(screen.queryByText(/^Updat/)).not.toBeOnTheScreen();
+    if (shows.updated) expect(screen.getByTestId('updated-line')).toHaveAccessibleName(shows.updated);
+    else expect(screen.queryByTestId('updated-line')).not.toBeOnTheScreen();
     // Nothing manages Feeds any more but Remove (FEE-97).
     expect(screen.queryByText(/Manage/)).not.toBeOnTheScreen();
     expect(screen.queryAllByRole('button', { name: /^Remove / })).toHaveLength(shows.remove ? 1 : 0);
@@ -621,6 +621,7 @@ describe('new Articles arriving while you read (FEE-102)', () => {
     'arrive-scrolled-largest-font': { note: true, theme: 'dark', labelSize: 26 },
     'arrive-scrolled-remove-animations': { note: true, theme: 'dark', labelSize: 13 },
     'arrive-top': { note: false, theme: 'dark', labelSize: 13 },
+    'arrive-top-remove-animations': { note: false, theme: 'dark', labelSize: 13 },
     'arrive-feed-scrolled': { note: true, theme: 'dark', labelSize: 13 },
   };
 
@@ -697,15 +698,16 @@ describe('the "Updated" line changes with the rows, never ahead (FEE-103)', () =
     const control = screen.getByTestId('all-list').props.refreshControl;
     await act(async () => control.props.onRefresh());
   };
-  const lineText = () => screen.getByText(/^Updat/);
+  /** The line, as TalkBack hears it: one line, though it's drawn in parts (FEE-104). */
+  const line = () => screen.getByTestId('updated-line');
 
   test('a background fetch: the new rows and "Updated just now" arrive in the same render', async () => {
     await open({ colorScheme: 'dark', feeds: 'busy', arrivals: 'later' });
     await screen.findAllByRole('link');
-    expect(screen.getByText('Updated 5 min ago')).toBeOnTheScreen();
+    expect(line()).toHaveAccessibleName('Updated 5 min ago');
     await act(async () => world!.feeds.arrive());
     await layOutList('all-list');
-    expect(screen.getByText('Updated just now')).toBeOnTheScreen();
+    expect(line()).toHaveAccessibleName('Updated just now');
     expect(screen.getByText(NEW_TITLE)).toBeOnTheScreen();
   });
 
@@ -726,29 +728,51 @@ describe('the "Updated" line changes with the rows, never ahead (FEE-103)', () =
     const shows = SHOWS[id];
     await open(spec);
     await screen.findAllByRole('link');
-    expect(screen.getByText('Updated 5 min ago')).toBeOnTheScreen();
+    expect(line()).toHaveAccessibleName('Updated 5 min ago');
     await pull();
     await layOutList('all-list');
-    expect(screen.getByText(shows.answered)).toBeOnTheScreen();
+    expect(line()).toHaveAccessibleName(shows.answered);
     expect(screen.queryByText(NEW_TITLE) !== null).toBe(shows.rowsWhenAnswered);
     expect(screen.getByTestId('all-list').props.refreshControl.props.refreshing).toBe(shows.answered === 'Updating…');
     if (!shows.rowsWhenAnswered) {
       await act(async () => world!.feeds.arrive());
       await layOutList('all-list');
-      expect(screen.getByText('Updated just now')).toBeOnTheScreen();
+      expect(line()).toHaveAccessibleName('Updated just now');
       expect(screen.getByText(NEW_TITLE)).toBeOnTheScreen();
       expect(screen.getByTestId('all-list').props.refreshControl.props.refreshing).toBe(false);
     }
     // Never a count, only when (P7, D20).
-    expect(lineText()).not.toHaveTextContent(/\d+ (new|Articles)/);
+    expect(line()).not.toHaveAccessibleName(/\d+ (new|Articles)/);
   });
 
   test('a pull that fetched nothing new ends at once, the line back to its time', async () => {
     await open({ colorScheme: 'dark', feeds: 'some' });
     await screen.findAllByRole('link');
     await pull();
-    expect(screen.getByText('Updated 5 min ago')).toBeOnTheScreen();
+    expect(line()).toHaveAccessibleName('Updated 5 min ago');
     expect(screen.getByTestId('all-list').props.refreshControl.props.refreshing).toBe(false);
+  });
+});
+
+describe('the "Updated" line moves only where it changes (FEE-104)', () => {
+  test('it is drawn in two parts: "Updated" stays, only the time changes, and TalkBack hears one line', async () => {
+    await open({ colorScheme: 'dark', feeds: 'busy', arrivals: 'later' });
+    await screen.findAllByRole('link');
+    const line = screen.getByTestId('updated-line');
+    const still = within(line).getByText('Updated');
+    expect(within(line).getByText('5 min ago')).toBeOnTheScreen();
+    await act(async () => world!.feeds.arrive());
+    expect(within(screen.getByTestId('updated-line')).getByText('Updated')).toBe(still);
+    expect(within(screen.getByTestId('updated-line')).getByText('just now')).toBeOnTheScreen();
+    expect(within(screen.getByTestId('updated-line')).queryByText('5 min ago')).not.toBeOnTheScreen();
+    expect(screen.getByTestId('updated-line')).toHaveAccessibleName('Updated just now');
+  });
+
+  test('while updating, the line is the one word "Updating…"', async () => {
+    await open({ colorScheme: 'light', feeds: 'some', refreshing: true });
+    await screen.findAllByRole('link');
+    expect(within(screen.getByTestId('updated-line')).getByText('Updating…')).toBeOnTheScreen();
+    expect(screen.getByTestId('updated-line')).toHaveAccessibleName('Updating…');
   });
 });
 

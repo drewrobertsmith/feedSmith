@@ -22,7 +22,8 @@ export function TopBar({
   trailing,
 }: {
   title: string;
-  summary?: string;
+  /** One line under the title: text, or a line drawn in parts (the "Updated" line, FEE-104). */
+  summary?: ReactNode;
   action?: ReactNode;
   trailing?: ReactNode;
 }) {
@@ -32,11 +33,13 @@ export function TopBar({
         <AppText variant="title" className="text-text">
           {title}
         </AppText>
-        {summary ? (
+        {typeof summary === 'string' ? (
           <AppText variant="label" className="text-text-muted">
             {summary}
           </AppText>
-        ) : null}
+        ) : (
+          summary
+        )}
       </View>
       <View className="flex-row items-center gap-related">
         {action}

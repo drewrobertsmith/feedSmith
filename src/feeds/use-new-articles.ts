@@ -22,5 +22,5 @@ export function useNewArticles(view: string, articles: ArticleRow[], atTop: bool
     setTracked({ state: atTop ? reachTop(tracked.state) : tracked.state, articles, atTop });
   }
   const clear = () => setTracked((current) => ({ ...current, state: reachTop(current.state) }));
-  return { waiting: tracked.state.waiting, clear };
+  return { waiting: tracked.state.waiting, arrived: tracked.state.arrived, clear };
 }

@@ -75,23 +75,23 @@ describe('"Updating…" lasts until the pull\'s results are on screen (FEE-103)'
   });
 });
 
-describe('the "Updated" line, as a still part and a changing part (FEE-103, D20)', () => {
+describe('the "Updated" line, as a still part and the time (FEE-104, D20)', () => {
   const NOW = 10 * 60_000;
   test.each([
-    ['updating', true, NOW - 5 * 60_000, { still: 'Updat', change: 'ing…', time: '' }],
-    ['updated a while ago', false, NOW - 5 * 60_000, { still: 'Updat', change: 'ed', time: ' 5 min ago' }],
-    ['updated just now', false, NOW, { still: 'Updat', change: 'ed', time: ' just now' }],
+    ['updating', true, NOW - 5 * 60_000, { still: 'Updating…', time: '' }],
+    ['updated a while ago', false, NOW - 5 * 60_000, { still: 'Updated', time: ' 5 min ago' }],
+    ['updated just now', false, NOW, { still: 'Updated', time: ' just now' }],
   ] as const)('%s', (_case, refreshing, at, parts) => {
     expect(updatedLine(refreshing, at, NOW)).toEqual(parts);
   });
 
   test('nothing to say before the first fetch, unless a pull is under way', () => {
     expect(updatedLine(false, null, NOW)).toBeUndefined();
-    expect(updatedLine(true, null, NOW)).toEqual({ still: 'Updat', change: 'ing…', time: '' });
+    expect(updatedLine(true, null, NOW)).toEqual({ still: 'Updating…', time: '' });
   });
 
   test('its parts read as one line', () => {
     const parts = updatedLine(false, NOW - 2 * 60_000, NOW)!;
-    expect(parts.still + parts.change + parts.time).toBe('Updated 2 min ago');
+    expect(parts.still + parts.time).toBe('Updated 2 min ago');
   });
 });

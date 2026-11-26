@@ -9,6 +9,7 @@ import { AppText } from '@/components/app-text';
 import { SharedTitleScreen } from '@/components/shared-title';
 import { ChipSwitch, SlideRow } from '@/components/chip-switch';
 import { ArticleRow } from '@/components/article-row';
+import { ArrivalProvider, ArrivingRow, useArrival } from '@/components/arriving-row';
 import { TopBar, TopBarIcon } from '@/components/top-bar';
 import { useEnvironment, useMinuteClock } from '@/environment';
 import { useAll, useChips, useLastUpdated, useRefresh, useRemoveFeed, type FeedChip } from '@/feeds/feeds-data';
@@ -19,20 +20,20 @@ import { AccountButton } from '@/screens/account/account-sheet';
 import { AddFeedSheet } from '@/screens/add-feed-sheet';
 import { ChipRow } from '@/screens/chip-row';
 import { NewArticlesNote } from '@/screens/new-articles-note';
+import { UpdatedLine } from '@/screens/updated-line';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
 
 /**
  * The line under the Feeds title (FEE-47): how fresh All is, so you know whether pulling down is
  * worth it. Information, not a count (P7). Nothing until there's something to say. "Updating…" lasts until
- * a pull's results are on screen (FEE-103).
+ * a pull's results are on screen (FEE-103), and only the part that changes moves (FEE-104).
  */
-function useUpdatedLine(refreshing: boolean): string | undefined {
+function useUpdatedLine(refreshing: boolean) {
   const lastUpdated = useLastUpdated();
   const now = useMinuteClock();
   const parts = updatedLine(refreshing, lastUpdated.status === 'ready' ? lastUpdated.at : null, now);
-  // One span, so the line keeps its kerning; FEE-104 splits it where only part of it moves (owner's call).
-  return parts && parts.still + parts.change + parts.time;
+  return parts && <UpdatedLine {...parts} />;
 }
 
 /**
@@ -107,6 +108,8 @@ export function FeedsScreen({
     setAtTop(top);
   };
   const newArticles = useNewArticles(order[shown.index] ?? '', shown.articles, atTop);
+  const shownIds = shown.articles.map((article) => article.id);
+  const arrival = useArrival(list, shownIds, newArticles.arrived);
   const goToTop = () => {
     newArticles.clear();
     list.current?.scrollToOffset({ offset: 0, animated: !reduceMotion });
@@ -172,6 +175,7 @@ export function FeedsScreen({
     <SharedTitleScreen>
       <View className="flex-1 bg-background">
       <ChipSwitch index={shown.index}>
+        <ArrivalProvider value={arrival}>
         <LegendList
           ref={list}
           testID="all-list"
@@ -183,7 +187,9 @@ export function FeedsScreen({
           keyExtractor={(article) => article.id}
           renderItem={({ item }) => (
             <SlideRow>
-              <ArticleRow article={item} feedNamed={rowsNameFeeds} />
+              <ArrivingRow id={item.id}>
+                <ArticleRow article={item} feedNamed={rowsNameFeeds} />
+              </ArrivingRow>
             </SlideRow>
           )}
           estimatedItemSize={ESTIMATED_ROW}
@@ -202,6 +208,7 @@ export function FeedsScreen({
           className="flex-1 bg-background"
           contentContainerStyle={{ paddingBottom: insets.bottom + spacing.section }}
         />
+        </ArrivalProvider>
       </ChipSwitch>
       {newArticles.waiting ? <NewArticlesNote onPress={goToTop} /> : null}
       {addSheet}

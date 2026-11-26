@@ -11,6 +11,8 @@ export type NewArticles = {
   /** The Articles last on screen, by id. */
   readonly shown: ReadonlySet<string>;
   readonly waiting: boolean;
+  /** The Articles that just arrived in view, at the top, as listed (FEE-104): they fade in as the rows below make room. */
+  readonly arrived: readonly string[];
 };
 
 /**
@@ -20,9 +22,9 @@ export type NewArticles = {
  */
 export function update(state: NewArticles | null, view: string, ids: readonly string[], atTop: boolean): NewArticles {
   const shown = new Set(ids);
-  if (state === null || state.view !== view || state.shown.size === 0) return { view, shown, waiting: false };
-  const arrived = ids.some((id) => !state.shown.has(id));
-  return { view, shown, waiting: !atTop && (state.waiting || arrived) };
+  if (state === null || state.view !== view || state.shown.size === 0) return { view, shown, waiting: false, arrived: [] };
+  const fresh = ids.filter((id) => !state.shown.has(id));
+  return { view, shown, waiting: !atTop && (state.waiting || fresh.length > 0), arrived: atTop ? fresh : [] };
 }
 
 /** You've reached the top, by the note or by scrolling: whatever was waiting is in view. */
