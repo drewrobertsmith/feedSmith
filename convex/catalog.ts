@@ -1,5 +1,5 @@
 import { v, type Infer } from 'convex/values';
-import { Effect, Schema } from 'effect';
+import { Effect, Option, Schema } from 'effect';
 
 import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
@@ -8,8 +8,9 @@ import { requireUserId } from './lib/currentUser';
 import { faviconOf, hostOf, siteHost } from './lib/feed/face';
 import { fetchFeed } from './lib/feed/fetch';
 import { candidates, hostMatch, isStrong, nameMatch, rank, searchTerms, siteLabel } from './lib/feed/find';
-import { FeedHttp, safeUrl } from './lib/feed/http';
+import { safeUrl } from './lib/feed/http';
 import { Budget, proveSite } from './lib/feed/prove';
+import { ServerLayer } from './lib/feed/server';
 import { rateLimiter } from './rateLimits';
 
 /** Catalog entries one search reads from the search index, at most (Q10). */
@@ -189,10 +190,16 @@ export const find = action({
     });
     await Effect.runPromise(
       Effect.forEach(hosts, guess, { concurrency: CONCURRENCY, discard: true }).pipe(
-        Effect.catchTag('StrongMatch', () => Effect.void),
+        Effect.as('exhausted' as const),
+        Effect.catchTag('StrongMatch', () => Effect.succeed('strong-match' as const)),
         // The deadline cancels every fetch still running and aborts its request (FEE-109).
         Effect.timeoutOption(DEADLINE_MS),
-        Effect.provide(FeedHttp.layer),
+        Effect.map(Option.getOrElse(() => 'deadline' as const)),
+        // How it ended, never the name typed or the sites guessed (FEE-113).
+        Effect.flatMap((ended) =>
+          Effect.logInfo('guessing search').pipe(Effect.annotateLogs({ ended, fetches: budget.used, found: found.length })),
+        ),
+        Effect.provide(ServerLayer),
       ),
     );
     return { found };

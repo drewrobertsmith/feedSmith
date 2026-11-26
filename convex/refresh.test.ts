@@ -3,6 +3,7 @@ import { convexTest } from 'convex-test';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { runScheduledNow } from '../test/convex-scheduled';
+import { captureLogs } from '../test/log-lines';
 
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
@@ -315,6 +316,69 @@ describe('a bug is kept apart from an ordinary failure (FEE-110)', () => {
     vi.setSystemTime(START + HOUR);
     expect(await s.a.action(api.feeds.refreshAll, {})).toBe(START + HOUR);
     expect(await feedOf(s, feed._id)).toMatchObject({ status: 'failing', failures: 1 });
+  });
+});
+
+describe('what the server logs about fetching (FEE-113, Q9)', () => {
+  test("a fetch logs the Feed's id, its outcome and how long it took, and never its URL", async () => {
+    const s = await setup();
+    const feed = await follow(s, [{ guid: 'g1', ago: HOUR }]);
+    const logs = captureLogs();
+    network.mockImplementation(async () => new Response(rss([{ guid: 'g1', ago: HOUR }, { guid: 'g2', ago: 0 }])));
+    vi.setSystemTime(START + HOUR);
+    await refresh(s, feed._id);
+    expect(logs.lines('fetch')).toEqual([
+      expect.objectContaining({ level: 'INFO', annotations: expect.objectContaining({ feedId: feed._id, outcome: 'fetched' }), spans: { fetch: expect.any(Number) } }),
+    ]);
+    expect(logs.all()).not.toContain('a.example.com');
+    logs.restore();
+  });
+
+  test('a Feed failing after its retries logs each retry and the failure with its reason, by id only', async () => {
+    const s = await setup();
+    const feed = await follow(s, [{ guid: 'g1', ago: HOUR }]);
+    const logs = captureLogs();
+    network.mockImplementation(async () => new Response('busy', { status: 503 }));
+    vi.setSystemTime(START + HOUR);
+    const done = refresh(s, feed._id);
+    await vi.advanceTimersByTimeAsync(11_000);
+    await done;
+    const retries = logs.lines('network blip, retrying');
+    expect(retries).toHaveLength(2);
+    for (const line of retries) expect(line).toMatchObject({ level: 'WARN', annotations: { feedId: feed._id } });
+    expect(logs.lines('fetch')).toEqual([
+      expect.objectContaining({ annotations: expect.objectContaining({ feedId: feed._id, outcome: 'failed', reason: 'unreachable' }) }),
+    ]);
+    expect(logs.all()).not.toContain('a.example.com');
+    logs.restore();
+  });
+
+  test('a defect while storing is logged as an error with its cause, the URL in it removed', async () => {
+    const s = await setup();
+    const feed = await follow(s, [{ guid: 'g1', ago: HOUR }]);
+    const logs = captureLogs();
+    storing.broken = true;
+    network.mockImplementation(async () => new Response(rss([{ guid: 'g2', ago: 0 }])));
+    vi.setSystemTime(START + HOUR);
+    await refresh(s, feed._id);
+    const [defect] = logs.lines('defect while fetching a Feed');
+    expect(defect).toMatchObject({ level: 'ERROR', annotations: { feedId: feed._id } });
+    expect(defect.cause).toContain('storing [url] broke');
+    expect(logs.all()).not.toContain('a.example.com');
+    expect(await feedOf(s, feed._id)).toMatchObject({ status: 'failing', failures: 1 });
+    logs.restore();
+  });
+
+  test('a pull logs one summary: Feeds fetched and Feeds failed', async () => {
+    const s = await setup();
+    await insertFeeds(s, 3, START + DAY);
+    const logs = captureLogs();
+    network.mockImplementation(async (url) => (url.includes('f1.') ? new Response('gone', { status: 404 }) : new Response(rss([]))));
+    vi.setSystemTime(START + HOUR);
+    await s.a.action(api.feeds.refreshAll, {});
+    expect(logs.lines('pull')).toEqual([expect.objectContaining({ level: 'INFO', annotations: expect.objectContaining({ fetched: 3, failed: 1 }) })]);
+    expect(logs.all()).not.toMatch(/f\d\.example\.com/);
+    logs.restore();
   });
 });
 

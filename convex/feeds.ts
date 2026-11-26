@@ -11,7 +11,8 @@ import { requireUserId } from './lib/currentUser';
 import { findFeedLinks, siteMeta, type FeedLink, type SiteMeta } from './lib/feed/discover';
 import { faviconOf, hostOf } from './lib/feed/face';
 import { fetchFeed, type FetchOutcome } from './lib/feed/fetch';
-import { FeedHttp, safeUrl } from './lib/feed/http';
+import { safeUrl } from './lib/feed/http';
+import { ServerLayer } from './lib/feed/server';
 import { markWorking, scheduleOf, storeNewArticles } from './lib/feed/record';
 import { vAddFeedReason, vFeedChoice, vStoredArticle, vValidators, type AddFeedReason } from './lib/feed/validators';
 import { refreshFeedEffect } from './refresh';
@@ -123,11 +124,14 @@ export const refreshAll = action({
     // Each Feed records its own outcome, failures and defects included, so one never stops the rest (FEE-108, FEE-110).
     const recorded = await Effect.runPromise(
       Effect.forEach(feedIds, (feedId) => refreshFeedEffect(ctx, feedId), { concurrency: PULL_CONCURRENCY }).pipe(
-        Effect.provide(FeedHttp.layer),
+        Effect.map((results) => results.filter((result) => result !== null)),
+        Effect.tap((results) =>
+          Effect.logInfo('pull').pipe(Effect.annotateLogs({ fetched: results.length, failed: results.filter((result) => result.failed).length })),
+        ),
+        Effect.provide(ServerLayer),
       ),
     );
-    const times = recorded.filter((at) => at !== null);
-    return times.length > 0 ? Math.max(...times) : null;
+    return recorded.length > 0 ? Math.max(...recorded.map((result) => result.at)) : null;
   },
 });
 

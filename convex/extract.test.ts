@@ -3,6 +3,7 @@ import { convexTest } from 'convex-test';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { runScheduledNow } from '../test/convex-scheduled';
+import { captureLogs } from '../test/log-lines';
 
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
@@ -219,7 +220,7 @@ describe('a bug while reading a page costs only that Article (FEE-110)', () => {
     ['reading it dies', 'reading'],
     ["what it gives can't be stored", 'storing'],
   ] as const)('%s: that Article falls back (Q6), the next is still read, and the log names only its id', async (_case, broken) => {
-    const logged = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const logs = captureLogs();
     reading.broken = broken;
     pages['https://calmnotes.example/broken'] = article;
     pages['https://calmnotes.example/fine'] = article;
@@ -230,10 +231,29 @@ describe('a bug while reading a page costs only that Article (FEE-110)', () => {
     await s.finish();
     expect(await s.open('broken')).toMatchObject({ page: 'unavailable', subtitle: SUBTITLE });
     expect(textOf(await s.open('fine'))).toContain('Slow reading is a practice, not a speed.');
-    const lines = JSON.stringify(logged.mock.calls);
-    expect(lines).not.toContain('https://');
-    if (broken === 'storing') expect(lines).toContain(await s.idOf('broken'));
-    logged.mockRestore();
+    expect(logs.all()).not.toContain('calmnotes.example');
+    // The bug is logged as an error, by the Article's id (FEE-113).
+    expect(logs.lines('defect while reading a page')).toEqual([
+      expect.objectContaining({ level: 'ERROR', annotations: expect.objectContaining({ articleId: await s.idOf('broken') }) }),
+    ]);
+    logs.restore();
+  });
+});
+
+describe('what the server logs about reading pages (FEE-113, Q9)', () => {
+  test("each page read logs the Article's id and its outcome, and never its link", async () => {
+    const logs = captureLogs();
+    pages['https://calmnotes.example/read'] = article;
+    pages['https://calmnotes.example/gone'] = 500;
+    const s = await follow([
+      { guid: 'read', link: 'https://calmnotes.example/read' },
+      { guid: 'gone', link: 'https://calmnotes.example/gone' },
+    ]);
+    await s.finish();
+    const outcomes = Object.fromEntries(logs.lines('page read').map((line) => [line.annotations.articleId, line.annotations.outcome]));
+    expect(outcomes).toEqual({ [await s.idOf('read')]: 'extracted', [await s.idOf('gone')]: 'unreachable' });
+    expect(logs.all()).not.toContain('calmnotes.example');
+    logs.restore();
   });
 });
 

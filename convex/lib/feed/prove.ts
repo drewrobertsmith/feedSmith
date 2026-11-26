@@ -27,15 +27,22 @@ const DECLARED_TRIES = 3;
  */
 export class Budget {
   #left: number;
+  #used = 0;
 
   constructor(fetches: number) {
     this.#left = fetches;
+  }
+
+  /** Fetches started so far, for the search's log line (FEE-113). */
+  get used(): number {
+    return this.#used;
   }
 
   fetch(url: string): Effect.Effect<FetchOutcome, never, FeedHttp> {
     return Effect.suspend(() => {
       if (this.#left <= 0) return Effect.succeed({ _tag: 'Failed', reason: 'timeout' } as const);
       this.#left--;
+      this.#used++;
       return fetchFeedEffect(url);
     });
   }
@@ -46,7 +53,7 @@ export class Budget {
  * at a site already tried in this search), isn't parked, names itself like what was typed, and
  * has a feed that parses, declared by the page or else at a common address.
  */
-export const proveSite = Effect.fnUntraced(function* (
+export const proveSite = Effect.fn('proveSite')(function* (
   host: string,
   typed: string,
   budget: Budget,

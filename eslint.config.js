@@ -27,6 +27,12 @@ module.exports = defineConfig([
     rules: { 'no-restricted-imports': ['error', { patterns: [NO_REPOS] }] },
   },
   {
+    // Server Effect code logs through the URL-scrubbing logger (convex/lib/log.ts), never the console (Q9, FEE-113).
+    files: ['convex/lib/feed/**/*.ts', 'convex/extractPages.ts'],
+    ignores: ['**/*.test.ts'],
+    rules: { 'no-console': 'error' },
+  },
+  {
     files: ['src/**/*.{ts,tsx}'],
     rules: { 'no-restricted-imports': ['error', { paths: [NO_EFFECT_PATH], patterns: [NO_REPOS, NO_EFFECT_PATTERN] }] },
   },

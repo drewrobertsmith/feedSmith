@@ -1,13 +1,14 @@
 import { v } from 'convex/values';
-import { Effect } from 'effect';
+import { Cause, Effect } from 'effect';
 
 import { internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { internalAction, internalMutation, internalQuery, type ActionCtx } from './_generated/server';
 import { DELETE_BATCH } from './lib/feed/blocks';
 import { deleteArticles } from './lib/deleteArticles';
-import { fetchFeedEffect } from './lib/feed/fetch';
-import { FeedHttp } from './lib/feed/http';
+import { fetchFeedEffect, type FetchOutcome } from './lib/feed/fetch';
+import type { FeedHttp } from './lib/feed/http';
+import { ServerLayer } from './lib/feed/server';
 import { KEEP_NEWEST, markFailing, markWorking, RETENTION, scheduleOf, storeNewArticles } from './lib/feed/record';
 import { bookNextFetch, ensureFetchBooked } from './lib/feed/timer';
 import { vStoredArticle, vValidators } from './lib/feed/validators';
@@ -16,12 +17,29 @@ import { vStoredArticle, vValidators } from './lib/feed/validators';
 const LEASE = 10 * 60_000;
 /** Feeds started per tick; the rest wait for the next one. */
 const PER_TICK = 50;
-/** Fetches a Feed and records the outcome, answering when it recorded it. Every outcome, failures included, is a value. */
+/** A fetch that was recorded: when, and whether it counted as a failure (for a pull's log line, FEE-113). */
+export type Recorded = { at: number; failed: boolean };
+
+/** What a fetch's outcome says in its log line: never the URL, only what happened (FEE-113). */
+function described(outcome: FetchOutcome): Record<string, string | number> {
+  switch (outcome._tag) {
+    case 'Fetched':
+      return { outcome: 'fetched', articles: outcome.articles.length };
+    case 'NotModified':
+      return { outcome: 'not-modified' };
+    case 'Page':
+      return { outcome: 'failed', reason: 'page-not-feed' };
+    case 'Failed':
+      return { outcome: 'failed', reason: outcome.reason };
+  }
+}
+
+/** Fetches a Feed and records the outcome. Every outcome, failures included, is a value. */
 const fetchAndRecord = Effect.fnUntraced(function* (
   ctx: ActionCtx,
   feedId: Id<'feeds'>,
   feed: { url: string; etag?: string; lastModified?: string },
-): Effect.fn.Return<number, never, FeedHttp> {
+): Effect.fn.Return<Recorded, never, FeedHttp> {
   const outcome = yield* fetchFeedEffect(feed.url, { etag: feed.etag, lastModified: feed.lastModified });
   const now = Date.now();
   if (outcome._tag === 'Fetched') {
@@ -34,35 +52,44 @@ const fetchAndRecord = Effect.fnUntraced(function* (
     // Failed, or a page where a feed used to be: either way the Feed isn't working.
     yield* Effect.promise(() => ctx.runMutation(internal.refresh.recordFailure, { feedId, now }));
   }
-  return now;
+  yield* Effect.logInfo('fetch').pipe(Effect.annotateLogs(described(outcome)));
+  return { at: now, failed: outcome._tag === 'Failed' || outcome._tag === 'Page' };
 });
 
 /**
  * Fetches one Feed and records what happened. Shared by the cron and pulling down. Answers when it
  * recorded the fetch (null for a Feed that's gone), so a pull can say when the "Updated" line catches up (FEE-103).
- * A defect (a bug, or a limit hit while storing) is kept apart from those outcomes, and still recorded as a
- * failure, so the Feed backs off instead of retrying when its lease ends. It isn't logged: it may carry the URL (Q9, FEE-110).
+ * A defect (a bug, or a limit hit while storing) is kept apart from those outcomes: it's logged as an error, its
+ * cause scrubbed of URLs by the server logger, and still recorded as a failure, so the Feed backs off instead of
+ * retrying when its lease ends (Q7, Q9, FEE-110, FEE-113). Every line it logs carries the Feed's id, never its URL.
  */
-export const refreshFeedEffect = Effect.fnUntraced(function* (
+export const refreshFeedEffect = Effect.fn('refreshFeed')(function* (
   ctx: ActionCtx,
   feedId: Id<'feeds'>,
-): Effect.fn.Return<number | null, never, FeedHttp> {
+): Effect.fn.Return<Recorded | null, never, FeedHttp> {
   const feed = yield* Effect.promise(() => ctx.runQuery(internal.refresh.forRefresh, { feedId }));
   if (!feed) return null;
   return yield* fetchAndRecord(ctx, feedId, feed).pipe(
-    Effect.catchDefect(() =>
-      Effect.promise(async () => {
-        const now = Date.now();
-        await ctx.runMutation(internal.refresh.recordFailure, { feedId, now });
-        return now;
-      }),
+    Effect.withLogSpan('fetch'),
+    Effect.catchDefect((defect) =>
+      Effect.logError('defect while fetching a Feed', Cause.die(defect)).pipe(
+        Effect.andThen(
+          Effect.promise(async () => {
+            const now = Date.now();
+            await ctx.runMutation(internal.refresh.recordFailure, { feedId, now });
+            return { at: now, failed: true };
+          }),
+        ),
+      ),
     ),
+    Effect.annotateLogs({ feedId }),
   );
 });
 
-/** `refreshFeedEffect` on the live network, for Promise callers. */
-export function refreshOne(ctx: ActionCtx, feedId: Id<'feeds'>): Promise<number | null> {
-  return Effect.runPromise(refreshFeedEffect(ctx, feedId).pipe(Effect.provide(FeedHttp.layer)));
+/** `refreshFeedEffect` on the live network and logger, for Promise callers: when it recorded the fetch. */
+export async function refreshOne(ctx: ActionCtx, feedId: Id<'feeds'>): Promise<number | null> {
+  const recorded = await Effect.runPromise(refreshFeedEffect(ctx, feedId).pipe(Effect.provide(ServerLayer)));
+  return recorded?.at ?? null;
 }
 
 /** What a fetch needs to know about a Feed. Internal: the URL never leaves the server (Q9). */
