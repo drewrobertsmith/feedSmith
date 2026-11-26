@@ -10,7 +10,6 @@ import { NativeSheet } from '@/components/native-sheet';
 import { publishedAgo, publishedDate } from '@/feeds/format';
 import { depthStyle } from '@/theme/depth';
 import { spacing } from '@/theme/spacing';
-import { themes } from '@/theme/tokens';
 import {
   ADD_FEED_WORLDS,
   ALL_WORLDS,
@@ -490,8 +489,7 @@ describe('Add a Feed, in its sheet over Feeds (FEE-45)', () => {
     else expect(screen.queryByRole('alert')).not.toBeOnTheScreen();
     const choices = screen.queryAllByRole('button', { name: /, theverge\.com$/ });
     expect(choices).toHaveLength(shows.choices);
-    // FEE-81: the field is set into the sheet (inset, D34) and a site's feeds stand on it (soft), none outlined.
-    expect(faceOf(field)).toMatchObject(depthStyle(shows.theme, 'inset'));
+    // FEE-81: a site's feeds stand on the sheet as soft cards, not outlined. The field is Material's own (D44).
     for (const choice of choices) expect(faceOf(choice)).toMatchObject(depthStyle(shows.theme, 'soft'));
     // One field, for an address: it never asks for a name (FEE-96).
     expect(screen.queryByText(/name/i)).not.toBeOnTheScreen();
@@ -506,21 +504,6 @@ describe('Add a Feed, in its sheet over Feeds (FEE-45)', () => {
     await user.press(screen.getByRole('button', { name: `${first.title}, theverge.com` }));
     expect(w.feedsLog.added).toEqual([first.url]);
   });
-
-  test.each(['dark', 'light'] as const)(
-    'in %s, the field shows it has focus with a thicker Gold line under it, and losing focus puts it back (FEE-81, Q14)',
-    async (colorScheme) => {
-      await openSheet({ colorScheme });
-      const field = await screen.findByLabelText(FIELD);
-      const line = () => screen.getByTestId('field-indicator');
-      const theme = themes[colorScheme];
-      expect(line()).toHaveStyle({ height: 1, backgroundColor: theme.textMuted });
-      await act(async () => fireEvent(field, 'focus'));
-      expect(line()).toHaveStyle({ height: 2, backgroundColor: theme.accent });
-      await act(async () => fireEvent(field, 'blur'));
-      expect(line()).toHaveStyle({ height: 1, backgroundColor: theme.textMuted });
-    },
-  );
 
   test('Add Feed waits for an address', async () => {
     await openSheet({ colorScheme: 'dark' });

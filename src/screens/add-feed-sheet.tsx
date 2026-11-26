@@ -4,7 +4,7 @@ import { ScrollView, ToastAndroid, useWindowDimensions, View } from 'react-nativ
 import { AppButton } from '@/components/app-button';
 import { AppText } from '@/components/app-text';
 import { NativeSheet } from '@/components/native-sheet';
-import { DepthField } from '@/components/depth-field';
+import { NativeTextField } from '@/components/native-text-field';
 import { DepthPressable } from '@/components/depth-pressable';
 import { useAddFeed, type AddFeedReason, type FeedChoice } from '@/feeds/feeds-data';
 
@@ -84,20 +84,16 @@ export function AddFeedSheet({ open, onClose, onFeed }: { open: boolean; onClose
           <AppText variant="title" className="text-text">
             Add a Feed
           </AppText>
-          <View className="gap-related">
-            <AppText variant="label" className="text-text-muted" accessible={false}>
-              Website or feed URL
-            </AppText>
-            <DepthField
-              key={adds}
-              label="Website or feed URL"
-              placeholder="theverge.com"
-              defaultValue={typed}
-              onChangeText={setTyped}
-              onSubmitEditing={() => void submit()}
-              editable={!adding}
-            />
-          </View>
+          {/* Material's filled field, its label floating inside it (FEE-81). */}
+          <NativeTextField
+            key={adds}
+            label="Website or feed URL"
+            placeholder="theverge.com"
+            defaultValue={typed}
+            onChangeText={setTyped}
+            onSubmitEditing={() => void submit()}
+            editable={!adding}
+          />
           {error ? (
             <AppText variant="label" role="alert" className="text-text">
               {error}

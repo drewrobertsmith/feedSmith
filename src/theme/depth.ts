@@ -28,8 +28,7 @@ type Layers = {
 
 /**
  * The shapes a face with depth takes (FEE-81): a pill or circle for what's pressed in passing (chips,
- * buttons), a card's `rounded-lg` corners for what holds a few lines (a site's feeds to choose from, the
- * text field's top edge).
+ * buttons), a card's `rounded-lg` corners for what holds a few lines (a site's feeds to choose from).
  */
 export const SHAPE_RADIUS = { round: 9999, card: 8 } as const;
 export type DepthShape = keyof typeof SHAPE_RADIUS;
