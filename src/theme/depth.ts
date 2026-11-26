@@ -6,7 +6,7 @@ import { palette, themes, type ThemeName } from '@/theme/tokens';
  * How physical a control looks (FEE-74, D27), in Android's terms (D29): a tonal face a step off the
  * page and a soft shadow below it, stepped together on named levels, as Material 3's elevated chips and
  * buttons are. No light down the face and no top-edge sheen: Material lights no surface from above.
- * Chips and buttons are soft, the chosen chip and the Undo note raised, and a control under the
+ * Chips and buttons are soft, the chosen chip raised, and a control under the
  * finger is pressed (with Android's ripple, from `rippleColor`). What's set into the page rather than
  * standing on it, the Pinned group's tray and the text fields, is inset (FEE-83): a face a step darker
  * than the page and the shadow reversed, a soft inner shadow from the top edge and none below.

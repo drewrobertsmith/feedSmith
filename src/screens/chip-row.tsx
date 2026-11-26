@@ -4,6 +4,7 @@ import { Animated, View, type LayoutChangeEvent, type ScrollViewInstance } from 
 import { AppText } from '@/components/app-text';
 import { DepthPressable } from '@/components/depth-pressable';
 import { FeedIcon } from '@/components/feed-icon';
+import { NativeMenu } from '@/components/native-menu';
 import { useEnvironment } from '@/environment';
 import type { FeedChip } from '@/feeds/feeds-data';
 import { chipLabel, chipTone, fadeRanges, revealOffset, transparent, type ChipTone } from '@/screens/chip-row-layout';
@@ -17,7 +18,8 @@ const FADE = spacing.section;
 
 /**
  * One chip: a tab in the row. Chosen, it's raised (D27) and springs into place (D7); what it shows, in `chipTone`'s
- * colour (Gold when chosen, D5), is its children: a Feed's icon and name.
+ * colour (Gold when chosen, D5), is its children: a Feed's icon and name. A Feed's chip also holds Remove: a
+ * long-press opens its menu (`onLongPress`), and TalkBack offers it as an action by name (`remove`, Q15).
  */
 function Chip({
   accessibleName,
@@ -25,12 +27,16 @@ function Chip({
   children,
   onPress,
   onLayout,
+  onLongPress,
+  remove,
 }: {
   accessibleName: string;
   selected: boolean;
   children: React.ReactNode;
   onPress: () => void;
   onLayout?: (event: LayoutChangeEvent) => void;
+  onLongPress?: () => void;
+  remove?: { label: string; onRemove: () => void };
 }) {
   const { reduceMotion } = useEnvironment();
   const [scale] = useState(() => new Animated.Value(1));
@@ -61,6 +67,9 @@ function Chip({
         aria-label={accessibleName}
         aria-selected={selected}
         onPress={onPress}
+        onLongPress={onLongPress}
+        accessibilityActions={remove ? [{ name: 'remove', label: remove.label }] : undefined}
+        onAccessibilityAction={remove ? (event) => event.nativeEvent.actionName === 'remove' && remove.onRemove() : undefined}
         // Every chip is an object, not an outline (FEE-74, D27): soft, the chosen one raised, and one under the finger
         // sinks to pressed. Its label identifies it, at 4.5:1 on every face (Q14, D26).
         className="flex-row items-center gap-inside rounded-full px-group py-related"
@@ -82,29 +91,52 @@ function ChipLabel({ label, tone }: { label: string; tone: ChipTone }) {
   );
 }
 
+/** Where a chip sits in the row's content, as it last laid out. */
+type Box = { x: number; y: number; width: number; height: number };
+const NO_BOX: Box = { x: 0, y: 0, width: 0, height: 0 };
+
 /**
- * The chip row under the Feeds top bar (P5, P9, D12): All, then the Feeds in the server's order. Only
- * for choosing what to read: adding a Feed is the top bar's + (FEE-44), and a chip has no other action
- * (Pinned is gone, FEE-94). Where the row runs off-screen it fades, and a chip chosen from elsewhere (a
- * link) scrolls into view.
+ * The chip whose menu is showing (FEE-97), and where it sits: the menu anchors to an empty box laid over
+ * it. It stays after the menu closes, so the menu can leave on its own motion.
+ */
+type Menu = { id: string; open: boolean; box?: Box };
+
+/**
+ * The chip row under the Feeds top bar (P5, P9, D12): All, then the Feeds in the server's order. For
+ * choosing what to read: adding a Feed is the top bar's + (FEE-44), and a Feed's only other action,
+ * Remove, waits behind a long-press (FEE-97). Where the row runs off-screen it fades, and a chip chosen
+ * from elsewhere (a link) scrolls into view. `menuFor`, a Feed's id, opens its menu at once, for the
+ * state gallery.
  */
 export function ChipRow({
   chips,
   selected,
   onSelect,
+  onRemove,
+  menuFor,
 }: {
   chips: FeedChip[];
   /** The chosen Feed's id, or null for All. */
   selected: string | null;
   onSelect: (feedId: string | null) => void;
+  /** Remove chosen from a Feed's menu, or by TalkBack: the screen asks first (T23). */
+  onRemove: (chip: FeedChip) => void;
+  menuFor?: string;
 }) {
   const { colorScheme, reduceMotion } = useEnvironment();
   const background = themes[colorScheme].background;
   const scroller = useRef<ScrollViewInstance>(null);
   /** Each chip's place in the row, by Feed id (All is ''), measured as it lays out. */
-  const chipAt = useRef(new Map<string, { x: number; width: number }>());
-  const place = (event: LayoutChangeEvent, id: string) =>
-    chipAt.current.set(id, { x: event.nativeEvent.layout.x, width: event.nativeEvent.layout.width });
+  const chipAt = useRef(new Map<string, Box>());
+  const [menu, setMenu] = useState<Menu | null>(menuFor ? { id: menuFor, open: true } : null);
+  const place = (event: LayoutChangeEvent, id: string) => {
+    const { x, y, width, height } = event.nativeEvent.layout;
+    chipAt.current.set(id, { x, y, width, height });
+    // A menu opened before its chip was measured (the gallery's) finds its place now.
+    setMenu((now) => (now?.id === id && !now.box ? { ...now, box: { x, y, width, height } } : now));
+  };
+  const openMenu = (id: string) => setMenu({ id, open: true, box: chipAt.current.get(id) });
+  const menuChip = menu ? chips.find((chip) => chip.id === menu.id) : undefined;
   const [row, setRow] = useState({ width: 0, content: 0 });
   /** Where the row is scrolled to: native for the fades, a ref for the reveal (no React state on a scroll). */
   const [scroll] = useState(() => new Animated.Value(0));
@@ -164,11 +196,30 @@ export function ChipRow({
             selected={selected === chip.id}
             onPress={() => onSelect(chip.id)}
             onLayout={(event) => place(event, chip.id)}
+            onLongPress={() => openMenu(chip.id)}
+            remove={{ label: `Remove ${chip.title}`, onRemove: () => onRemove(chip) }}
           >
             <FeedIcon key={chip.faviconUrl} url={chip.faviconUrl} title={chip.title} size={ICON} fallback="none" />
             <ChipLabel label={chipLabel(chip.title)} tone={chipTone({ selected: selected === chip.id })} />
           </Chip>
         ))}
+        {menu && menuChip ? (
+          // The menu's anchor: an empty box over the chip, scrolling with it, that never takes a touch. The chips
+          // themselves stay plain React Native, since Android's host around a chip would clip its shadow (D27).
+          <View
+            pointerEvents="box-none"
+            className="absolute"
+            style={{ left: (menu.box ?? NO_BOX).x, top: (menu.box ?? NO_BOX).y }}
+          >
+            <NativeMenu
+              open={menu.open}
+              onClose={() => setMenu((now) => now && { ...now, open: false })}
+              actions={[{ label: `Remove ${menuChip.title}`, destructive: true, onPress: () => onRemove(menuChip) }]}
+            >
+              <View style={{ width: (menu.box ?? NO_BOX).width, height: (menu.box ?? NO_BOX).height }} />
+            </NativeMenu>
+          </View>
+        ) : null}
       </Animated.ScrollView>
       {/* More chips lie past a faded edge; the fade is the page's own colour, so it never greys. */}
       {fades ? (

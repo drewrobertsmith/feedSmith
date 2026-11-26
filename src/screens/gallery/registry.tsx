@@ -1,19 +1,17 @@
 import type { ReactElement } from 'react';
 
 import { FeedsScreen } from '@/screens/feeds-screen';
-import { ManageFeedsScreen } from '@/screens/manage-feeds-screen';
 import { ReadingScreen } from '@/screens/reading/reading-screen';
 import { SignInScreen } from '@/screens/sign-in/sign-in-screen';
 import {
   ACCOUNT_WORLDS,
   ADD_FEED_WORLDS,
   ALL_WORLDS,
-  MANAGE_WORLDS,
   READING_WORLDS,
   SHELL_WORLDS,
   SIGN_IN_WORLDS,
 } from '@/worlds/catalog';
-import { FIXTURE_MANAGE, FIXTURE_ROWS } from '@/worlds/fixtures';
+import { FIXTURE_ROWS } from '@/worlds/fixtures';
 import type { CatalogWorld, WorldSpec } from '@/worlds/world';
 
 export type GalleryEntry = {
@@ -35,15 +33,9 @@ export const GALLERY: readonly GalleryEntry[] = [
     worlds: SIGN_IN_WORLDS,
     render: () => <SignInScreen />,
   },
-  { screen: 'All', worlds: ALL_WORLDS, render: (spec) => <FeedsScreen feed={spec.feed} /> },
+  { screen: 'All', worlds: ALL_WORLDS, render: (spec) => <FeedsScreen feed={spec.feed} menuFor={spec.chipMenu} /> },
   // The add sheet over Feeds, open (FEE-45).
   { screen: 'Add a Feed', worlds: ADD_FEED_WORLDS, render: (spec) => <FeedsScreen feed={spec.feed} addOpen /> },
-  {
-    screen: 'Manage Feeds',
-    worlds: MANAGE_WORLDS,
-    // The rename worlds open Calm Notes' sheet.
-    render: (spec) => <ManageFeedsScreen renaming={spec.renameSheet === 'open' ? FIXTURE_MANAGE[1].id : undefined} />,
-  },
   { screen: 'Reading view', worlds: READING_WORLDS, render: () => <ReadingScreen id={FIXTURE_ROWS[0].id} /> },
   {
     screen: 'Account',

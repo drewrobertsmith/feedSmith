@@ -4,7 +4,6 @@ import { DarkTheme, DefaultTheme, ThemeProvider, type Theme } from 'expo-router/
 import { StatusBar } from 'expo-status-bar';
 
 import { AuthContext, useAuth, type Auth } from '@/auth/auth-context';
-import { UndoProvider } from '@/components/undo-toast';
 import { ConvexAuth } from '@/auth/convex-auth';
 import { EnvironmentProvider, useEnvironment, type Environment } from '@/environment';
 import { ConvexFeeds } from '@/feeds/convex-feeds';
@@ -41,7 +40,6 @@ function ThemedStack() {
           <Stack.Protected guard={session === 'signed-in'}>
             <Stack.Screen name="index" />
             <Stack.Screen name="article/[id]" />
-            <Stack.Screen name="manage-feeds" />
           </Stack.Protected>
           <Stack.Protected guard={session === 'signed-out'}>
             <Stack.Screen name="sign-in" />
@@ -67,10 +65,7 @@ export function AppRoot({ environment, auth, feeds }: { environment?: Environmen
     // Gesture Handler's root: nothing of ours drags or swipes since FEE-94/95, but navigation may.
     <GestureHandlerRootView style={{ flex: 1 }}>
       <EnvironmentProvider environment={environment}>
-        {/* One note at a time, across screens (Q35). */}
-        <UndoProvider>
-          <ThemedStack />
-        </UndoProvider>
+        <ThemedStack />
       </EnvironmentProvider>
     </GestureHandlerRootView>
   );

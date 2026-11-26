@@ -27,12 +27,40 @@ jest.mock('@/components/native-sheet', () => ({
   NativeSheet: jest.fn(({ open, children }) => (open ? children : null)),
 }));
 
+// Android's own menu is Compose too (FEE-97): its adapter shows the trigger, and while open, each
+// action as a menu item named by its label.
+jest.mock('@/components/native-menu', () => {
+  const { Pressable, Text, View } = jest.requireActual('react-native');
+  return {
+    NativeMenu: jest.fn(({ open, onClose, actions, children }) => (
+      <View>
+        {children}
+        {open
+          ? actions.map((action) => (
+              <Pressable
+                key={action.label}
+                role="menuitem"
+                aria-label={action.label}
+                onPress={() => {
+                  onClose();
+                  action.onPress();
+                }}
+              >
+                <Text>{action.label}</Text>
+              </Pressable>
+            ))
+          : null}
+      </View>
+    )),
+  };
+});
+
 // Android's own text field is Compose too (FEE-43): its adapter here is React Native's field, with
 // the same uncontrolled interface: a starting value, each change reported, Done submits.
 jest.mock('@/components/native-text-field', () => {
   const { TextInput } = jest.requireActual('react-native');
   return {
-    NativeTextField: ({ label, placeholder, defaultValue, onChangeText, onSubmitEditing, editable, maxLength }) => (
+    NativeTextField: ({ label, placeholder, defaultValue, onChangeText, onSubmitEditing, editable }) => (
       <TextInput
         aria-label={label}
         placeholder={placeholder}
@@ -40,7 +68,6 @@ jest.mock('@/components/native-text-field', () => {
         onChangeText={onChangeText}
         onSubmitEditing={onSubmitEditing}
         editable={editable}
-        maxLength={maxLength}
       />
     ),
   };

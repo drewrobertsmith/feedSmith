@@ -55,15 +55,11 @@ export type LastUpdatedView = { status: 'loading' } | { status: 'ready'; at: num
 /** One Feed's chip (P5, P9). Never carries a feed URL (Q9). */
 export type FeedChip = { id: string; title: string; faviconUrl?: string };
 export type ChipsView = { status: 'loading' } | { status: 'ready'; chips: FeedChip[] };
-/** One Feed in Manage Feeds (D13): its site host, never its URL (Q9), and whether it works (P15). */
-export type ManagedFeed = { id: string; title: string; faviconUrl?: string; host: string; working: boolean };
-export type ManageView = { status: 'loading' } | { status: 'ready'; feeds: ManagedFeed[] };
-export type ManageActions = {
-  /** `failed`: it didn't reach the server (offline, or an error), so the name can be tried again (Q5). */
-  rename: (id: string, title: string) => Promise<'ok' | 'invalid-name' | 'not-found' | 'failed'>;
-  /** `ok` once the Feed is gone (or already was); `failed` when it didn't reach the server. */
-  remove: (id: string) => Promise<'ok' | 'failed'>;
-};
+/**
+ * Removing a Feed and its Articles (T23): `ok` once it's gone (or already was); `failed` when it didn't
+ * reach the server (offline, or an error), so nothing changed (Q5).
+ */
+export type RemoveFeed = (id: string) => Promise<'ok' | 'failed'>;
 
 /**
  * The Article the Reading view opens. While it loads, `title` is the one a list already showed for it, when
@@ -99,10 +95,8 @@ export type FeedsData = {
   useAll: (feedId: string | null) => AllView;
   /** The chip row's Feeds, in order (P9). */
   useChips: () => ChipsView;
-  /** Manage Feeds' list (D13). */
-  useManage: () => ManageView;
-  /** Renaming and removing Feeds. */
-  useManageActions: () => ManageActions;
+  /** Removing a Feed, from its chip (FEE-97). */
+  useRemoveFeed: () => RemoveFeed;
   useArticle: (id: string) => ArticleView;
   /**
    * Adding a Feed: where it's up to, and `add`, which resolves to what happened. Only an address is
@@ -140,15 +134,9 @@ export function useChips(): ChipsView {
   return read();
 }
 
-/** Manage Feeds' list. */
-export function useManage(): ManageView {
-  const { useManage: read } = useFeedsData();
-  return read();
-}
-
-/** Renaming and removing. */
-export function useManageActions(): ManageActions {
-  const { useManageActions: read } = useFeedsData();
+/** Removing a Feed. */
+export function useRemoveFeed(): RemoveFeed {
+  const { useRemoveFeed: read } = useFeedsData();
   return read();
 }
 

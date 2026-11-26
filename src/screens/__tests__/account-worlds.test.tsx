@@ -6,7 +6,6 @@ import { Alert } from 'react-native';
 import { Uniwind } from 'uniwind';
 
 import FeedsRoute from '@/app/index';
-import ManageFeedsRoute from '@/app/manage-feeds';
 import SignInRoute from '@/app/sign-in';
 import { NativeSheet } from '@/components/native-sheet';
 import { AppRoot } from '@/navigation/app-root';
@@ -92,7 +91,6 @@ function renderWorld(world: World) {
     {
       _layout: () => <AppRoot environment={world.environment} auth={world.auth} feeds={world.feeds} />,
       index: FeedsRoute,
-      'manage-feeds': ManageFeedsRoute,
       'sign-in': SignInRoute,
     },
     { initialUrl: world.initialUrl },
@@ -117,7 +115,7 @@ describe.each(ACCOUNT_WORLDS)('$label', ({ id, spec }) => {
     const bar = await screen.findByTestId(`top-bar-${shows.section}`);
     expect(within(bar).getByRole('heading', { name: shows.section })).toHaveStyle({ fontSize: 24 * shows.fontScale });
     expect(within(await circle(shows)).getByText(shows.initial)).toBeOnTheScreen();
-    // Manage Feeds lives in the Account sheet now, not the top bar (D17).
+    // Manage Feeds is gone (FEE-97): not in the top bar either.
     expect(screen.queryByRole('button', { name: 'Manage Feeds' })).toBeNull();
     expect(screen.queryByTestId('account-sheet')).toBeNull();
     expect(Uniwind.currentTheme).toBe(shows.theme);
@@ -146,7 +144,8 @@ describe.each(ACCOUNT_WORLDS)('$label', ({ id, spec }) => {
     expect(jest.mocked(NativeSheet)).toHaveBeenLastCalledWith(expect.objectContaining({ open: true }), undefined);
     expect(within(sheet()).getByRole('heading', { name: open.title })).toBeOnTheScreen();
     if (open.email) expect(within(sheet()).getByText(open.email)).toBeOnTheScreen();
-    expect(within(sheet()).getByRole('button', { name: 'Manage Feeds' })).toBeOnTheScreen();
+    // Manage Feeds is gone (FEE-97): the sheet is who's signed in, Sign out and Delete account.
+    expect(within(sheet()).queryByText(/Manage/)).toBeNull();
     const signOut = within(sheet()).getByRole('button', { name: open.signingOut ? 'Signing out' : 'Sign out' });
     const deleteRow = within(sheet()).getByRole('button', { name: open.deletion === 'deleting' ? 'Deleting account' : 'Delete account' });
     if (open.deletion === 'deleting') {
@@ -226,19 +225,6 @@ describe.each(ACCOUNT_WORLDS)('$label', ({ id, spec }) => {
     expect(world.signInLog.signOuts).toBe(1);
     // Signing out never shows an error of its own, server or not.
     expect(screen.queryAllByRole('alert')).toHaveLength(alertsBefore);
-
-    world.dispose();
-  });
-
-  test('Manage Feeds closes the sheet and opens Manage Feeds', async () => {
-    const world = createWorld(spec);
-    await renderWorld(world);
-    await userEvent.press(await circle(shows));
-
-    await userEvent.press(within(sheet()).getByRole('button', { name: 'Manage Feeds' }));
-
-    expect(await screen.findByRole('heading', { name: 'Manage Feeds' })).toBeOnTheScreen();
-    expect(screen.queryByTestId('account-sheet')).toBeNull();
 
     world.dispose();
   });

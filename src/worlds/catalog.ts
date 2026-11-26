@@ -54,6 +54,14 @@ export const ALL_WORLDS = [
     label: 'Many Feeds, largest font size',
     spec: { colorScheme: 'light', feeds: 'some', chips: 'many', fontScale: 2 },
   },
+  // FEE-97: a Feed chip's long-press menu, holding Remove (T23).
+  { id: 'feed-menu', label: "A Feed's menu, open", spec: { colorScheme: 'dark', feeds: 'some', feed: 'f1', chipMenu: 'f1' } },
+  { id: 'feed-menu-light', label: "A Feed's menu, light", spec: { colorScheme: 'light', feeds: 'some', feed: 'f1', chipMenu: 'f1' } },
+  {
+    id: 'feed-menu-largest-font',
+    label: "A Feed's menu, largest font size",
+    spec: { colorScheme: 'dark', feeds: 'some', feed: 'f1', chipMenu: 'f1', fontScale: 2 },
+  },
   {
     id: 'all-remove-animations',
     label: 'All, Remove animations',
@@ -122,44 +130,6 @@ export const READING_WORLDS = [
 ] as const satisfies readonly CatalogWorld[];
 
 export type ReadingWorldId = (typeof READING_WORLDS)[number]['id'];
-
-/** Manage Feeds (FEE-31, D13). */
-export const MANAGE_WORLDS = [
-  { id: 'manage-dark', label: 'Manage Feeds, dark', spec: { colorScheme: 'dark', section: 'manage' } },
-  { id: 'manage-light', label: 'Manage Feeds, light', spec: { colorScheme: 'light', section: 'manage' } },
-  { id: 'manage-empty', label: 'No Feeds to manage', spec: { colorScheme: 'dark', section: 'manage', manage: 'none' } },
-  { id: 'manage-loading', label: 'Manage Feeds, loading', spec: { colorScheme: 'dark', section: 'manage', manage: 'loading' } },
-  {
-    id: 'manage-largest-font',
-    label: 'Manage Feeds, largest font size',
-    spec: { colorScheme: 'dark', section: 'manage', fontScale: 2 },
-  },
-  // Renaming in a sheet over the list (FEE-43, Q32). The refused and failed worlds show their
-  // message once Save is tapped: the tests tap it, and so does the device walk.
-  { id: 'manage-rename', label: 'Renaming a Feed', spec: { colorScheme: 'dark', section: 'manage', renameSheet: 'open' } },
-  {
-    id: 'manage-rename-light',
-    label: 'Renaming a Feed, light',
-    spec: { colorScheme: 'light', section: 'manage', renameSheet: 'open' },
-  },
-  {
-    id: 'manage-rename-largest-font',
-    label: 'Renaming a Feed, largest font size',
-    spec: { colorScheme: 'dark', section: 'manage', renameSheet: 'open', fontScale: 2 },
-  },
-  {
-    id: 'manage-rename-invalid',
-    label: 'Renaming a Feed, name refused',
-    spec: { colorScheme: 'dark', section: 'manage', renameSheet: 'open', manageWrites: 'invalid' },
-  },
-  {
-    id: 'manage-rename-failed',
-    label: "Renaming a Feed, can't reach the server",
-    spec: { colorScheme: 'light', section: 'manage', renameSheet: 'open', manageWrites: 'fail' },
-  },
-] as const satisfies readonly CatalogWorld[];
-
-export type ManageWorldId = (typeof MANAGE_WORLDS)[number]['id'];
 
 /** The account circle and the Account sheet (FEE-35, P17, D17). */
 export const ACCOUNT_WORLDS = [

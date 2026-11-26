@@ -1,6 +1,6 @@
 import type { Account } from '@/auth/auth-context';
-import type { ArticleRow, FeedChip, ManagedFeed, ReadingArticle } from '@/feeds/feeds-data';
-import { FARNAM_ICON, FIREBALL_ICON, FRAME_PHOTO, RUNWAY_PHOTO, VERGE_ICON } from '@/worlds/fixture-images';
+import type { ArticleRow, FeedChip, ReadingArticle } from '@/feeds/feeds-data';
+import { FIREBALL_ICON, FRAME_PHOTO, RUNWAY_PHOTO, VERGE_ICON } from '@/worlds/fixture-images';
 
 /** Midday UTC, so the date reads the same in every time zone a test runs in. */
 const day = (d: number) => Date.UTC(2026, 10, d, 12);
@@ -232,14 +232,6 @@ export const FIXTURE_MANY_CHIPS: FeedChip[] = [
   { id: 'f7', title: 'MacStories' },
   { id: 'f8', title: 'Kottke' },
 ];
-
-/** Manage Feeds (D13): the Feeds by name; Farnam Street has stopped working. */
-export const FIXTURE_MANAGE: ManagedFeed[] = [
-  { id: 'f1', title: VERGE, faviconUrl: VERGE_ICON, host: 'www.theverge.com', working: true },
-  { id: 'f2', title: 'Calm Notes', host: 'calmnotes.example', working: true },
-  { id: 'f4', title: 'Farnam Street', faviconUrl: FARNAM_ICON, host: 'fs.blog', working: false },
-];
-
 
 /** The signed-in User's Account (P17): a made-up person, never the owner's real Google account (Q22). */
 export const FIXTURE_ACCOUNT: Account = { name: 'Ada Lovelace', email: 'ada@example.com', initial: 'A' };
