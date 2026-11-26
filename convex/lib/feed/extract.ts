@@ -3,6 +3,7 @@ import { Effect, Option, Schema } from 'effect';
 import { parseHTML } from 'linkedom';
 
 import { htmlToBlocks, httpsUrl } from './blocks';
+import type { FetchError } from './errors';
 import { FeedHttp } from './http';
 import { MAX_IMAGE_URL } from './parse';
 import type { ExtractOutcome } from './validators';
@@ -76,19 +77,12 @@ export function extractFromPage(html: string, url: string): ExtractOutcome {
 
 /**
  * Reads an Article's page under the fetch policy (T18: https only, no private hosts, three
- * redirects, ten seconds, 2 MB) and extracts it. A page that can't be fetched fails like one
- * with no Article on it: nothing here throws.
+ * redirects, ten seconds, 2 MB) and extracts it. A page that can't be fetched fails with its
+ * reason, typed; a page that's fetched but has no Article is a `Failed` outcome (FEE-110).
  */
-export function fetchAndExtract(link: string): Promise<ExtractOutcome> {
-  return Effect.runPromise(
-    Effect.gen(function* () {
-      const http = yield* FeedHttp;
-      const response = yield* http.get(link);
-      if (response._tag === 'NotModified') return { _tag: 'Failed' as const };
-      return extractFromPage(response.body, response.url);
-    }).pipe(
-      Effect.provide(FeedHttp.layer),
-      Effect.catch(() => Effect.succeed({ _tag: 'Failed' as const })),
-    ),
-  );
-}
+export const fetchAndExtractEffect = Effect.fnUntraced(function* (link: string): Effect.fn.Return<ExtractOutcome, FetchError, FeedHttp> {
+  const http = yield* FeedHttp;
+  const response = yield* http.get(link);
+  if (response._tag === 'NotModified') return { _tag: 'Failed' };
+  return extractFromPage(response.body, response.url);
+});

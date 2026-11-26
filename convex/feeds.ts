@@ -11,10 +11,10 @@ import { requireUserId } from './lib/currentUser';
 import { findFeedLinks, siteMeta, type FeedLink, type SiteMeta } from './lib/feed/discover';
 import { faviconOf, hostOf } from './lib/feed/face';
 import { fetchFeed, type FetchOutcome } from './lib/feed/fetch';
-import { safeUrl } from './lib/feed/http';
+import { FeedHttp, safeUrl } from './lib/feed/http';
 import { markWorking, scheduleOf, storeNewArticles } from './lib/feed/record';
 import { vAddFeedReason, vFeedChoice, vStoredArticle, vValidators, type AddFeedReason } from './lib/feed/validators';
-import { refreshOne } from './refresh';
+import { refreshFeedEffect } from './refresh';
 
 const MAX_URL = 2048;
 /** Pulling down skips a Feed fetched this recently, so repeated pulls can't hammer a site. */
@@ -120,9 +120,11 @@ export const refreshAll = action({
   handler: async (ctx): Promise<number | null> => {
     const userId = await ctx.runQuery(internal.feeds.viewer, {});
     const feedIds = await ctx.runQuery(internal.feeds.toRefresh, { userId, now: Date.now() });
-    // `refreshOne` records every outcome itself, failures included, so one Feed never stops the rest (FEE-108).
+    // Each Feed records its own outcome, failures and defects included, so one never stops the rest (FEE-108, FEE-110).
     const recorded = await Effect.runPromise(
-      Effect.forEach(feedIds, (feedId) => Effect.promise(() => refreshOne(ctx, feedId)), { concurrency: PULL_CONCURRENCY }),
+      Effect.forEach(feedIds, (feedId) => refreshFeedEffect(ctx, feedId), { concurrency: PULL_CONCURRENCY }).pipe(
+        Effect.provide(FeedHttp.layer),
+      ),
     );
     const times = recorded.filter((at) => at !== null);
     return times.length > 0 ? Math.max(...times) : null;

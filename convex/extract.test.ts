@@ -17,6 +17,21 @@ vi.mock('@convex-dev/auth/server', async (original) => ({
     (await ctx.auth.getUserIdentity())?.subject ?? null,
 }));
 
+/** Reading the page at `/broken` can be made to die, or to give what can't be stored (FEE-110). */
+const reading = vi.hoisted(() => ({ broken: undefined as undefined | 'reading' | 'storing' }));
+vi.mock('./lib/feed/extract', async (original) => {
+  const real = await original<typeof import('./lib/feed/extract')>();
+  const { Effect } = await import('effect');
+  return {
+    ...real,
+    fetchAndExtractEffect: (link: string) => {
+      if (!link.endsWith('/broken') || !reading.broken) return real.fetchAndExtractEffect(link);
+      if (reading.broken === 'reading') return Effect.die(new Error(`reading ${link} blew up`));
+      return Effect.succeed({ _tag: 'Extracted', blocks: [{ type: 'nonsense' }], omitted: [] });
+    },
+  };
+});
+
 const modules = import.meta.glob('./**/*.ts');
 const NOW = Date.UTC(2026, 10, 21, 12);
 const FEED = 'https://calmnotes.example/feed';
@@ -45,6 +60,7 @@ const network = vi.fn(async (url: string) => {
 });
 
 beforeEach(() => {
+  reading.broken = undefined;
   vi.useFakeTimers();
   vi.setSystemTime(NOW);
   pages = {};
@@ -195,6 +211,29 @@ describe('a summary-only Feed reads in full, from its pages (FEE-25, T8)', () =>
     pages['https://calmnotes.example/slow'] = article;
     await s.finish();
     expect(await s.other.query(api.articles.get, { id: await s.idOf('slow') })).toBeNull();
+  });
+});
+
+describe('a bug while reading a page costs only that Article (FEE-110)', () => {
+  test.each([
+    ['reading it dies', 'reading'],
+    ["what it gives can't be stored", 'storing'],
+  ] as const)('%s: that Article falls back (Q6), the next is still read, and the log names only its id', async (_case, broken) => {
+    const logged = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    reading.broken = broken;
+    pages['https://calmnotes.example/broken'] = article;
+    pages['https://calmnotes.example/fine'] = article;
+    const s = await follow([
+      { guid: 'broken', link: 'https://calmnotes.example/broken' },
+      { guid: 'fine', link: 'https://calmnotes.example/fine' },
+    ]);
+    await s.finish();
+    expect(await s.open('broken')).toMatchObject({ page: 'unavailable', subtitle: SUBTITLE });
+    expect(textOf(await s.open('fine'))).toContain('Slow reading is a practice, not a speed.');
+    const lines = JSON.stringify(logged.mock.calls);
+    expect(lines).not.toContain('https://');
+    if (broken === 'storing') expect(lines).toContain(await s.idOf('broken'));
+    logged.mockRestore();
   });
 });
 
