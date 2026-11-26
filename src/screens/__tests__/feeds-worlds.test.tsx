@@ -2,7 +2,7 @@ import { faceOf } from '../../../test/depth';
 import { act, fireEvent, userEvent, within } from '@testing-library/react-native';
 import { screen } from 'expo-router/testing-library';
 import { useState } from 'react';
-import { Alert, Animated, ScrollView, StyleSheet, ToastAndroid } from 'react-native';
+import { AccessibilityInfo, Alert, Animated, ScrollView, StyleSheet, ToastAndroid } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { Uniwind } from 'uniwind';
 
@@ -106,6 +106,8 @@ describe('All', () => {
     'feed-menu-light': { rows: VERGE_ROWS, read: 1, empty: false, refreshing: false, theme: 'light', titleSize: 24, selected: 'The Verge', feedNames: 0, updated: 'Updated 5 min ago', remove: null, menu: 'Remove The Verge' },
     'feed-menu-largest-font': { rows: VERGE_ROWS, read: 1, empty: false, refreshing: false, theme: 'dark', titleSize: 48, selected: 'The Verge', feedNames: 0, updated: 'Updated 5 min ago', remove: null, menu: 'Remove The Verge' },
     'all-remove-animations': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All', feedNames: ROWS, updated: 'Updated 5 min ago', remove: null, menu: null },
+    'all-offline': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'dark', titleSize: 24, selected: 'All', feedNames: ROWS, updated: 'Offline · updated 5 min ago', remove: null, menu: null },
+    'all-offline-light': { rows: ROWS, read: READ, empty: false, refreshing: false, theme: 'light', titleSize: 24, selected: 'All', feedNames: ROWS, updated: 'Offline · updated 5 min ago', remove: null, menu: null },
   };
 
   test.each(ALL_WORLDS)('$label', async ({ id, spec }) => {
@@ -803,6 +805,68 @@ describe('the "Updated" line moves only where it changes (FEE-104)', () => {
   });
 });
 
+describe('offline, the app says so quietly and recovers by itself (FEE-32)', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+  const line = () => screen.getByTestId('updated-line');
+  const openAll = async () => {
+    await open({ colorScheme: 'dark', feeds: 'some' });
+    await screen.findAllByRole('link');
+  };
+  const network = async (state: 'online' | 'offline', wait = 0) => {
+    await act(async () => world!.feeds.setNetwork(state));
+    if (wait) await act(async () => jest.advanceTimersByTime(wait));
+  };
+
+  test('switching from Wi-Fi to cellular, a drop of a second or two, says nothing', async () => {
+    await openAll();
+    await network('offline', 1500);
+    await network('online', 1500);
+    await act(async () => jest.advanceTimersByTime(5000));
+    expect(line()).toHaveAccessibleName('Updated 5 min ago');
+  });
+
+  test('in airplane mode the line says Offline, TalkBack hears it once, and it goes when the connection returns', async () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {});
+    // The test setup's mock remembers earlier worlds' announcements.
+    announce.mockClear();
+    await openAll();
+    await network('offline', 3000);
+    expect(line()).toHaveAccessibleName('Offline · updated 5 min ago');
+    // What's on screen stays readable (Q5).
+    expect(screen.getAllByRole('link').length).toBeGreaterThan(0);
+    expect(announce).toHaveBeenCalledTimes(1);
+    expect(announce).toHaveBeenCalledWith('Offline');
+    await network('online');
+    expect(line()).toHaveAccessibleName('Updated 5 min ago');
+    announce.mockRestore();
+  });
+
+  test('a slow network, still connected, says nothing', async () => {
+    await openAll();
+    await act(async () => jest.advanceTimersByTime(10_000));
+    expect(line()).toHaveAccessibleName('Updated 5 min ago');
+  });
+
+  test('pulling down while offline asks for nothing and leaves no spinner', async () => {
+    await openAll();
+    await network('offline', 3000);
+    const control = screen.getByTestId('all-list').props.refreshControl;
+    await act(async () => control.props.onRefresh());
+    expect(world!.feedsLog.refreshes).toBe(0);
+    expect(screen.getByTestId('all-list').props.refreshControl.props.refreshing).toBe(false);
+    expect(line()).toHaveAccessibleName('Offline · updated 5 min ago');
+  });
+
+  test('a pull under way when the connection drops stops spinning, and the line says Offline', async () => {
+    await open({ colorScheme: 'dark', feeds: 'some', refreshing: true });
+    await screen.findAllByRole('link');
+    await network('offline', 3000);
+    expect(screen.getByTestId('all-list').props.refreshControl.props.refreshing).toBe(false);
+    expect(line()).toHaveAccessibleName('Offline · updated 5 min ago');
+  });
+});
+
 describe('the Reading view', () => {
   type Shows = {
     heading: string;
@@ -826,6 +890,7 @@ describe('the Reading view', () => {
   const MISSING = 'This Article isn’t available.';
   const BRINGING = 'Bringing in the full Article from its page…';
   const UNREAD = 'This Article couldn’t be brought in from its page.';
+  const OFFLINE_READING = 'You’re offline. This Article will load when you’re back online.';
   // An Article's headline is Literata 30 (D6); "not available" is the app speaking, in the interface's title.
   // Every Article with a link ends with Open original; the fallback offers it as its main action instead.
   const full = { omittedLines: 0, titleSize: 30, note: null, openButton: true, leadImage: false, byline: 'By Terrence O’Brien' } as const;
@@ -869,6 +934,19 @@ describe('the Reading view', () => {
       titleSize: 30,
       theme: 'dark',
       note: null,
+      byline: null,
+      openButton: false,
+      leadImage: false,
+      feed: null,
+    },
+    // Offline before the text arrived (FEE-32): the headline, and a calm line instead of an endless wait.
+    'reading-offline-opening': {
+      heading: ARTICLE,
+      body: null,
+      omittedLines: 0,
+      titleSize: 30,
+      theme: 'dark',
+      note: OFFLINE_READING,
       byline: null,
       openButton: false,
       leadImage: false,

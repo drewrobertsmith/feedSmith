@@ -49,6 +49,9 @@ export const ALL_WORLDS = [
   { id: 'feed-rare-light', label: 'A rare writer, light', spec: { colorScheme: 'light', feeds: 'some', feed: 'f3' } },
   { id: 'feed-frequent', label: 'A frequent site: seven this month', spec: { colorScheme: 'dark', feeds: 'busy', feed: 'f1' } },
   { id: 'all-many-feeds', label: 'Many Feeds, one long name', spec: { colorScheme: 'dark', feeds: 'some', chips: 'many' } },
+  // Offline (FEE-32): what's on screen stays, and the line under the title says so, quietly.
+  { id: 'all-offline', label: 'Offline', spec: { colorScheme: 'dark', feeds: 'some', network: 'offline' } },
+  { id: 'all-offline-light', label: 'Offline, light', spec: { colorScheme: 'light', feeds: 'some', network: 'offline' } },
   {
     id: 'all-many-feeds-largest-font',
     label: 'Many Feeds, largest font size',
@@ -143,6 +146,12 @@ export const READING_WORLDS = [
   { id: 'reading-no-author', label: 'No author', spec: { colorScheme: 'light', section: 'article', article: 'no-author' } },
   { id: 'reading-omitted', label: 'A video and a table left out', spec: { colorScheme: 'dark', section: 'article', article: 'omitted' } },
   { id: 'reading-missing', label: 'Article not available', spec: { colorScheme: 'dark', section: 'article', article: 'missing' } },
+  // Offline before its text arrived (FEE-32): the headline it had, and a calm line, never a blank page.
+  {
+    id: 'reading-offline-opening',
+    label: 'Offline, before the text arrives',
+    spec: { colorScheme: 'dark', section: 'article', article: 'loading-with-title', network: 'offline' },
+  },
   { id: 'reading-extracting', label: 'Bringing in from the page', spec: { colorScheme: 'dark', section: 'article', article: 'extracting' } },
   { id: 'reading-unextracted', label: "Page couldn't be read", spec: { colorScheme: 'dark', section: 'article', article: 'unextracted' } },
   {

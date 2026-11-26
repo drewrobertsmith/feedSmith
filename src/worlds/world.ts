@@ -4,6 +4,7 @@ import { Uniwind } from 'uniwind';
 import type { Account, Auth } from '@/auth/auth-context';
 import type { SignInView } from '@/auth/sign-in-outcome';
 import type { Environment } from '@/environment';
+import type { Connection } from '@/feeds/connection';
 import { usePull } from '@/feeds/use-pull';
 import { isAddress, type AddFeedReason, type AddFeedView, type AddOutcome, type ArticleRow, type ArticleView, type FeedChip, type FeedsData } from '@/feeds/feeds-data';
 import {
@@ -78,6 +79,8 @@ export type WorldSpec = {
   pull?: 'late' | 'early';
   /** Whether a pull-down refresh is under way. */
   refreshing?: boolean;
+  /** The connection to the server (FEE-32): offline from the start; tests change it with the world's `setNetwork`. */
+  network?: 'offline';
   /** The chosen Feed's chip, by id: All shows only its Articles (P5). */
   feed?: string;
   /** The chip whose menu starts open, by its Feed's id (the state gallery; tests long-press it, FEE-97). */
@@ -138,7 +141,11 @@ const READING_FIXTURES = {
 } as const;
 
 /** A world's Feeds, and `arrive`, which brings its new Articles as a fetch would (FEE-102). */
-export type WorldFeeds = FeedsData & { arrive: () => void };
+export type WorldFeeds = FeedsData & {
+  arrive: () => void;
+  /** Drops or restores the connection, as switching networks or airplane mode would (FEE-32). */
+  setNetwork: (connection: Connection) => void;
+};
 
 /** A world's Feeds and Articles: fixture data, and a log of what it's asked. */
 export function worldFeeds(
@@ -193,6 +200,16 @@ export function worldFeeds(
     articleListeners.add(listener);
     return () => void articleListeners.delete(listener);
   };
+  let connection: Connection = spec.network ?? 'online';
+  const connectionListeners = new Set<() => void>();
+  const subscribeConnection = (listener: () => void) => {
+    connectionListeners.add(listener);
+    return () => void connectionListeners.delete(listener);
+  };
+  const setNetwork = (next: Connection) => {
+    connection = next;
+    connectionListeners.forEach((listener) => listener());
+  };
   /** When the world's Feeds were last fetched: a while ago, or just now once new Articles arrived (FEE-103). */
   const lastUpdatedAt = () => (feeds === 'none' ? null : arrived ? FIXTURE_NOW : FIXTURE_NOW - FIXTURE_LAST_UPDATED_AGO);
   const arrive = () => {
@@ -212,6 +229,8 @@ export function worldFeeds(
 
   return {
     arrive,
+    setNetwork,
+    useConnection: () => useSyncExternalStore(subscribeConnection, () => connection),
     useAll: (feedId) => {
       const state = useSyncExternalStore(subscribeArticles, () => articlesState);
       if (feeds === 'loading') return { status: 'loading' };

@@ -95,3 +95,13 @@ describe('the "Updated" line, as a still part and the time (FEE-104, D20)', () =
     expect(parts.still + parts.time).toBe('Updated 2 min ago');
   });
 });
+
+describe('the line offline (FEE-32)', () => {
+  test('says Offline with the time it was last updated, in place of a pull', () => {
+    expect(updatedLine(true, 0, 5 * 60_000, true)).toEqual({ still: 'Offline · updated', time: ' 5 min ago' });
+  });
+
+  test('says only Offline when nothing was ever fetched', () => {
+    expect(updatedLine(false, null, 0, true)).toEqual({ still: 'Offline', time: '' });
+  });
+});

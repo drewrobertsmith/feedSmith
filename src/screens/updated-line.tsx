@@ -1,4 +1,5 @@
-import { View } from 'react-native';
+import { useEffect } from 'react';
+import { AccessibilityInfo, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig } from 'react-native-reanimated';
 
 import { AppText } from '@/components/app-text';
@@ -45,11 +46,16 @@ export function UpdatedLine({ still, time }: Parts) {
  * The line under the Feeds title (FEE-47): how fresh All is, so you know whether pulling down is worth it.
  * Information, not a count (P7). Nothing until there's something to say: it draws no view then, so the top
  * bar has no gap under its title. "Updating…" lasts until a pull's results are on screen (FEE-103). It reads
- * the minute clock itself, so a minute passing renders only this line, not the Feeds screen (FEE-106).
+ * the minute clock itself, so a minute passing renders only this line, not the Feeds screen (FEE-106). Offline,
+ * it says so in place of the pull (FEE-32).
  */
-export function FeedsUpdatedLine({ refreshing }: { refreshing: boolean }) {
+export function FeedsUpdatedLine({ refreshing, offline }: { refreshing: boolean; offline: boolean }) {
   const lastUpdated = useLastUpdated();
   const now = useMinuteClock();
-  const parts = updatedLine(refreshing, lastUpdated.status === 'ready' ? lastUpdated.at : null, now);
+  // Going offline is said once, out loud, for TalkBack (FEE-32); the line itself isn't read on every change.
+  useEffect(() => {
+    if (offline) AccessibilityInfo.announceForAccessibility('Offline');
+  }, [offline]);
+  const parts = updatedLine(refreshing, lastUpdated.status === 'ready' ? lastUpdated.at : null, now, offline);
   return parts ? <UpdatedLine {...parts} /> : null;
 }
