@@ -30,6 +30,7 @@ import type * as lib_feed_face from "../lib/feed/face.js";
 import type * as lib_feed_fetch from "../lib/feed/fetch.js";
 import type * as lib_feed_find from "../lib/feed/find.js";
 import type * as lib_feed_http from "../lib/feed/http.js";
+import type * as lib_feed_name from "../lib/feed/name.js";
 import type * as lib_feed_nesting from "../lib/feed/nesting.js";
 import type * as lib_feed_pace from "../lib/feed/pace.js";
 import type * as lib_feed_parse from "../lib/feed/parse.js";
@@ -78,6 +79,7 @@ declare const fullApi: ApiFromModules<{
   "lib/feed/fetch": typeof lib_feed_fetch;
   "lib/feed/find": typeof lib_feed_find;
   "lib/feed/http": typeof lib_feed_http;
+  "lib/feed/name": typeof lib_feed_name;
   "lib/feed/nesting": typeof lib_feed_nesting;
   "lib/feed/pace": typeof lib_feed_pace;
   "lib/feed/parse": typeof lib_feed_parse;

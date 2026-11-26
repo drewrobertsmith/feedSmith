@@ -72,6 +72,31 @@ describe("a site's name and icon (T21)", () => {
     expect(siteMeta(head(''), PAGE).name).toBeUndefined();
   });
 
+  // FEE-89: a name taken from the page's <title> keeps only the part before its tagline or byline.
+  test.each([
+    [
+      'a tagline after a colon',
+      'Pluralistic: Daily links from Cory Doctorow – No trackers, no ads. Black type, white background. Privacy respecting.',
+      'Pluralistic',
+    ],
+    ['a byline, then a tagline', 'Stratechery by Ben Thompson – On the business, strategy, and impact of technology.', 'Stratechery'],
+    ['a tagline after a bar', 'Calm Notes | Writing about slowness', 'Calm Notes'],
+    ['no tagline: kept whole', 'Farnam Street', 'Farnam Street'],
+    ['all tagline, nothing before it: kept whole', ': Daily links', ': Daily links'],
+  ])('a page-title name with %s', (_case, title, name) => {
+    const meta = siteMeta(head(`<title>${title}</title>`), PAGE);
+    expect(meta.name).toBe(name);
+    // What the whole title used to give, so a Feed named by it before can be recognised (and shortened once).
+    expect(meta.pageTitle).toBe(title.slice(0, 100));
+  });
+
+  test("a name the site states itself is never cut, and isn't a page title", () => {
+    const meta = siteMeta(head('<meta property="og:site_name" content="Stratechery by Ben Thompson"><title>Stratechery by Ben Thompson – On…</title>'), PAGE);
+    expect(meta.name).toBe('Stratechery by Ben Thompson');
+    expect(meta.pageTitle).toBeUndefined();
+    expect(siteMeta(head('<meta name="application-name" content="Notes: A Blog">'), PAGE).name).toBe('Notes: A Blog');
+  });
+
   test('the icon: apple-touch-icon first, then icon, https only', () => {
     expect(siteMeta(head('<link rel="icon" href="/i.png"><link rel="apple-touch-icon" href="/touch.png">'), PAGE).iconUrl).toBe(
       'https://www.example.com/touch.png',

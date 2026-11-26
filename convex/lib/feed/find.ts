@@ -1,5 +1,7 @@
 import { parse } from 'tldts';
 
+import { beforeByline, beforeTagline } from './name';
+
 /**
  * Finding a Feed by its site's name (FEE-80, T35): which addresses to guess, whether a site's own
  * name matches what was typed, whether a page is a parked domain, and how results rank. Pure: no
@@ -102,8 +104,8 @@ function distance(a: string, b: string): number {
  * before a byline ("Stratechery by Ben Thompson" → "Stratechery").
  */
 function nameForms(site: string): string[] {
-  const head = site.split(/\s[-|–—:·]\s|:\s/)[0];
-  const named = head.split(/\sby\s/i)[0];
+  const head = beforeTagline(site);
+  const named = beforeByline(head);
   return [...new Set([site, head, named].filter(Boolean))];
 }
 

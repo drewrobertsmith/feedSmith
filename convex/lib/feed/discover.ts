@@ -2,6 +2,7 @@ import { isTag, type ChildNode, type Element } from 'domhandler';
 import { parseDocument } from 'htmlparser2';
 
 import { safeUrl } from './http';
+import { nameFromTitle } from './name';
 
 /** A page offers at most this many feeds to choose from (T21). */
 export const MAX_FEED_LINKS = 10;
@@ -17,7 +18,11 @@ const MAX_DEPTH = 32;
 const FEED_TYPES = new Set(['application/rss+xml', 'application/atom+xml']);
 
 export type FeedLink = { url: string; title: string };
-export type SiteMeta = { name?: string; iconUrl?: string };
+/**
+ * What a site says about itself (T21). `pageTitle` is set only when the name came from the page's <title>: the
+ * whole title, as feedSmith named Feeds by it before FEE-89, so a Feed named that way can be recognised.
+ */
+export type SiteMeta = { name?: string; iconUrl?: string; pageTitle?: string };
 
 const plain = (value: string | undefined, max: number) => {
   const text = (value ?? '').replace(/\s+/g, ' ').trim();
@@ -72,7 +77,10 @@ export function siteMeta(html: string, pageUrl: string): SiteMeta {
   const { links, metas, title } = heads(html);
   const meta = (key: string, value: string) =>
     metas.find((m) => (m.attribs[key] ?? '').toLowerCase() === value)?.attribs.content;
-  const name = plain(meta('property', 'og:site_name'), MAX_TITLE) ?? plain(meta('name', 'application-name'), MAX_TITLE) ?? plain(title, MAX_TITLE);
+  const stated = plain(meta('property', 'og:site_name'), MAX_TITLE) ?? plain(meta('name', 'application-name'), MAX_TITLE);
+  // A name the site states is kept as it is; one from its <title> keeps the part before the tagline (FEE-89).
+  const whole = stated ? undefined : plain(title, Infinity);
+  const name = stated ?? (whole ? nameFromTitle(whole).slice(0, MAX_TITLE) : undefined);
 
   const iconHref =
     links.find((l) => rels(l).has('apple-touch-icon'))?.attribs.href ??
@@ -83,6 +91,7 @@ export function siteMeta(html: string, pageUrl: string): SiteMeta {
 
   const out: SiteMeta = {};
   if (name) out.name = name;
+  if (whole) out.pageTitle = whole.slice(0, MAX_TITLE);
   if (iconUrl) out.iconUrl = iconUrl;
   return out;
 }

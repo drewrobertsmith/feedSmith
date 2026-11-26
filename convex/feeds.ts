@@ -6,7 +6,7 @@ import { DELETE_BATCH } from './lib/feed/blocks';
 import { deleteArticles } from './lib/deleteArticles';
 import { MAX_FEED_NAME } from './lib/feedName';
 import type { Id } from './_generated/dataModel';
-import { action, internalMutation, internalQuery, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
+import { action, internalAction, internalMutation, internalQuery, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireUserId } from './lib/currentUser';
 import { findFeedLinks, siteMeta, type FeedLink, type SiteMeta } from './lib/feed/discover';
 import { faviconOf, hostOf } from './lib/feed/face';
@@ -51,6 +51,34 @@ async function homepageMeta(siteUrl: string | undefined): Promise<SiteMeta> {
   const page = await fetchFeed(siteUrl);
   return page._tag === 'Page' ? siteMeta(page.body, page.url) : {};
 }
+
+/**
+ * Shortens a Feed named, before FEE-89, by its site's whole page title: re-reads the homepage, and when the
+ * Feed's name is still exactly that title, renames it to the part before the tagline. Scheduled once per
+ * Feed from a fetch (`refresh.recordFetch`); a name the site states, or the Feed's own title, is left alone.
+ */
+export const shortenName = internalAction({
+  args: { feedId: v.id('feeds'), siteUrl: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { feedId, siteUrl }) => {
+    const meta = await homepageMeta(siteUrl);
+    if (meta.pageTitle && meta.name && meta.name !== meta.pageTitle) {
+      await ctx.runMutation(internal.feeds.renameFromPageTitle, { feedId, from: meta.pageTitle, to: meta.name });
+    }
+    return null;
+  },
+});
+
+/** Renames a Feed `from` its whole page title `to` the part before the tagline, only if it still has that name. */
+export const renameFromPageTitle = internalMutation({
+  args: { feedId: v.id('feeds'), from: v.string(), to: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { feedId, from, to }) => {
+    const feed = await ctx.db.get(feedId);
+    if (feed && feed.title === from) await ctx.db.patch(feedId, { title: to });
+    return null;
+  },
+});
 
 /**
  * Adds a Feed for the signed-in User: fetches it at once under the fetch policy (T18),
