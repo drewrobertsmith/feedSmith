@@ -231,6 +231,52 @@ describe('a Feed that stops working (Q7)', () => {
   });
 });
 
+describe('a network blip is retried, not counted against the Feed (FEE-111)', () => {
+  /** Refreshes `feed` an hour on, letting the fake clock run through any retries. */
+  async function refreshLater(s: Awaited<ReturnType<typeof setup>>, feedId: Id<'feeds'>) {
+    vi.setSystemTime(START + HOUR);
+    const done = refresh(s, feedId);
+    await vi.advanceTimersByTimeAsync(11_000);
+    await done;
+  }
+
+  test('a dropped connection, then an answer, stores the new Articles and leaves the Feed working', async () => {
+    const s = await setup();
+    const feed = await follow(s, [{ guid: 'g1', ago: HOUR }]);
+    network.mockClear();
+    let tries = 0;
+    network.mockImplementation(async () =>
+      tries++ === 0 ? Promise.reject(new TypeError('connection reset')) : new Response(rss([{ guid: 'g1', ago: 2 * HOUR }, { guid: 'g2', ago: 0 }])),
+    );
+    await refreshLater(s, feed._id);
+    expect(network).toHaveBeenCalledTimes(2);
+    expect(await feedOf(s, feed._id)).toMatchObject({ status: 'working', failures: 0 });
+    expect(await s.a.query(api.articles.all, {})).toHaveLength(2);
+  });
+
+  test('a Feed busy on every try is tried three times, then marked failing and backs off as before (Q7)', async () => {
+    const s = await setup();
+    const feed = await follow(s, [{ guid: 'g1', ago: HOUR }]);
+    network.mockReset();
+    network.mockImplementation(async () => new Response('busy', { status: 503 }));
+    await refreshLater(s, feed._id);
+    expect(network).toHaveBeenCalledTimes(3);
+    const failed = (await feedOf(s, feed._id))!;
+    expect(failed).toMatchObject({ status: 'failing', failures: 1 });
+    expect(failed.nextFetchAt).toBe(failed.lastFetchedAt! + backoff(1));
+  });
+
+  test('a 404 reaches the network once', async () => {
+    const s = await setup();
+    const feed = await follow(s, [{ guid: 'g1', ago: HOUR }]);
+    network.mockReset();
+    network.mockImplementation(async () => new Response('gone', { status: 404 }));
+    await refreshLater(s, feed._id);
+    expect(network).toHaveBeenCalledTimes(1);
+    expect(await feedOf(s, feed._id)).toMatchObject({ status: 'failing', failures: 1 });
+  });
+});
+
 describe('fetches that overlap or misbehave', () => {
   test('an older result never overwrites a newer one', async () => {
     const s = await setup();
@@ -245,7 +291,9 @@ describe('fetches that overlap or misbehave', () => {
     network.mockImplementation(() => {
       throw new Error('not even a rejected promise');
     });
-    await refresh(s, feed._id);
+    const done = refresh(s, feed._id);
+    await vi.advanceTimersByTimeAsync(11_000);
+    await done;
     expect(await feedOf(s, feed._id)).toMatchObject({ status: 'failing', failures: 1 });
   });
 
@@ -322,7 +370,8 @@ describe('pulling down fetches every Feed now', () => {
     const s = await setup();
     await follow(s, [{ guid: 'g1', ago: HOUR }]);
     vi.setSystemTime(START + HOUR);
-    network.mockImplementation(async () => new Response('down', { status: 503 }));
+    // A lasting failure: a busy one (503) is retried first (FEE-111).
+    network.mockImplementation(async () => new Response('down', { status: 500 }));
     const until = await s.a.action(api.feeds.refreshAll, {});
     expect(until).toBe(START + HOUR);
     expect(await s.a.query(api.feeds.lastUpdated, {})).toBeGreaterThanOrEqual(until!);
