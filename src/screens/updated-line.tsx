@@ -2,8 +2,9 @@ import { View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig } from 'react-native-reanimated';
 
 import { AppText } from '@/components/app-text';
-import { useEnvironment } from '@/environment';
-import type { UpdatedLine as Parts } from '@/feeds/use-pull';
+import { useEnvironment, useMinuteClock } from '@/environment';
+import { useLastUpdated } from '@/feeds/feeds-data';
+import { updatedLine, type UpdatedLine as Parts } from '@/feeds/use-pull';
 import { motion } from '@/theme/motion';
 
 const OUT = FadeOut.duration(motion.lineChange.out);
@@ -38,4 +39,17 @@ export function UpdatedLine({ still, time }: Parts) {
       </LayoutAnimationConfig>
     </View>
   );
+}
+
+/**
+ * The line under the Feeds title (FEE-47): how fresh All is, so you know whether pulling down is worth it.
+ * Information, not a count (P7). Nothing until there's something to say: it draws no view then, so the top
+ * bar has no gap under its title. "Updating…" lasts until a pull's results are on screen (FEE-103). It reads
+ * the minute clock itself, so a minute passing renders only this line, not the Feeds screen (FEE-106).
+ */
+export function FeedsUpdatedLine({ refreshing }: { refreshing: boolean }) {
+  const lastUpdated = useLastUpdated();
+  const now = useMinuteClock();
+  const parts = updatedLine(refreshing, lastUpdated.status === 'ready' ? lastUpdated.at : null, now);
+  return parts ? <UpdatedLine {...parts} /> : null;
 }

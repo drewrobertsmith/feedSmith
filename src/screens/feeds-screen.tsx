@@ -10,30 +10,17 @@ import { ChipSwitch, SlideRow, useChipSwitch } from '@/components/chip-switch';
 import { ArticleRow } from '@/components/article-row';
 import { ArrivalProvider, ArrivingRow, useArrival } from '@/components/arriving-row';
 import { TopBar, TopBarIcon } from '@/components/top-bar';
-import { useEnvironment, useMinuteClock } from '@/environment';
-import { useAll, useChips, useLastUpdated, useRefresh, useRemoveFeed, type FeedChip } from '@/feeds/feeds-data';
-import { updatedLine } from '@/feeds/use-pull';
+import { useEnvironment } from '@/environment';
+import { useAll, useChips, useRefresh, useRemoveFeed, type FeedChip } from '@/feeds/feeds-data';
 import { useNewArticles } from '@/feeds/use-new-articles';
 import { useShownRows } from '@/feeds/use-shown-rows';
 import { AccountButton } from '@/screens/account/account-sheet';
 import { AddFeedSheet } from '@/screens/add-feed-sheet';
 import { ChipRow } from '@/screens/chip-row';
 import { NewArticlesNote } from '@/screens/new-articles-note';
-import { UpdatedLine } from '@/screens/updated-line';
+import { FeedsUpdatedLine } from '@/screens/updated-line';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
-
-/**
- * The line under the Feeds title (FEE-47): how fresh All is, so you know whether pulling down is
- * worth it. Information, not a count (P7). Nothing until there's something to say. "Updating…" lasts until
- * a pull's results are on screen (FEE-103), and only the part that changes moves (FEE-104).
- */
-function useUpdatedLine(refreshing: boolean) {
-  const lastUpdated = useLastUpdated();
-  const now = useMinuteClock();
-  const parts = updatedLine(refreshing, lastUpdated.status === 'ready' ? lastUpdated.at : null, now);
-  return parts && <UpdatedLine {...parts} />;
-}
 
 /**
  * Removing a Feed (FEE-97, T23): Android's dialog asks first (Q32), saying its Articles go too. Once it's
@@ -115,7 +102,6 @@ export function FeedsScreen({
     list.current?.scrollToOffset({ offset: 0, animated: !reduceMotion });
   };
   const { refreshing, refresh } = useRefresh();
-  const updated = useUpdatedLine(refreshing);
   const theme = themes[colorScheme];
   const noFeeds = chipsView.status === 'ready' && chips.length === 0;
   const empty = all.status === 'ready' && all.articles.length === 0;
@@ -135,7 +121,7 @@ export function FeedsScreen({
     <View className="gap-group pb-related" style={{ paddingTop: insets.top + spacing.section }}>
       <TopBar
         title="Feeds"
-        summary={updated}
+        summary={<FeedsUpdatedLine refreshing={refreshing} />}
         // Adding a Feed is always here, in the same place (Q31, D18); the empty state has its own button.
         action={chips.length > 0 ? <TopBarIcon label="Add a Feed" icon={{ ios: 'plus', android: 'add' }} onPress={addFeed} /> : undefined}
         trailing={<AccountButton initiallyOpen={accountOpen} />}
