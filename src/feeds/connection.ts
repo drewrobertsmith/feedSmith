@@ -20,14 +20,14 @@ export const OFFLINE_GRACE = 3000;
  * it opened offline. Back online is shown at once. Its timer is cleared when the drop ends or it unmounts (Q20).
  */
 export function useSaysOffline(connection: Connection): boolean {
-  const [says, setSays] = useState(connection === 'offline');
+  // The connection that has lasted: offline only once a drop outlasts the grace.
+  const [lasting, setLasting] = useState(connection);
+  // Back online is adjusted during render, as React recommends for state that follows a prop (as `usePull` does).
+  if (connection === 'online' && lasting !== 'online') setLasting('online');
   useEffect(() => {
-    if (connection === 'online') {
-      setSays(false);
-      return;
-    }
-    const timer = setTimeout(() => setSays(true), OFFLINE_GRACE);
+    if (connection === 'online') return;
+    const timer = setTimeout(() => setLasting('offline'), OFFLINE_GRACE);
     return () => clearTimeout(timer);
   }, [connection]);
-  return says;
+  return connection === 'offline' && lasting === 'offline';
 }

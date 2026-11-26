@@ -42,6 +42,16 @@ function useConfirmRemove(onRemoved: () => void) {
 /** Offline, a pull asks for nothing: the spinner ends at once and the line says why (FEE-32). */
 const ignorePull = () => {};
 
+/**
+ * Pulling down (P15), unless the app is offline (FEE-32, Q5): then a pull can't reach the server, so nothing
+ * is asked and no spinner waits for it, and the line under the title says why.
+ */
+function usePullUnlessOffline() {
+  const { refreshing, refresh } = useRefresh();
+  const offline = useOffline();
+  return { refreshing: refreshing && !offline, onRefresh: offline ? ignorePull : refresh, offline };
+}
+
 /** A row's usual height, for the list's first layout before rows measure themselves. */
 const ESTIMATED_ROW = 112;
 
@@ -104,10 +114,7 @@ export function FeedsScreen({
     newArticles.clear();
     list.current?.scrollToOffset({ offset: 0, animated: !reduceMotion });
   };
-  const { refreshing: pulling, refresh } = useRefresh();
-  // Offline, a pull can't reach the server: the line says so and no spinner waits for it (FEE-32, Q5).
-  const offline = useOffline();
-  const refreshing = pulling && !offline;
+  const { refreshing, onRefresh, offline } = usePullUnlessOffline();
   const theme = themes[colorScheme];
   const noFeeds = chipsView.status === 'ready' && chips.length === 0;
   const empty = all.status === 'ready' && all.articles.length === 0;
@@ -189,7 +196,7 @@ export function FeedsScreen({
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={offline ? ignorePull : refresh}
+              onRefresh={onRefresh}
               progressViewOffset={insets.top}
               colors={[theme.accent]}
               progressBackgroundColor={theme.surface}
