@@ -93,7 +93,7 @@ Then treat `repos/effect/` as the source of truth for Effect patterns: before us
 
 ## Vendored repositories
 
-- External repositories are vendored under `repos/` with `git subtree --squash`. They're read-only reference material for working with those libraries.
+- External repositories are vendored under `repos/` (Effect's first added with `git subtree --squash`; updated by `bun run repos:effect`). They're read-only reference material for working with those libraries.
 - Prefer their examples and patterns over generated guesses or web search results.
 - Never edit files under `repos/` unless the owner asks, and never import from `repos/`: app code keeps importing the installed packages.
-- Each one is pinned to the version in `package.json`. After bumping `effect`, run `bun run repos:effect` so the source matches, and commit the squash it makes with the bump.
+- Each one is pinned to the version in `package.json`. After bumping `effect`, run `bun run repos:effect` so the source matches, and commit what it stages with the bump.
