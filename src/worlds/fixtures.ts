@@ -93,6 +93,15 @@ export const FIXTURE_BUSY_ROWS: ArticleRow[] = [16, 14, 12, 10].map((d, i) => ({
   read: false,
 }));
 
+/**
+ * Two Articles a fetch brings while the screen is open (FEE-102): newer than every other, between the
+ * newest fixture Article and "now", from The Verge, so they reach All and The Verge's page alike.
+ */
+export const FIXTURE_ARRIVED_ROWS: ArticleRow[] = [
+  { id: 'n1', title: 'A new kind of laptop hinge', ...VERGE_FACE, publishedAt: Date.UTC(2026, 10, 21, 13, 30), read: false },
+  { id: 'n2', title: 'The week in phones', ...VERGE_FACE, publishedAt: Date.UTC(2026, 10, 21, 13), read: false },
+];
+
 /** Every Article in All Read. */
 export const FIXTURE_READ_ROWS: ArticleRow[] = FIXTURE_ROWS.map((row) => ({ ...row, read: true }));
 

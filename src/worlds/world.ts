@@ -9,6 +9,7 @@ import {
   FIXTURE_ACCOUNT,
   FIXTURE_ARTICLE,
   FIXTURE_ADDED_CHIP,
+  FIXTURE_ARRIVED_ROWS,
   FIXTURE_CHIPS,
   FIXTURE_CHOICES,
   FIXTURE_LAST_UPDATED_AGO,
@@ -62,6 +63,13 @@ export type WorldSpec = {
    * several feeds. `already`: adding finds The Verge, already followed. Any other is that error.
    */
   addFeed?: 'idle' | 'busy' | 'choose' | 'already' | AddFeedReason;
+  /**
+   * A fetch brings new Articles while the screen is open (FEE-102): `later` adds them when the world's
+   * `arrive` is called (tests call it; the state gallery calls it a moment after the world opens).
+   */
+  arrivals?: 'later';
+  /** The list starts scrolled down, past the header (FEE-102): the gallery opens it there; tests scroll. */
+  scrolled?: boolean;
   /** Whether a pull-down refresh is under way. */
   refreshing?: boolean;
   /** The chosen Feed's chip, by id: All shows only its Articles (P5). */
@@ -120,11 +128,14 @@ const READING_FIXTURES = {
   'unextracted-no-image': { ...FIXTURE_UNEXTRACTED_ARTICLE, imageUrl: undefined },
 } as const;
 
+/** A world's Feeds, and `arrive`, which brings its new Articles as a fetch would (FEE-102). */
+export type WorldFeeds = FeedsData & { arrive: () => void };
+
 /** A world's Feeds and Articles: fixture data, and a log of what it's asked. */
 export function worldFeeds(
   spec: WorldSpec,
   log: FeedsLog = emptyLog(),
-): FeedsData {
+): WorldFeeds {
   const feeds = spec.feeds ?? 'none';
   /** The chips a world with Feeds shows: a few, or enough to run off the screen (FEE-44). */
   const someChips = spec.chips === 'many' ? FIXTURE_MANY_CHIPS : FIXTURE_CHIPS;
@@ -162,8 +173,23 @@ export function worldFeeds(
     if (!forState.has(key)) forState.set(key, build());
     return forState.get(key) as T;
   };
-  /** A world's Articles don't change while it's shown, so its views are built once. */
-  const fixed = {};
+  /**
+   * A world's Articles change only when its new ones arrive (FEE-102): each state builds its views once, and
+   * arriving moves to a new state, as Convex's live query hands the app a new result.
+   */
+  let articlesState: object = {};
+  let arrived = false;
+  const articleListeners = new Set<() => void>();
+  const subscribeArticles = (listener: () => void) => {
+    articleListeners.add(listener);
+    return () => void articleListeners.delete(listener);
+  };
+  const arrive = () => {
+    if (spec.arrivals !== 'later' || arrived) return;
+    arrived = true;
+    articlesState = {};
+    articleListeners.forEach((listener) => listener());
+  };
   const articleView: ArticleView =
     article === 'loading'
       ? { status: 'loading' }
@@ -174,12 +200,15 @@ export function worldFeeds(
           : { status: 'ready', article: READING_FIXTURES[article ?? 'full'] };
 
   return {
+    arrive,
     useAll: (feedId) => {
+      const state = useSyncExternalStore(subscribeArticles, () => articlesState);
       if (feeds === 'loading') return { status: 'loading' };
-      return viewOf(fixed, `all:${feedId}`, () => {
+      return viewOf(state, `all:${feedId}`, () => {
         // All is the last 30 days; a Feed's page adds its kept older posts (FEE-93), as the backend does.
-        const recent =
+        const fetched =
           feeds === 'some' ? FIXTURE_ROWS : feeds === 'busy' ? [...FIXTURE_ROWS, ...FIXTURE_BUSY_ROWS] : feeds === 'read' ? FIXTURE_READ_ROWS : [];
+        const recent = arrived ? [...FIXTURE_ARRIVED_ROWS, ...fetched] : fetched;
         const kept = feeds === 'some' || feeds === 'busy' ? FIXTURE_KEPT_ROWS : [];
         const newestFirst = (list: ArticleRow[]) => [...list].sort((x, y) => y.publishedAt - x.publishedAt);
         const shown =
@@ -248,7 +277,7 @@ export type World = {
   auth: Auth;
   signInLog: SignInLog;
   /** What `<AppRoot feeds>` takes: fixture Feeds and Articles that record what they're asked. */
-  feeds: FeedsData;
+  feeds: WorldFeeds;
   feedsLog: FeedsLog;
   /** Where the router starts. */
   initialUrl: '/' | '/sign-in' | `/article/${string}` | `/?feed=${string}`;
