@@ -46,6 +46,8 @@ function Chip({
   notUpdating?: boolean;
 }) {
   const settle = useChipSettle();
+  // A badged chip makes room on its right, so its name never runs under the badge's notch, at any size.
+  const badgeRoom = (NOTCH / 4) * useSizeScale();
   return (
     <View onLayout={onLayout}>
       <DepthPressable
@@ -61,6 +63,7 @@ function Chip({
         // Every chip is an object, not an outline (FEE-74, D27): soft, the chosen one raised, and one under the finger
         // sinks to pressed. Its label identifies it, at 4.5:1 on every face (Q14, D26).
         className="flex-row items-center gap-inside rounded-full px-group py-related"
+        style={failing ? { paddingRight: spacing.group + badgeRoom } : undefined}
       >
         {children}
       </DepthPressable>
@@ -217,6 +220,8 @@ export function ChipRow({
         onLayout={(event) => setRow((now) => ({ ...now, width: event.nativeEvent.layout.width }))}
         onContentSizeChange={(content) => setRow((now) => ({ ...now, content }))}
         contentContainerClassName="items-center gap-related px-edge"
+        // Room for a badge grows only with Android's font size, never on a scroll or a keyboard (FEE-126).
+        // react-doctor-disable-next-line react-doctor/rn-scrollview-dynamic-padding
         contentContainerStyle={{ paddingTop: badgeRoom, paddingBottom: spacing.related }}
       >
         <Chip accessibleName="All" selected={selected === null} onPress={() => onSelect(null)} onLayout={(event) => place(event, '')}>
