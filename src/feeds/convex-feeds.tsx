@@ -1,9 +1,10 @@
-import { useAction, useConvex, useConvexAuth, useMutation, useQuery } from 'convex/react';
+import { useAction, useConvex, useConvexAuth, useConvexConnectionState, useMutation, useQuery } from 'convex/react';
 import type { FunctionArgs, FunctionReference } from 'convex/server';
 import { useEffect, useState, type ReactNode } from 'react';
 
 import { api } from '../../convex/_generated/api';
 import { useAuth } from '@/auth/auth-context';
+import { connectionOf, type Connection } from '@/feeds/connection';
 import {
   FeedsContext,
   isAddress,
@@ -145,6 +146,10 @@ function useLastUpdated(): LastUpdatedView {
   return at === undefined ? { status: 'loading' } : { status: 'ready', at };
 }
 
+function useConnection(): Connection {
+  return connectionOf(useConvexConnectionState());
+}
+
 const convexFeeds: FeedsData = {
   useAll,
   useChips,
@@ -155,6 +160,7 @@ const convexFeeds: FeedsData = {
   useRefresh,
   useMarkRead,
   useLastUpdated,
+  useConnection,
 };
 
 /** The app's Feeds and Articles, from Convex. Sits inside `ConvexAuth`, which owns the client. */

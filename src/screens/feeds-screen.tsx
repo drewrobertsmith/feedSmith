@@ -11,7 +11,7 @@ import { ArticleRow } from '@/components/article-row';
 import { ArrivalProvider, ArrivingRow, useArrival } from '@/components/arriving-row';
 import { TopBar, TopBarIcon } from '@/components/top-bar';
 import { useEnvironment } from '@/environment';
-import { useAll, useChips, useRefresh, useRemoveFeed, type FeedChip } from '@/feeds/feeds-data';
+import { useAll, useChips, useOffline, useRefresh, useRemoveFeed, type FeedChip } from '@/feeds/feeds-data';
 import { useNewArticles } from '@/feeds/use-new-articles';
 import { useShownRows } from '@/feeds/use-shown-rows';
 import { AccountButton } from '@/screens/account/account-sheet';
@@ -38,6 +38,9 @@ function useConfirmRemove(onRemoved: () => void) {
       { text: 'Remove', style: 'destructive', onPress: () => void removeFeed(chip) },
     ]);
 }
+
+/** Offline, a pull asks for nothing: the spinner ends at once and the line says why (FEE-32). */
+const ignorePull = () => {};
 
 /** A row's usual height, for the list's first layout before rows measure themselves. */
 const ESTIMATED_ROW = 112;
@@ -101,7 +104,10 @@ export function FeedsScreen({
     newArticles.clear();
     list.current?.scrollToOffset({ offset: 0, animated: !reduceMotion });
   };
-  const { refreshing, refresh } = useRefresh();
+  const { refreshing: pulling, refresh } = useRefresh();
+  // Offline, a pull can't reach the server: the line says so and no spinner waits for it (FEE-32, Q5).
+  const offline = useOffline();
+  const refreshing = pulling && !offline;
   const theme = themes[colorScheme];
   const noFeeds = chipsView.status === 'ready' && chips.length === 0;
   const empty = all.status === 'ready' && all.articles.length === 0;
@@ -121,7 +127,7 @@ export function FeedsScreen({
     <View className="gap-group pb-related" style={{ paddingTop: insets.top + spacing.section }}>
       <TopBar
         title="Feeds"
-        summary={<FeedsUpdatedLine refreshing={refreshing} />}
+        summary={<FeedsUpdatedLine refreshing={refreshing} offline={offline} />}
         // Adding a Feed is always here, in the same place (Q31, D18); the empty state has its own button.
         action={chips.length > 0 ? <TopBarIcon label="Add a Feed" icon={{ ios: 'plus', android: 'add' }} onPress={addFeed} /> : undefined}
         trailing={<AccountButton initiallyOpen={accountOpen} />}
@@ -183,7 +189,7 @@ export function FeedsScreen({
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={refresh}
+              onRefresh={offline ? ignorePull : refresh}
               progressViewOffset={insets.top}
               colors={[theme.accent]}
               progressBackgroundColor={theme.surface}

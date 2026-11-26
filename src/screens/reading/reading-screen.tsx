@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppButton } from '@/components/app-button';
 import { AppText } from '@/components/app-text';
 import { useSizeScale } from '@/environment';
-import { useArticle, useMarkRead, type Block, type ReadingArticle } from '@/feeds/feeds-data';
+import { useArticle, useMarkRead, useOffline, type Block, type ReadingArticle } from '@/feeds/feeds-data';
 import { byline, publishedDate } from '@/feeds/format';
 import { openLink } from '@/feeds/open-link';
 import { ArticleBlocks } from '@/screens/reading/article-blocks';
@@ -186,6 +186,7 @@ export function ReadingScreen({ id }: { id: string }) {
   const scale = useSizeScale();
   const view = useArticle(id);
   const markRead = useMarkRead();
+  const offline = useOffline();
   const ready = view.status === 'ready';
   // Opening an Article marks it Read (P7): once per Article shown, not on every render.
   const markOpened = useEffectEvent(() => markRead(id));
@@ -207,7 +208,7 @@ export function ReadingScreen({ id }: { id: string }) {
   return (
     // Opened from a row, the page grows from it and goes back into it (FEE-114).
     <ArticleTransition id={id} articleReady={ready} hasLead={!!article && opensWithImage(article)}>
-      {title === undefined ? (
+      {title === undefined && !offline ? (
         <View className="flex-1 bg-background" />
       ) : (
         <View className="flex-1 bg-background">
@@ -220,8 +221,14 @@ export function ReadingScreen({ id }: { id: string }) {
           }}
         >
           <View className="w-full gap-section" style={{ maxWidth: MEASURE * scale }}>
-            <ArticleHeader title={title} article={article} />
+            {title !== undefined ? <ArticleHeader title={title} article={article} /> : null}
             {article ? <ArticleBody article={article} /> : null}
+            {/* Offline before the text arrived: a calm line, never a blank page or an endless wait (FEE-32, Q5). */}
+            {!article && offline ? (
+              <AppText variant="reading" className="text-text-muted">
+                You’re offline. This Article will load when you’re back online.
+              </AppText>
+            ) : null}
           </View>
         </ScrollView>
         {/* Edge-to-edge (Q18): the text scrolls behind the status bar, and this still strip keeps its icons legible. */}

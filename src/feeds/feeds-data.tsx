@@ -1,5 +1,6 @@
 import { createContext, use } from 'react';
 
+import { useSaysOffline, type Connection } from '@/feeds/connection';
 import type { Block, OmittedKind, Span } from '../../convex/lib/feed/blocks';
 import type { AddFeedReason, ReadingPage } from '../../convex/lib/feed/validators';
 
@@ -114,9 +115,20 @@ export type FeedsData = {
   useLastUpdated: () => LastUpdatedView;
   /** Marks an Article Read (P7), for the Reading view to call when it opens one. */
   useMarkRead: () => (id: string) => void;
+  /** Whether the server can be reached (FEE-32); the client reconnects by itself. */
+  useConnection: () => Connection;
 };
 
 export const FeedsContext = createContext<FeedsData | null>(null);
+
+/**
+ * Whether to tell the User the app is offline (FEE-32): after a drop that lasts, never for a passing blip.
+ * What's on screen stays readable meanwhile (Q5).
+ */
+export function useOffline(): boolean {
+  const { useConnection: read } = useFeedsData();
+  return useSaysOffline(read());
+}
 
 export function useFeedsData(): FeedsData {
   const feeds = use(FeedsContext);

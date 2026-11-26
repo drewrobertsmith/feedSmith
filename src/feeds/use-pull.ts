@@ -37,10 +37,14 @@ export function usePull(run: () => Promise<number | null>, at: number | null | u
  * The "Updated" line's parts (FEE-104): `still` ("Updated", or "Updating…" during a pull) and the `time` as
  * it ages. Split after the word, so the time changes while "Updated" stays put, and the line keeps its kerning.
  */
-export type UpdatedLine = { still: 'Updated' | 'Updating…'; time: string };
+export type UpdatedLine = { still: 'Updated' | 'Updating…' | 'Offline · updated' | 'Offline'; time: string };
 
-/** The line under the Feeds title (D20): how fresh All is, or that it's updating. Nothing until there's something to say. */
-export function updatedLine(refreshing: boolean, at: number | null | undefined, now: number): UpdatedLine | undefined {
+/**
+ * The line under the Feeds title (D20): how fresh All is, that it's updating, or that the app is offline
+ * (FEE-32), which a pull can't change. Nothing until there's something to say.
+ */
+export function updatedLine(refreshing: boolean, at: number | null | undefined, now: number, offline = false): UpdatedLine | undefined {
+  if (offline) return at === null || at === undefined ? { still: 'Offline', time: '' } : { still: 'Offline · updated', time: ` ${publishedAgo(at, now)}` };
   if (refreshing) return { still: 'Updating…', time: '' };
   if (at === null || at === undefined) return undefined;
   return { still: 'Updated', time: ` ${publishedAgo(at, now)}` };
