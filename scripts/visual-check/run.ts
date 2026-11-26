@@ -12,12 +12,13 @@
  * bar is cropped off every picture anyway, since other apps' notification icons show there, and so is the
  * right edge, where a scroll indicator sometimes lingers with animations off.
  */
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import * as catalog from '../../src/worlds/catalog';
 import { compare, crop, halve } from './compare';
+import { watchReady } from './ready';
 
 const APP = 'com.mediatedreality.feedsmith';
 const APPROVED = 'test/visual/approved';
@@ -30,6 +31,10 @@ const TOLERANCE = 0.001;
 const SCROLL_INDICATOR = 16;
 /** agent-device's invisible input method, the one keyboard allowed during a check. */
 const TEST_KEYBOARD = 'com.callstack.agentdevice.imehelper/';
+/** How long a world may take to say it's ready before it's reported "never ready" (FEE-121). */
+const READY_TIMEOUT = 10_000;
+/** Between the confirming screenshots taken once a world is ready, while its images finish drawing. */
+const CONFIRM_PAUSE = 150;
 const ANIMATION_SETTINGS = ['animator_duration_scale', 'transition_animation_scale', 'window_animation_scale'];
 
 const WORLD_IDS: string[] = Object.values(catalog).flatMap((worlds) => worlds.map((world) => world.id));
@@ -110,19 +115,27 @@ function statusBarRows(): number {
   return Number(frame[1]);
 }
 
-/** Opens a world and captures it once two screenshots in a row agree, so loading and settling are over. */
-async function capture(world: string, theme: string, statusBar: number): Promise<Buffer> {
-  const link = `feedsmith://gallery?world=${world}&theme=${theme}&capture=1`;
+type Watch = ReturnType<typeof watchReady>;
+/** Each capture's own number, so only its world's ready line counts, never an earlier run's (FEE-121). */
+let lastShot = Date.now();
+
+/**
+ * Opens a world, waits for it to say it's ready (FEE-121), then captures it once two quick screenshots agree,
+ * so its images have finished drawing. A world that never says ready is captured anyway, and reported.
+ */
+async function capture(world: string, theme: string, statusBar: number, watch: Watch): Promise<{ picture: Buffer; ready: boolean }> {
+  const shot = String(++lastShot);
+  const link = `feedsmith://gallery?world=${world}&theme=${theme}&capture=1&shot=${shot}`;
   shell('am', 'start', '-W', '-a', 'android.intent.action.VIEW', '-d', `'${link}'`, APP);
+  const ready = await watch.wait(shot, READY_TIMEOUT);
   let last = screenshot();
-  for (let attempt = 0; attempt < 12; attempt++) {
-    await pause(attempt === 0 ? 700 : 400);
+  for (let attempt = 0; attempt < 8; attempt++) {
+    await pause(CONFIRM_PAUSE);
     const next = screenshot();
-    if (next.equals(last)) return halve(crop(next, { top: statusBar, right: SCROLL_INDICATOR }));
+    if (next.equals(last)) break;
     last = next;
   }
-  console.warn(`  ${world} (${theme}) never stopped changing; comparing its last frame`);
-  return halve(crop(last, { top: statusBar, right: SCROLL_INDICATOR }));
+  return { picture: halve(crop(last, { top: statusBar, right: SCROLL_INDICATOR })), ready };
 }
 
 async function check(only: string[]) {
@@ -137,6 +150,10 @@ async function check(only: string[]) {
 
   const statusBar = statusBarRows();
   const restore = prepareDevice();
+  // The app's log, from now on: each world says there when it's ready (FEE-121).
+  const logcat = spawn('adb', ['logcat', '-T', '1', '-v', 'raw', '-s', 'ReactNativeJS:V'], { stdio: ['ignore', 'pipe', 'ignore'] });
+  const watch = watchReady(logcat.stdout);
+  const started = Date.now();
   // A Ctrl-C or kill stops the run after the picture in hand, and `finally` puts the device back.
   let interrupted = false;
   const stop = () => {
@@ -150,8 +167,9 @@ async function check(only: string[]) {
       for (const theme of THEMES) {
         if (interrupted) break;
         const name = `${world}-${theme}`;
-        const picture = await capture(world, theme, statusBar);
+        const { picture, ready } = await capture(world, theme, statusBar, watch);
         writeFileSync(join(LATEST, `${name}.png`), picture);
+        if (!ready) report.push({ name, verdict: `never ready: no ready line in ${READY_TIMEOUT / 1000} s; compared its last frame` });
         const approvedPath = join(APPROVED, `${name}.png`);
         if (!existsSync(approvedPath)) {
           report.push({ name, verdict: 'new: no approved picture' });
@@ -171,6 +189,8 @@ async function check(only: string[]) {
   } finally {
     process.off('SIGINT', stop);
     process.off('SIGTERM', stop);
+    watch.stop();
+    logcat.kill();
     restore();
   }
   if (interrupted) {
@@ -180,7 +200,8 @@ async function check(only: string[]) {
   }
 
   const total = worlds.length * THEMES.length;
-  console.log(`\n${total - report.length} of ${total} pictures match their approved picture.`);
+  const changed = new Set(report.map(({ name }) => name)).size;
+  console.log(`\n${total - changed} of ${total} pictures match their approved picture (${Math.round((Date.now() - started) / 1000)} s).`);
   for (const { name, verdict } of report) console.log(`  ${name}: ${verdict}`);
   if (report.length) {
     console.log(`\nDifferences (changed pixels in red): ${DIFF}/\nNew pictures: ${LATEST}/`);
