@@ -1,4 +1,4 @@
-import { notUpdatingReason } from '@/screens/not-updating-notice';
+import { notUpdatingReason } from '@/screens/not-updating-reason';
 import type { FetchFailure } from '../../../convex/lib/feed/validators';
 
 // Every reason a fetch can fail has its plain words (FEE-127): a reason added without them doesn't compile.
