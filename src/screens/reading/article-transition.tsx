@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { router, useIsFocused } from 'expo-router';
-import { useCallback, useEffect, useEffectEvent, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { StyleSheet, useWindowDimensions, View, type LayoutChangeEvent } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, type SharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
@@ -101,6 +101,8 @@ export function ArticleTransition({
   const [path, setPath] = useState<Path>(reduceMotion ? 'cut' : origin ? 'row' : 'axis');
   const [phase, setPhase] = useState<'waiting' | 'opening' | 'open' | 'closing'>(reduceMotion ? 'open' : 'waiting');
   const [flight, setFlight] = useState<Flight | undefined>();
+  // Whether the travelling picture is on screen yet: until it is, the row and the page keep their own.
+  const [flightShown, setFlightShown] = useState(false);
   const [rowShown, setRowShown] = useState(origin);
 
   // How to measure the page's lead image while it's mounted (`LeadSlot`).
@@ -126,15 +128,14 @@ export function ArticleTransition({
   // Opening waits, briefly, for the page to place its lead image, so the thumbnail knows where to land.
   const leadSettled = !hasLead || lead !== undefined;
   const finishOpening = () => {
-    flying.set(false);
     setFlight(undefined);
+    setFlightShown(false);
     setRowShown(undefined);
     setPhase('open');
   };
   const startOpening = useEffectEvent(() => {
     if (path === 'row' && origin?.thumb && lead) {
       setFlight({ thumb: origin.thumb, lead, read: origin.article.read });
-      flying.set(true);
     }
     setPhase('opening');
     progress.set(
@@ -160,6 +161,12 @@ export function ArticleTransition({
     return () => clearTimeout(timer);
   }, [waiting, pageSettled]);
 
+  // The lead shows again as its travelling copy goes. It hides only once the copy is on screen (`onDisplay`),
+  // so the picture is never missing for a frame while the copy loads.
+  useLayoutEffect(() => {
+    if (!flight) flying.set(false);
+  }, [flight, flying]);
+
   /** Back: into the row where it is now, else away on the axis; the navigator then drops the page at once. */
   const closeArticle = () => {
     if (path === 'cut') return goBack(id);
@@ -175,7 +182,7 @@ export function ArticleTransition({
       setRowShown(toRow);
       if (into.thumb && leadNow && isOnScreen(leadNow, screen)) {
         setFlight({ thumb: into.thumb, lead: leadNow, read });
-        flying.set(true);
+        setFlightShown(false);
       }
     }
     closing.set(true);
@@ -339,7 +346,7 @@ export function ArticleTransition({
             <ArticleRowContent
               article={rowShown.article}
               feedNamed={rowShown.feedNamed}
-              image={flight ? 'space' : 'show'}
+              image={flightShown ? 'space' : 'show'}
             />
           </Animated.View>
         ) : null}
@@ -351,6 +358,10 @@ export function ArticleTransition({
             accessible={false}
             contentFit="cover"
             recyclingKey={id}
+            onDisplay={() => {
+              flying.set(true);
+              setFlightShown(true);
+            }}
             style={StyleSheet.absoluteFill}
           />
         </Animated.View>
