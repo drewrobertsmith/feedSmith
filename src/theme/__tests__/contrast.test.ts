@@ -70,6 +70,15 @@ test.each(['dark', 'light'] as const)('background on Gold reads at 4.5:1, and a 
   expect(contrastRatio(theme.accent, theme.surface)).toBeGreaterThanOrEqual(3);
 });
 
+// FEE-126: a Feed that's not updating carries a warning glyph in its chip's label tone, notched into the page
+// colour on the chip's corner, so it reaches 3:1 on the page in both themes, chosen or not (Q14).
+test.each(['dark', 'light'] as const)('the not-updating badge reaches 3:1 on the page in %s', (scheme) => {
+  const theme = themes[scheme];
+  for (const tone of ['textMuted', 'accent'] as const) {
+    expect(contrastRatio(theme[tone], theme.background)).toBeGreaterThanOrEqual(3);
+  }
+});
+
 // Q14 (D26): a control is found by its label, which reads at 4.5:1 on its own face at every depth level
 // (FEE-74). Icons use the muted text colour, so they clear 3:1 too. Gold, the chosen label, on every face.
 describe.each(['dark', 'light'] as const)('depth in %s', (scheme) => {

@@ -2,7 +2,7 @@
 import { convexTest } from 'convex-test';
 import { describe, expect, test, vi } from 'vitest';
 
-import { api } from './_generated/api';
+import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import schema from './schema';
 
@@ -272,5 +272,44 @@ describe('icons', () => {
     const s = await setup([{ title: 'A', ago: HOUR }]);
     await s.t.run((ctx) => ctx.db.patch(s.feedIds[0], { siteUrl: 'https://f0.example.com/' }));
     expect((await s.a.query(api.feeds.chips, {}))[0].faviconUrl).toBe('https://f0.example.com/favicon.ico');
+  });
+});
+
+describe('a Feed that stops updating (FEE-126, Q7)', () => {
+  const chipOf = async (s: Awaited<ReturnType<typeof setup>>, id: Id<'feeds'>) =>
+    (await s.a.query(api.feeds.chips, {})).find((chip) => chip.id === id)!;
+
+  test('a working Feed reports nothing', async () => {
+    const s = await setup([{ title: 'The Verge', ago: HOUR }]);
+    expect((await chipOf(s, s.feedIds[0])).failing).toBeUndefined();
+  });
+
+  test('a failing Feed reports since when and why, never its address (Q9)', async () => {
+    const s = await setup([{ title: 'The Verge', ago: HOUR }]);
+    await s.t.mutation(internal.refresh.recordFailure, { feedId: s.feedIds[0], now: NOW, reason: 'timeout' });
+    const chip = await chipOf(s, s.feedIds[0]);
+    expect(chip.failing).toEqual({ since: NOW, reason: 'timeout' });
+    // The favicon is the site's; the Feed's own address never leaves the server.
+    expect(JSON.stringify(chip)).not.toContain('/feed');
+  });
+
+  test('repeated failures keep the first failing time and update the reason', async () => {
+    const s = await setup([{ title: 'The Verge', ago: HOUR }]);
+    await s.t.mutation(internal.refresh.recordFailure, { feedId: s.feedIds[0], now: NOW, reason: 'timeout' });
+    await s.t.mutation(internal.refresh.recordFailure, { feedId: s.feedIds[0], now: NOW + HOUR, reason: 'not-a-feed' });
+    expect((await chipOf(s, s.feedIds[0])).failing).toEqual({ since: NOW, reason: 'not-a-feed' });
+  });
+
+  test('a working fetch clears it', async () => {
+    const s = await setup([{ title: 'The Verge', ago: HOUR }]);
+    await s.t.mutation(internal.refresh.recordFailure, { feedId: s.feedIds[0], now: NOW, reason: 'unreachable' });
+    await s.t.mutation(internal.refresh.recordNotModified, { feedId: s.feedIds[0], now: NOW + HOUR });
+    expect((await chipOf(s, s.feedIds[0])).failing).toBeUndefined();
+  });
+
+  test('another User never sees it (Q10)', async () => {
+    const s = await setup([{ title: 'The Verge', ago: HOUR }]);
+    await s.t.mutation(internal.refresh.recordFailure, { feedId: s.feedIds[0], now: NOW, reason: 'timeout' });
+    expect(await s.b.query(api.feeds.chips, {})).toEqual([]);
   });
 });

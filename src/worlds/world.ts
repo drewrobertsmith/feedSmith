@@ -79,6 +79,8 @@ export type WorldSpec = {
   pull?: 'late' | 'early';
   /** Whether a pull-down refresh is under way. */
   refreshing?: boolean;
+  /** The Verge stops updating (FEE-126): failing for a `day` (its chip badged), or `recent`ly (not yet). */
+  failing?: 'day' | 'recent';
   /** The connection to the server (FEE-32): offline from the start; tests change it with the world's `setNetwork`. */
   network?: 'offline';
   /** The chosen Feed's chip, by id: All shows only its Articles (P5). */
@@ -143,9 +145,13 @@ const READING_FIXTURES = {
 /** A world's Feeds, and `arrive`, which brings its new Articles as a fetch would (FEE-102). */
 export type WorldFeeds = FeedsData & {
   arrive: () => void;
+  /** The failing Feed works again (FEE-126), as a working fetch would record. */
+  recover: () => void;
   /** Drops or restores the connection, as switching networks or airplane mode would (FEE-32). */
   setNetwork: (connection: Connection) => void;
 };
+
+const HOUR = 3_600_000;
 
 /** A world's Feeds and Articles: fixture data, and a log of what it's asked. */
 export function worldFeeds(
@@ -177,6 +183,14 @@ export function worldFeeds(
     addedChips = [...addedChips, chip];
     chipListeners.forEach((listener) => listener());
   };
+  // A world's failing Feed is The Verge, failing since a day and an hour ago, or an hour ago (FEE-126).
+  let failingSince: number | null = spec.failing === 'day' ? FIXTURE_NOW - 25 * HOUR : spec.failing === 'recent' ? FIXTURE_NOW - HOUR : null;
+  const recover = () => {
+    failingSince = null;
+    chipListeners.forEach((listener) => listener());
+  };
+  const withHealth = (chip: FeedChip): FeedChip =>
+    chip.id === 'f1' && failingSince !== null ? { ...chip, failing: { since: failingSince, reason: 'not-a-feed' } } : chip;
   const dropChip = (id: string) => {
     removedIds = new Set([...removedIds, id]);
     chipListeners.forEach((listener) => listener());
@@ -229,6 +243,7 @@ export function worldFeeds(
 
   return {
     arrive,
+    recover,
     setNetwork,
     useConnection: () => useSyncExternalStore(subscribeConnection, () => connection),
     useAll: (feedId) => {
@@ -249,9 +264,10 @@ export function worldFeeds(
     useChips: () => {
       const added = useSyncExternalStore(subscribeChips, () => addedChips);
       const removed = useSyncExternalStore(subscribeChips, () => removedIds);
+      useSyncExternalStore(subscribeChips, () => failingSince);
       if (feeds === 'loading') return { status: 'loading' };
       const chips = [...(feeds === 'none' ? [] : someChips), ...added];
-      return { status: 'ready', chips: chips.filter((chip) => !removed.has(chip.id)) };
+      return { status: 'ready', chips: chips.filter((chip) => !removed.has(chip.id)).map(withHealth) };
     },
     useRemoveFeed: () => async (id) => {
       if (spec.removes === 'fail') return 'failed';

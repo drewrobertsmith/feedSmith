@@ -5,9 +5,11 @@ import { FeedHttp, type Validators } from './http';
 import { parseFeed } from './parse';
 import { ServerLayer } from './server';
 import { articlesToStore } from './store';
-import type { AddFeedReason, StoredArticle } from './validators';
+import type { FetchFailure, StoredArticle } from './validators';
 
-export type FetchFailure = Exclude<AddFeedReason, 'no-feed-found'>;
+export type { FetchFailure };
+
+
 
 /** The one place a fetch's typed failure becomes the reason the app shows (T44). */
 export const REASONS = {
