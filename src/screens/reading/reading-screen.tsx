@@ -1,14 +1,15 @@
 import { router } from 'expo-router';
-import { useEffect, useEffectEvent } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import { Pressable, ScrollView, View, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/app-button';
 import { AppText } from '@/components/app-text';
 import { useSizeScale } from '@/environment';
-import { useArticle, useMarkRead, useOffline, type Block, type ReadingArticle } from '@/feeds/feeds-data';
+import { useArticle, useMarkRead, useOffline, type ArticleView, type Block, type ReadingArticle } from '@/feeds/feeds-data';
 import { byline, publishedDate } from '@/feeds/format';
 import { openLink } from '@/feeds/open-link';
+import { usePlaceKeeper } from '@/navigation/place-context';
 import { ArticleBlocks } from '@/screens/reading/article-blocks';
 import { useLeaveArticle } from '@/screens/reading/article-leave-context';
 import { ArticleTransition } from '@/screens/reading/article-transition';
@@ -181,6 +182,38 @@ function ArticleBody({ article }: { article: ReadingArticle }) {
  * text, and a plain end. Literata for everything the author wrote, Instrument Sans for what
  * the app says. The page itself never moves.
  */
+/**
+ * Your place in an Article (FEE-130, Q4): it's part of where you are while it's open, and the one you were reading
+ * when Android closed the app opens again where you left it. Its text arrives after the page opens, so the place
+ * is scrolled to once the page is tall enough; until then it starts there. One that's gone falls back to Feeds.
+ */
+function useArticlePlace(id: string, status: ArticleView['status']) {
+  const keeper = usePlaceKeeper();
+  const [startAt] = useState(() => keeper.restoredArticleOffset(id));
+  const scroller = useRef<ScrollViewInstance>(null);
+  const pending = useRef(startAt);
+  useEffect(() => {
+    keeper.update({ article: id, articleOffset: startAt });
+    return () => keeper.update({ article: undefined, articleOffset: 0 });
+  }, [keeper, id, startAt]);
+  useEffect(() => {
+    if (status === 'missing' && keeper.isRestoredArticle(id)) router.back();
+    if (status !== 'loading') keeper.articleShown();
+  }, [keeper, id, status]);
+  return {
+    startAt,
+    scroller,
+    // Kept in memory only; written when the app leaves the screen (Q21).
+    onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => keeper.update({ articleOffset: event.nativeEvent.contentOffset.y }),
+    onContentSizeChange: (_width: number, height: number) => {
+      if (pending.current > 0 && height > pending.current) {
+        scroller.current?.scrollTo({ y: pending.current, animated: false });
+        pending.current = 0;
+      }
+    },
+  };
+}
+
 export function ReadingScreen({ id }: { id: string }) {
   const insets = useSafeAreaInsets();
   const scale = useSizeScale();
@@ -193,6 +226,7 @@ export function ReadingScreen({ id }: { id: string }) {
   useEffect(() => {
     if (ready) markOpened();
   }, [ready, id]);
+  const { startAt, onScroll, onContentSizeChange, scroller } = useArticlePlace(id, view.status);
 
   if (view.status === 'missing') {
     // Settled at once: there's nothing more to wait for, and it opens and leaves like any page (FEE-115).
@@ -213,6 +247,12 @@ export function ReadingScreen({ id }: { id: string }) {
       ) : (
         <View className="flex-1 bg-background">
         <ScrollView
+          ref={scroller}
+          testID="reading-scroll"
+          contentOffset={{ x: 0, y: startAt }}
+          onScroll={onScroll}
+          scrollEventThrottle={100}
+          onContentSizeChange={onContentSizeChange}
           className="flex-1"
           contentContainerClassName="items-center px-edge"
           contentContainerStyle={{

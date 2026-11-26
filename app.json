@@ -92,7 +92,8 @@
           "organization": "mediated-reality",
           "project": "feedsmith"
         }
-      ]
+      ],
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true,

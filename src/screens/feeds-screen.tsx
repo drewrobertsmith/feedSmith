@@ -1,6 +1,6 @@
 import { LegendList, type LegendListRef } from '@legendapp/list/react-native';
 import { router } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, RefreshControl, ToastAndroid, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -14,6 +14,7 @@ import { useEnvironment } from '@/environment';
 import { useAll, useChips, useOffline, useRefresh, useRemoveFeed, type FeedChip } from '@/feeds/feeds-data';
 import { useNewArticles } from '@/feeds/use-new-articles';
 import { useShownRows } from '@/feeds/use-shown-rows';
+import { usePlaceKeeper } from '@/navigation/place-context';
 import { AccountButton } from '@/screens/account/account-sheet';
 import { AddFeedSheet } from '@/screens/add-feed-sheet';
 import { ChipRow } from '@/screens/chip-row';
@@ -65,7 +66,8 @@ const AT_TOP = spacing.related;
  * a link's value is untrusted, so anything but one of the User's chips means All (Q25).
  * Adding a Feed is a sheet over it (FEE-45); removing one is in its chip's menu (FEE-97). New Articles that
  * arrive while you're scrolled down wait above you, your place held, with a note to go to them (FEE-102).
- * `accountOpen`, `addOpen`, `menuFor` and `startAtRow` open the Account sheet, the add sheet or a chip's menu
+ * `startAtOffset` opens the list where you left it (FEE-130). `accountOpen`, `addOpen`, `menuFor` and `startAtRow`
+ * open the Account sheet, the add sheet or a chip's menu
  * at once, or start the list scrolled to a row, for the state gallery.
  */
 export function FeedsScreen({
@@ -74,12 +76,14 @@ export function FeedsScreen({
   addOpen = false,
   menuFor,
   startAtRow,
+  startAtOffset,
 }: {
   feed?: string;
   accountOpen?: boolean;
   addOpen?: boolean;
   menuFor?: string;
   startAtRow?: number;
+  startAtOffset?: number;
 }) {
   const insets = useSafeAreaInsets();
   const chipsView = useChips();
@@ -99,7 +103,7 @@ export function FeedsScreen({
   const rowsNameFeeds = order[shown.index] === '';
   // Scrolled down, new Articles wait above you, and the list holds your place (FEE-102); at the top they're in view.
   const list = useRef<LegendListRef>(null);
-  const [atTop, setAtTop] = useState(startAtRow === undefined);
+  const [atTop, setAtTop] = useState(startAtRow === undefined && startAtOffset === undefined);
   // Scrolling sets state only when it crosses the top, never on every frame (FEE-102).
   const atTopRef = useRef(atTop);
   const trackTop = (offset: number) => {
@@ -121,6 +125,11 @@ export function FeedsScreen({
   const empty = all.status === 'ready' && all.articles.length === 0;
 
   const select = (feedId: string | null) => router.setParams({ feed: feedId ?? undefined });
+  // The chip you're on is part of your place (FEE-130); a new chip starts its list at the top.
+  const keeper = usePlaceKeeper();
+  useEffect(() => {
+    keeper.update({ feed: selection ?? undefined });
+  }, [keeper, selection]);
   const [adding, setAdding] = useState(addOpen);
   const addFeed = () => setAdding(true);
   // A Feed added, or one already followed: the sheet closes on its chip (FEE-45, T22).
@@ -176,7 +185,13 @@ export function FeedsScreen({
           // Your place holds when Articles arrive above you; at the top they push in, in view (FEE-102).
           maintainVisibleContentPosition={{ data: !atTop }}
           initialScrollIndex={startAtRow}
-          onScroll={(event) => trackTop(event.nativeEvent.contentOffset.y)}
+          initialScrollOffset={startAtOffset}
+          onScroll={(event) => {
+            const offset = event.nativeEvent.contentOffset.y;
+            trackTop(offset);
+            // Kept in memory only; written when the app leaves the screen (FEE-130, Q21).
+            keeper.update({ listOffset: offset });
+          }}
           keyExtractor={(article) => article.id}
           renderItem={({ item }) => (
             <SlideRow>

@@ -74,3 +74,6 @@ jest.mock('@/components/native-text-field', () => {
     ),
   };
 });
+
+// expo-sqlite's key-value store is native; tests keep places in memory, and the app's own store reads nothing (FEE-130).
+jest.mock('expo-sqlite/kv-store', () => ({ Storage: { getItemSync: () => null, setItemSync: () => {} } }));

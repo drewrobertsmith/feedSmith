@@ -13,7 +13,7 @@ import type { World } from '@/worlds/world';
 export function renderWorld(world: World, initialUrl: string = world.initialUrl) {
   return renderRouter(
     {
-      _layout: () => <AppRoot environment={world.environment} auth={world.auth} feeds={world.feeds} />,
+      _layout: () => <AppRoot environment={world.environment} auth={world.auth} feeds={world.feeds} place={world.place} />,
       index: FeedsRoute,
       'article/[id]': ArticleRoute,
       'sign-in': SignInRoute,
