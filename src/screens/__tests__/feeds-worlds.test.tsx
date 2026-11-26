@@ -1,8 +1,9 @@
 import { faceOf } from '../../../test/depth';
 import { act, fireEvent, userEvent, within } from '@testing-library/react-native';
+import { router } from 'expo-router';
 import { screen } from 'expo-router/testing-library';
 import { useState } from 'react';
-import { AccessibilityInfo, Alert, Animated, ScrollView, StyleSheet, ToastAndroid } from 'react-native';
+import { AccessibilityInfo, Alert, Animated, AppState, ScrollView, StyleSheet, ToastAndroid } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { Uniwind } from 'uniwind';
 
@@ -804,6 +805,57 @@ describe('the "Updated" line moves only where it changes (FEE-104)', () => {
     await screen.findAllByRole('link');
     expect(within(screen.getByTestId('updated-line')).getByText('Updating…')).toBeOnTheScreen();
     expect(screen.getByTestId('updated-line')).toHaveAccessibleName('Updating…');
+  });
+});
+
+describe('your place comes back after Android closes the app (FEE-130, Q4)', () => {
+  const ARTICLE = FIXTURE_ROWS[0];
+  const list = () => screen.getByTestId('all-list');
+
+  test('Feeds opens on the chip and list position you left', async () => {
+    await open({ colorScheme: 'dark', feeds: 'some', place: { feed: 'f1', listOffset: 600, articleOffset: 0 } });
+    expect(await screen.findByRole('tab', { name: 'The Verge', selected: true })).toBeOnTheScreen();
+    // Legend List hands its starting place to the scroll view, so the list opens there on its first frame.
+    expect(list().props.contentOffset).toEqual({ x: 0, y: 600 });
+  });
+
+  test('the Article you were reading opens again over Feeds, at your place, and Back goes to Feeds', async () => {
+    await open({ colorScheme: 'dark', feeds: 'some', place: { article: ARTICLE.id, listOffset: 0, articleOffset: 900 } });
+    expect(await screen.findByRole('heading', { name: ARTICLE.title })).toBeOnTheScreen();
+    expect(screen.getByTestId('reading-scroll').props.contentOffset).toEqual({ x: 0, y: 900 });
+    await act(async () => router.back());
+    expect(await screen.findByRole('heading', { name: 'Feeds' })).toBeOnTheScreen();
+  });
+
+  test('a chip that is no longer yours opens All (Q25)', async () => {
+    await open({ colorScheme: 'dark', feeds: 'some', place: { feed: 'gone', listOffset: 0, articleOffset: 0 } });
+    expect(await screen.findByRole('tab', { name: 'All', selected: true })).toBeOnTheScreen();
+  });
+
+  test('an Article that is gone falls back to Feeds, calmly', async () => {
+    await open({ colorScheme: 'dark', feeds: 'some', article: 'missing', place: { article: 'gone', listOffset: 0, articleOffset: 0 } });
+    expect(await screen.findByRole('heading', { name: 'Feeds' })).toBeOnTheScreen();
+    expect(screen.queryByText('This Article isn’t available.')).not.toBeOnTheScreen();
+  });
+
+  test('garbage on the phone opens All at the top (Q25)', async () => {
+    await open({ colorScheme: 'dark', feeds: 'some', place: '{"feed": 42, "listOffset": "far"' });
+    expect(await screen.findByRole('tab', { name: 'All', selected: true })).toBeOnTheScreen();
+    expect(list().props.contentOffset?.y ?? 0).toBe(0);
+  });
+
+  test('where you are is written when the app leaves the screen, and not before (Q21)', async () => {
+    // The test setup's AppState is a mock that remembers its listeners: this world's are the ones added from here.
+    const calls = jest.mocked(AppState.addEventListener).mock.calls;
+    const before = calls.length;
+    await open({ colorScheme: 'dark', feeds: 'some' });
+    const emitAppState = (state: string) =>
+      calls.slice(before).forEach(([event, listener]) => event === 'change' && (listener as (state: string) => void)(state));
+    await userEvent.press(await screen.findByRole('tab', { name: 'The Verge' }));
+    await act(async () => fireEvent.scroll(list(), { nativeEvent: { contentOffset: { x: 0, y: 400 }, contentSize: { height: 2000, width: 412 }, layoutMeasurement: { height: 915, width: 412 } } }));
+    expect(world!.place.writes).toBe(0);
+    await act(async () => emitAppState('background'));
+    expect(JSON.parse(world!.place.read()!)).toEqual({ feed: 'f1', listOffset: 400, articleOffset: 0 });
   });
 });
 

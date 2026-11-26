@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router';
+import { useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { DarkTheme, DefaultTheme, ThemeProvider, type Theme } from 'expo-router/react-navigation';
 import { StatusBar } from 'expo-status-bar';
@@ -8,6 +9,9 @@ import { ConvexAuth } from '@/auth/convex-auth';
 import { EnvironmentProvider, useEnvironment, type Environment } from '@/environment';
 import { ConvexFeeds } from '@/feeds/convex-feeds';
 import { FeedsContext, type FeedsData } from '@/feeds/feeds-data';
+import { kvPlaceStore } from '@/navigation/kv-place-store';
+import { memoryPlaceStore, type PlaceStore } from '@/navigation/place';
+import { PlaceProvider } from '@/navigation/place-context';
 import { themes, type ThemeName } from '@/theme/tokens';
 
 function navigationTheme(scheme: ThemeName): Theme {
@@ -61,12 +65,27 @@ function ThemedStack() {
  * The app's providers and root stack. A world passes its environment, auth and Feeds; the
  * app uses the phone's environment, Convex Auth and Convex.
  */
-export function AppRoot({ environment, auth, feeds }: { environment?: Environment; auth?: Auth; feeds?: FeedsData }) {
+export function AppRoot({
+  environment,
+  auth,
+  feeds,
+  place,
+}: {
+  environment?: Environment;
+  auth?: Auth;
+  feeds?: FeedsData;
+  /** Where your place is kept (FEE-130): a world's in memory; the app's on the phone. */
+  place?: PlaceStore;
+}) {
+  // A world without a place of its own starts fresh; the app keeps yours on the phone.
+  const [store] = useState(() => place ?? (auth && feeds ? memoryPlaceStore() : kvPlaceStore));
   const stack = (
     // Gesture Handler's root: nothing of ours drags or swipes since FEE-94/95, but navigation may.
     <GestureHandlerRootView style={{ flex: 1 }}>
       <EnvironmentProvider environment={environment}>
-        <ThemedStack />
+        <PlaceProvider store={store}>
+          <ThemedStack />
+        </PlaceProvider>
       </EnvironmentProvider>
     </GestureHandlerRootView>
   );

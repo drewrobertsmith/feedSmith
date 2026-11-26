@@ -5,6 +5,7 @@ import type { Account, Auth } from '@/auth/auth-context';
 import type { SignInView } from '@/auth/sign-in-outcome';
 import type { Environment } from '@/environment';
 import type { Connection } from '@/feeds/connection';
+import { memoryPlaceStore, type Place } from '@/navigation/place';
 import { usePull } from '@/feeds/use-pull';
 import { isAddress, type AddFeedReason, type AddFeedView, type AddOutcome, type ArticleRow, type ArticleView, type FeedChip, type FeedsData } from '@/feeds/feeds-data';
 import {
@@ -85,6 +86,8 @@ export type WorldSpec = {
    */
   failing?: 'day' | 'recent';
   failingSite?: 'none';
+  /** The place the phone held when the app started (FEE-130): as stored, or any text, to test what's untrusted. */
+  place?: Place | string;
   /** The connection to the server (FEE-32): offline from the start; tests change it with the world's `setNetwork`. */
   network?: 'offline';
   /** The chosen Feed's chip, by id: All shows only its Articles (P5). */
@@ -342,6 +345,8 @@ export type World = {
   /** What `<AppRoot feeds>` takes: fixture Feeds and Articles that record what they're asked. */
   feeds: WorldFeeds;
   feedsLog: FeedsLog;
+  /** What `<AppRoot place>` takes: the phone's store, holding the spec's place, counting its writes (FEE-130). */
+  place: ReturnType<typeof memoryPlaceStore>;
   /** Where the router starts. */
   initialUrl: '/' | '/sign-in' | `/article/${string}` | `/?feed=${string}`;
   /** Puts back what the world changed: the theme follows the phone again. */
@@ -412,6 +417,7 @@ export function createWorld(spec: WorldSpec): World {
     signInLog,
     feeds: worldFeeds(spec, feedsLog),
     feedsLog,
+    place: memoryPlaceStore(spec.place === undefined ? null : typeof spec.place === 'string' ? spec.place : JSON.stringify(spec.place)),
     initialUrl: !signedIn
       ? '/sign-in'
       : spec.feed && (spec.section ?? 'feeds') === 'feeds'
