@@ -9,6 +9,7 @@ import { AppText } from '@/components/app-text';
 import { SharedTitleScreen } from '@/components/shared-title';
 import { ChipSwitch, SlideRow } from '@/components/chip-switch';
 import { ArticleRow } from '@/components/article-row';
+import { ArrivalProvider, ArrivingRow, useArrival } from '@/components/arriving-row';
 import { TopBar, TopBarIcon } from '@/components/top-bar';
 import { useEnvironment, useMinuteClock } from '@/environment';
 import { useAll, useChips, useLastUpdated, useRefresh, useRemoveFeed, type FeedChip } from '@/feeds/feeds-data';
@@ -107,6 +108,8 @@ export function FeedsScreen({
     setAtTop(top);
   };
   const newArticles = useNewArticles(order[shown.index] ?? '', shown.articles, atTop);
+  const shownIds = shown.articles.map((article) => article.id);
+  const arrival = useArrival(list, shownIds, newArticles.arrived);
   const goToTop = () => {
     newArticles.clear();
     list.current?.scrollToOffset({ offset: 0, animated: !reduceMotion });
@@ -172,6 +175,7 @@ export function FeedsScreen({
     <SharedTitleScreen>
       <View className="flex-1 bg-background">
       <ChipSwitch index={shown.index}>
+        <ArrivalProvider value={arrival}>
         <LegendList
           ref={list}
           testID="all-list"
@@ -183,7 +187,9 @@ export function FeedsScreen({
           keyExtractor={(article) => article.id}
           renderItem={({ item }) => (
             <SlideRow>
-              <ArticleRow article={item} feedNamed={rowsNameFeeds} />
+              <ArrivingRow id={item.id}>
+                <ArticleRow article={item} feedNamed={rowsNameFeeds} />
+              </ArrivingRow>
             </SlideRow>
           )}
           estimatedItemSize={ESTIMATED_ROW}
@@ -202,6 +208,7 @@ export function FeedsScreen({
           className="flex-1 bg-background"
           contentContainerStyle={{ paddingBottom: insets.bottom + spacing.section }}
         />
+        </ArrivalProvider>
       </ChipSwitch>
       {newArticles.waiting ? <NewArticlesNote onPress={goToTop} /> : null}
       {addSheet}

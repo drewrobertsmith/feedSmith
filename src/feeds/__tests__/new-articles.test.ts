@@ -58,3 +58,25 @@ describe('what counts as new Articles (FEE-102)', () => {
     expect(Object.values(waiting).filter((value) => typeof value === 'number')).toEqual([]);
   });
 });
+
+describe('which Articles arrive in view, at the top (FEE-104)', () => {
+  test('at the top, the new Articles are the ones arriving, newest first as listed', () => {
+    expect(update(shown(['a1', 'a2']), 'all', ['n1', 'n2', 'a1', 'a2'], true).arrived).toEqual(['n1', 'n2']);
+  });
+
+  test('scrolled down, nothing arrives in view: they wait above, with the note', () => {
+    expect(update(shown(['a1']), 'all', ['n1', 'a1'], false).arrived).toEqual([]);
+  });
+
+  test('a first load, a chip switch and a change to existing rows bring nothing in', () => {
+    expect(update(null, 'all', ['a1'], true).arrived).toEqual([]);
+    expect(update(update(null, 'all', [], true), 'all', ['a1'], true).arrived).toEqual([]);
+    expect(update(shown(['a1']), 'f2', ['c1'], true).arrived).toEqual([]);
+    expect(update(shown(['a1']), 'all', ['a1'], true).arrived).toEqual([]);
+  });
+
+  test('the next update forgets what last arrived', () => {
+    const arrived = update(shown(['a1']), 'all', ['n1', 'a1'], true);
+    expect(update(arrived, 'all', ['n1', 'a1'], true).arrived).toEqual([]);
+  });
+});

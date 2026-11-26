@@ -23,4 +23,10 @@ export const motion = {
    * when you reach them.
    */
   newArticlesNote: { distance: 8, duration: 200, exit: 150, easing: [0.05, 0.7, 0.1, 1] },
+  /**
+   * New Articles arriving at the top of Feeds (FEE-104): the rows below ease down together on Material's
+   * emphasized curve, then, once the space is open, the new rows fade in where they live, so nothing ever
+   * shares a place.
+   */
+  rowsArrive: { duration: 300, easing: [0.2, 0, 0, 1], fadeIn: 150 },
 } as const;
