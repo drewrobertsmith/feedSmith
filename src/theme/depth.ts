@@ -26,6 +26,13 @@ type Layers = {
   shadow: { y: number; blur: number; alpha: number; inset?: true };
 };
 
+/**
+ * The shapes a face with depth takes (FEE-81): a pill or circle for what's pressed in passing (chips,
+ * buttons), a card's `rounded-lg` corners for what holds a few lines (a site's feeds to choose from).
+ */
+export const SHAPE_RADIUS = { round: 9999, card: 8 } as const;
+export type DepthShape = keyof typeof SHAPE_RADIUS;
+
 /** What a shadow is made of: black on Midnight, Midnight on cream. */
 const SHADOW: Record<ThemeName, string> = { dark: palette.black, light: palette.midnight };
 /** Material 3's pressed-state strength, for the ripple. */

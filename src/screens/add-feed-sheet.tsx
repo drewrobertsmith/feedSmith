@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, ToastAndroid, useWindowDimensions, View } from 'react-native';
+import { ScrollView, ToastAndroid, useWindowDimensions, View } from 'react-native';
 
 import { AppButton } from '@/components/app-button';
 import { AppText } from '@/components/app-text';
 import { NativeSheet } from '@/components/native-sheet';
 import { NativeTextField } from '@/components/native-text-field';
+import { DepthPressable } from '@/components/depth-pressable';
 import { useAddFeed, type AddFeedReason, type FeedChoice } from '@/feeds/feeds-data';
 
 /** What went wrong, and what to do next. */
@@ -21,11 +22,14 @@ const ERRORS: Record<AddFeedReason, string> = {
 function Choice({ choice, onChoose }: { choice: FeedChoice; onChoose: (url: string) => void }) {
   const host = new URL(choice.url).hostname.replace(/^www\./, '');
   return (
-    <Pressable
+    // A choice you press: a soft card on the sheet, sinking as it's pressed (FEE-81, D27).
+    <DepthPressable
+      level="soft"
+      shape="card"
       role="button"
       aria-label={`${choice.title}, ${host}`}
       onPress={() => onChoose(choice.url)}
-      className="gap-inside rounded-lg border border-text-muted px-group py-related"
+      className="gap-inside px-group py-related"
     >
       <AppText variant="reading" className="text-text" accessible={false}>
         {choice.title}
@@ -33,7 +37,7 @@ function Choice({ choice, onChoose }: { choice: FeedChoice; onChoose: (url: stri
       <AppText variant="label" className="text-text-muted" accessible={false}>
         {host}
       </AppText>
-    </Pressable>
+    </DepthPressable>
   );
 }
 
@@ -80,20 +84,16 @@ export function AddFeedSheet({ open, onClose, onFeed }: { open: boolean; onClose
           <AppText variant="title" className="text-text">
             Add a Feed
           </AppText>
-          <View className="gap-related">
-            <AppText variant="label" className="text-text-muted" accessible={false}>
-              Website or feed URL
-            </AppText>
-            <NativeTextField
-              key={adds}
-              label="Website or feed URL"
-              placeholder="theverge.com"
-              defaultValue={typed}
-              onChangeText={setTyped}
-              onSubmitEditing={() => void submit()}
-              editable={!adding}
-            />
-          </View>
+          {/* Material's filled field, its label floating inside it (FEE-81). */}
+          <NativeTextField
+            key={adds}
+            label="Website or feed URL"
+            placeholder="theverge.com"
+            defaultValue={typed}
+            onChangeText={setTyped}
+            onSubmitEditing={() => void submit()}
+            editable={!adding}
+          />
           {error ? (
             <AppText variant="label" role="alert" className="text-text">
               {error}

@@ -487,7 +487,10 @@ describe('Add a Feed, in its sheet over Feeds (FEE-45)', () => {
     }
     if (shows.error) expect(screen.getByRole('alert')).toHaveTextContent(shows.error);
     else expect(screen.queryByRole('alert')).not.toBeOnTheScreen();
-    expect(screen.queryAllByRole('button', { name: /, theverge\.com$/ })).toHaveLength(shows.choices);
+    const choices = screen.queryAllByRole('button', { name: /, theverge\.com$/ });
+    expect(choices).toHaveLength(shows.choices);
+    // FEE-81: a site's feeds stand on the sheet as soft cards, not outlined. The field is Material's own (D44).
+    for (const choice of choices) expect(faceOf(choice)).toMatchObject(depthStyle(shows.theme, 'soft'));
     // One field, for an address: it never asks for a name (FEE-96).
     expect(screen.queryByText(/name/i)).not.toBeOnTheScreen();
     expect(Uniwind.currentTheme).toBe(shows.theme);
