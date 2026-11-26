@@ -8,10 +8,12 @@ import AuthReturnRoute from '@/app/auth';
 import GalleryRoute from '@/app/gallery';
 import SignInRoute from '@/app/sign-in';
 import { AppRoot } from '@/navigation/app-root';
+import { READY_PREFIX, readyLine } from '@/screens/gallery/capture-ready';
 import { GALLERY } from '@/screens/gallery/registry';
 import * as catalog from '@/worlds/catalog';
-import { FIXTURE_ARTICLE, FIXTURE_UNEXTRACTED_ARTICLE } from '@/worlds/fixtures';
+import { FIXTURE_ARRIVED_ROWS, FIXTURE_ARTICLE, FIXTURE_UNEXTRACTED_ARTICLE } from '@/worlds/fixtures';
 import { worldAuth, worldFeeds } from '@/worlds/world';
+import { layOutList } from '../../../../test/world-router';
 
 const routes = {
   _layout: () => <AppRoot auth={worldAuth({ colorScheme: 'dark' })} feeds={worldFeeds({ colorScheme: 'dark' })} />,
@@ -92,6 +94,47 @@ test('capture mode shows only the world, filling the screen, for the visual chec
   expect(screen.queryByRole('heading', { name: 'State gallery' })).not.toBeOnTheScreen();
   expect(screen.queryByRole('radiogroup', { name: 'Theme' })).not.toBeOnTheScreen();
   expect(Uniwind.currentTheme).toBe('light');
+});
+
+describe('capture mode says when its world is ready to be captured (FEE-121)', () => {
+  let log: jest.SpyInstance;
+  beforeEach(() => {
+    jest.useFakeTimers();
+    log = jest.spyOn(console, 'log').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    log.mockRestore();
+    jest.useRealTimers();
+  });
+  const readyLines = () => log.mock.calls.map(([line]) => line).filter((line) => String(line).startsWith(READY_PREFIX));
+
+  test('an ordinary world says so once, by its shot, world and theme, after it shows', async () => {
+    await renderRouter(routes, { initialUrl: '/gallery?world=reading-dark&theme=light&capture=1&shot=17' });
+    expect(await screen.findByRole('heading', { name: FIXTURE_ARTICLE.title })).toBeOnTheScreen();
+    await act(async () => jest.advanceTimersByTime(100));
+
+    expect(readyLines()).toEqual([readyLine('17', 'reading-dark-light')]);
+  });
+
+  test('a world whose new Articles arrive says so only once they are on screen', async () => {
+    await renderRouter(routes, { initialUrl: '/gallery?world=arrive-top&theme=dark&capture=1&shot=3' });
+    await act(async () => jest.advanceTimersByTime(50));
+    await layOutList('all-list');
+    expect(readyLines()).toEqual([]);
+    expect(screen.queryByText(FIXTURE_ARRIVED_ROWS[0].title)).not.toBeOnTheScreen();
+
+    await act(async () => jest.advanceTimersByTime(500));
+    await layOutList('all-list');
+    expect(screen.getByText(FIXTURE_ARRIVED_ROWS[0].title)).toBeOnTheScreen();
+    expect(readyLines()).toEqual([readyLine('3', 'arrive-top-dark')]);
+  });
+
+  test('a shot that is not a plain number, or no capture, says nothing (Q25)', async () => {
+    await renderRouter(routes, { initialUrl: `/gallery?world=reading-dark&capture=1&shot=${encodeURIComponent('1; rm -rf')}` });
+    await screen.findByRole('heading', { name: FIXTURE_ARTICLE.title });
+    await act(async () => jest.advanceTimersByTime(500));
+    expect(readyLines()).toEqual([]);
+  });
 });
 
 test('every world in the catalog is in the gallery, once, so the visual check walks them all', () => {

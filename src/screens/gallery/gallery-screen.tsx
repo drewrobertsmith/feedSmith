@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText } from '@/components/app-text';
 import { AuthContext } from '@/auth/auth-context';
 import { EnvironmentProvider } from '@/environment';
+import { isShot, readyLine } from '@/screens/gallery/capture-ready';
 import { GALLERY, type GalleryEntry } from '@/screens/gallery/registry';
 import { spacing } from '@/theme/spacing';
 import type { ThemeName } from '@/theme/tokens';
@@ -42,19 +43,35 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 /** How long after a world opens its new Articles arrive (FEE-102). */
 const ARRIVAL_DELAY = 300;
 
-/** Applies the world for as long as it's shown, then hands the theme back to the phone. */
-function WorldPreview({ entry, world, theme }: { entry: GalleryEntry; world: CatalogWorld; theme: ThemeName }) {
+/**
+ * Applies the world for as long as it's shown, then hands the theme back to the phone. In capture mode
+ * (`shot`), it tells the visual check when the world is ready (FEE-121): once its new Articles, if it has
+ * any, are on screen, and two frames have drawn them.
+ */
+function WorldPreview({ entry, world, theme, shot }: { entry: GalleryEntry; world: CatalogWorld; theme: ThemeName; shot?: string }) {
   const spec = { ...world.spec, colorScheme: theme };
   // `world` comes from the catalog, so it's stable while it stays selected.
   useEffect(() => createWorld({ ...world.spec, colorScheme: theme }).dispose, [world, theme]);
   // One world's Feeds for as long as it's shown: removing a Feed changes it, and it keeps the change (FEE-97).
   const [feeds] = useState(() => worldFeeds(spec));
-  // A world whose new Articles arrive does so just after it opens, well before the visual check's second look (FEE-102).
+  // A world whose new Articles arrive does so just after it opens (FEE-102); capture mode says ready only after.
+  const [arrived, setArrived] = useState(world.spec.arrivals !== 'later');
   useEffect(() => {
     if (world.spec.arrivals !== 'later') return;
-    const timer = setTimeout(feeds.arrive, ARRIVAL_DELAY);
+    const timer = setTimeout(() => {
+      feeds.arrive();
+      setArrived(true);
+    }, ARRIVAL_DELAY);
     return () => clearTimeout(timer);
   }, [world, feeds]);
+  useEffect(() => {
+    if (shot === undefined || !arrived) return;
+    let frame = requestAnimationFrame(() => {
+      // The visual check reads this line from logcat (FEE-121).
+      frame = requestAnimationFrame(() => console.log(readyLine(shot, `${world.id}-${theme}`)));
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [shot, arrived, world, theme]);
   return (
     <AuthContext value={worldAuth(spec)}>
       <FeedsContext value={feeds}>
@@ -77,8 +94,8 @@ function Capture({ children }: { children: ReactNode }) {
 export function GalleryScreen() {
   const insets = useSafeAreaInsets();
   // The link is the single source of truth, so `feedsmith://gallery?world=…&theme=…`
-  // switches an open gallery too. `capture=1` shows the world alone, filling the screen, for the visual check (FEE-70).
-  const params = useLocalSearchParams<{ world?: string; theme?: string; capture?: string }>();
+  // switches an open gallery too. `capture=1` shows the world alone, filling the screen, for the visual check (FEE-70); `shot` numbers that capture (FEE-121).
+  const params = useLocalSearchParams<{ world?: string; theme?: string; capture?: string; shot?: string }>();
   const selected = ALL.find(({ world }) => world.id === params.world) ?? ALL[0];
   // Link parameters are untrusted (Q25): anything but a known theme means the world's own.
   const theme = params.theme === 'dark' || params.theme === 'light' ? params.theme : selected.world.spec.colorScheme;
@@ -86,7 +103,14 @@ export function GalleryScreen() {
   if (params.capture === '1') {
     return (
       <Capture>
-        <WorldPreview key={`${selected.world.id}-${theme}`} entry={selected.entry} world={selected.world} theme={theme} />
+        {/* Keyed by the shot too, so capturing the same world again starts it fresh and says ready again. */}
+        <WorldPreview
+          key={`${selected.world.id}-${theme}-${params.shot}`}
+          entry={selected.entry}
+          world={selected.world}
+          theme={theme}
+          shot={isShot(params.shot) ? params.shot : undefined}
+        />
       </Capture>
     );
   }
