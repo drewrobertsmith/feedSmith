@@ -22,8 +22,7 @@ export function TopBar({
   trailing,
 }: {
   title: string;
-  /** One line; text, or text in parts (the "Updated" line, FEE-103). */
-  summary?: ReactNode;
+  summary?: string;
   action?: ReactNode;
   trailing?: ReactNode;
 }) {

@@ -1,7 +1,7 @@
 import { LegendList, type LegendListRef } from '@legendapp/list/react-native';
 import { router } from 'expo-router';
-import { useRef, useState, type ReactNode } from 'react';
-import { Alert, RefreshControl, Text, ToastAndroid, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Alert, RefreshControl, ToastAndroid, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/app-button';
@@ -24,21 +24,15 @@ import { themes } from '@/theme/tokens';
 
 /**
  * The line under the Feeds title (FEE-47): how fresh All is, so you know whether pulling down is
- * worth it. Information, not a count (P7). Nothing until there's something to say. Drawn in parts, so
- * only what changes changes: "Updat" stays, then "ing…" or "ed", then the time (FEE-103).
+ * worth it. Information, not a count (P7). Nothing until there's something to say. "Updating…" lasts until
+ * a pull's results are on screen (FEE-103).
  */
-function useUpdatedLine(refreshing: boolean): ReactNode {
+function useUpdatedLine(refreshing: boolean): string | undefined {
   const lastUpdated = useLastUpdated();
   const now = useMinuteClock();
   const parts = updatedLine(refreshing, lastUpdated.status === 'ready' ? lastUpdated.at : null, now);
-  if (!parts) return undefined;
-  return (
-    <>
-      <Text>{parts.still}</Text>
-      <Text>{parts.change}</Text>
-      {parts.time ? <Text>{parts.time}</Text> : null}
-    </>
-  );
+  // One span, so the line keeps its kerning; FEE-104 splits it where only part of it moves (owner's call).
+  return parts && parts.still + parts.change + parts.time;
 }
 
 /**
