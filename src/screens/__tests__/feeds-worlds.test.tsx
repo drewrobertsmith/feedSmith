@@ -767,6 +767,34 @@ describe('the "Updated" line moves only where it changes (FEE-104)', () => {
     expect(screen.getByTestId('updated-line')).toHaveAccessibleName('Updated just now');
   });
 
+  test('a minute passing changes only the line: the Feeds screen around it does not render again (FEE-106)', async () => {
+    jest.useFakeTimers();
+    try {
+      world = createWorld({ colorScheme: 'dark', feeds: 'some' });
+      let time = FIXTURE_NOW;
+      world.environment.now = () => time;
+      // Only the Feeds screen reads the pull, so its reads count the screen's renders.
+      const read = world.feeds.useRefresh;
+      let screenRenders = 0;
+      world.feeds.useRefresh = () => {
+        screenRenders += 1;
+        return read();
+      };
+      await renderWorld(world);
+      await layOutList('all-list');
+      await screen.findAllByRole('link');
+      expect(screen.getByTestId('updated-line')).toHaveAccessibleName('Updated 5 min ago');
+
+      const before = screenRenders;
+      time += 60_000;
+      await act(async () => jest.advanceTimersByTime(60_000));
+      expect(screen.getByTestId('updated-line')).toHaveAccessibleName('Updated 6 min ago');
+      expect(screenRenders).toBe(before);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   test('while updating, the line is the one word "Updating…"', async () => {
     await open({ colorScheme: 'light', feeds: 'some', refreshing: true });
     await screen.findAllByRole('link');
