@@ -2,7 +2,7 @@ import { createContext, use } from 'react';
 
 import { useSaysOffline, type Connection } from '@/feeds/connection';
 import type { Block, OmittedKind, Span } from '../../convex/lib/feed/blocks';
-import type { AddFeedReason, ReadingPage } from '../../convex/lib/feed/validators';
+import type { AddFeedReason, FetchFailure, ReadingPage } from '../../convex/lib/feed/validators';
 
 export type { AddFeedReason, Block, OmittedKind, Span };
 export { isAddress } from '../../convex/lib/feed/typed';
@@ -54,7 +54,13 @@ export type AllView = { status: 'loading' } | { status: 'ready'; articles: Artic
 export type LastUpdatedView = { status: 'loading' } | { status: 'ready'; at: number | null };
 
 /** One Feed's chip (P5, P9). Never carries a feed URL (Q9). */
-export type FeedChip = { id: string; title: string; faviconUrl?: string };
+export type FeedChip = {
+  id: string;
+  title: string;
+  faviconUrl?: string;
+  /** Since when it has failed every try, and why (FEE-126). Never its address (Q9). */
+  failing?: { since: number; reason: FetchFailure };
+};
 export type ChipsView = { status: 'loading' } | { status: 'ready'; chips: FeedChip[] };
 /**
  * Removing a Feed and its Articles (T23): `ok` once it's gone (or already was); `failed` when it didn't

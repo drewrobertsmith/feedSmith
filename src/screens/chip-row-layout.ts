@@ -57,3 +57,11 @@ export function chipSettle(reduceMotion: boolean): { duration: number; easing: r
   const { duration, easing } = motion.chipSelect;
   return { duration: reduceMotion ? 0 : duration, easing };
 }
+
+/** How long a Feed must fail every try before its chip says it's not updating (FEE-126): a passing blip says nothing. */
+export const NOT_UPDATING_AFTER = 24 * 3_600_000;
+
+/** Whether a Feed's chip says it's not updating (FEE-126): it has failed every try for a day, by the app's own clock. */
+export function notUpdating(chip: { failing?: { since: number } }, now: number): boolean {
+  return chip.failing !== undefined && now - chip.failing.since >= NOT_UPDATING_AFTER;
+}

@@ -2,17 +2,21 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, View, type LayoutChangeEvent, type ScrollViewInstance } from 'react-native';
 import Reanimated, { cubicBezier } from 'react-native-reanimated';
 
+import { AppSymbol } from '@/components/app-symbol';
 import { DepthPressable } from '@/components/depth-pressable';
 import { FeedIcon } from '@/components/feed-icon';
 import { NativeMenu } from '@/components/native-menu';
-import { useEnvironment } from '@/environment';
+import { useEnvironment, useMinuteClock, useSizeScale } from '@/environment';
 import type { FeedChip } from '@/feeds/feeds-data';
-import { chipLabel, chipSettle, chipTone, fadeRanges, revealOffset, transparent, type ChipTone } from '@/screens/chip-row-layout';
+import { chipLabel, chipSettle, chipTone, fadeRanges, notUpdating, revealOffset, transparent, type ChipTone } from '@/screens/chip-row-layout';
 import { typeScale } from '@/theme/type';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
 
 const ICON = 16;
+/** The not-updating badge: its glyph, and the notch of page colour it sits in on the chip's corner (FEE-126). */
+const BADGE = 16;
+const NOTCH = 24;
 /** How wide the fade is where the row runs off-screen (FEE-44). */
 const FADE = spacing.section;
 
@@ -29,6 +33,7 @@ function Chip({
   onLayout,
   onLongPress,
   remove,
+  notUpdating: failing = false,
 }: {
   accessibleName: string;
   selected: boolean;
@@ -37,6 +42,8 @@ function Chip({
   onLayout?: (event: LayoutChangeEvent) => void;
   onLongPress?: () => void;
   remove?: { label: string; onRemove: () => void };
+  /** Its Feed has failed every try for a day (FEE-126): a badge on its corner, and its name says so. */
+  notUpdating?: boolean;
 }) {
   const settle = useChipSettle();
   return (
@@ -45,7 +52,7 @@ function Chip({
         level={selected ? 'raised' : 'soft'}
         settle={settle}
         role="tab"
-        aria-label={accessibleName}
+        aria-label={failing ? `${accessibleName}, not updating` : accessibleName}
         aria-selected={selected}
         onPress={onPress}
         onLongPress={onLongPress}
@@ -57,6 +64,28 @@ function Chip({
       >
         {children}
       </DepthPressable>
+      {failing ? <NotUpdatingBadge tone={chipTone({ selected })} /> : null}
+    </View>
+  );
+}
+
+/**
+ * A Feed that has stopped updating (FEE-126): a warning glyph in its chip's label tone (no new colour, Q30),
+ * notched into the page colour on the chip's top-right corner, so it reads as a mark on that chip and not a
+ * control. It takes no touch, and TalkBack hears it in the chip's name. It grows with the font size (Q16).
+ */
+function NotUpdatingBadge({ tone }: { tone: ChipTone }) {
+  const { colorScheme } = useEnvironment();
+  const notch = NOTCH * useSizeScale();
+  return (
+    <View
+      testID="not-updating-badge"
+      pointerEvents="none"
+      accessible={false}
+      className="absolute items-center justify-center rounded-full bg-background"
+      style={{ top: -notch / 3, right: -notch / 4, width: notch, height: notch }}
+    >
+      <AppSymbol name={{ ios: 'exclamationmark.triangle', android: 'warning' }} size={BADGE} tintColor={themes[colorScheme][tone]} />
     </View>
   );
 }
@@ -127,6 +156,10 @@ export function ChipRow({
 }) {
   const { colorScheme, reduceMotion } = useEnvironment();
   const background = themes[colorScheme].background;
+  // A day of failing is told on the app's own clock, so a badge appears without the server saying so again.
+  const now = useMinuteClock();
+  // Room above the chips for a badge's notch, so the row never clips it (FEE-126).
+  const badgeRoom = (NOTCH / 3) * useSizeScale();
   const scroller = useRef<ScrollViewInstance>(null);
   /** Each chip's place in the row, by Feed id (All is ''), measured as it lays out. */
   const chipAt = useRef(new Map<string, Box>());
@@ -184,7 +217,7 @@ export function ChipRow({
         onLayout={(event) => setRow((now) => ({ ...now, width: event.nativeEvent.layout.width }))}
         onContentSizeChange={(content) => setRow((now) => ({ ...now, content }))}
         contentContainerClassName="items-center gap-related px-edge"
-        contentContainerStyle={{ paddingBottom: spacing.related }}
+        contentContainerStyle={{ paddingTop: badgeRoom, paddingBottom: spacing.related }}
       >
         <Chip accessibleName="All" selected={selected === null} onPress={() => onSelect(null)} onLayout={(event) => place(event, '')}>
           <ChipLabel label="All" tone={chipTone({ selected: selected === null })} />
@@ -200,6 +233,7 @@ export function ChipRow({
             onLayout={(event) => place(event, chip.id)}
             onLongPress={() => openMenu(chip.id)}
             remove={{ label: `Remove ${chip.title}`, onRemove: () => onRemove(chip) }}
+            notUpdating={notUpdating(chip, now)}
           >
             <FeedIcon key={chip.faviconUrl} url={chip.faviconUrl} title={chip.title} size={ICON} fallback="none" />
             <ChipLabel label={chipLabel(chip.title)} tone={chipTone({ selected: selected === chip.id })} />

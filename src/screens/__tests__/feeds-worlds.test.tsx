@@ -15,10 +15,12 @@ import {
   ADD_FEED_WORLDS,
   ALL_WORLDS,
   NEW_ARTICLES_WORLDS,
+  NOT_UPDATING_WORLDS,
   READING_WORLDS,
   type AddFeedWorldId,
   type AllWorldId,
   type NewArticlesWorldId,
+  type NotUpdatingWorldId,
   type ReadingWorldId,
 } from '@/worlds/catalog';
 import {
@@ -802,6 +804,51 @@ describe('the "Updated" line moves only where it changes (FEE-104)', () => {
     await screen.findAllByRole('link');
     expect(within(screen.getByTestId('updated-line')).getByText('Updating…')).toBeOnTheScreen();
     expect(screen.getByTestId('updated-line')).toHaveAccessibleName('Updating…');
+  });
+});
+
+describe('a Feed that stops updating shows a badge on its chip (FEE-126)', () => {
+  type Shows = {
+    /** The Verge's chip, as TalkBack hears it. */
+    chipName: string;
+    badge: boolean;
+    selected: boolean;
+  };
+  const BADGED = 'The Verge, not updating';
+  const SHOWS: Record<NotUpdatingWorldId, Shows> = {
+    'not-updating': { chipName: BADGED, badge: true, selected: false },
+    'not-updating-light': { chipName: BADGED, badge: true, selected: false },
+    // Failing for under a day says nothing, anywhere: a passing blip never alarms.
+    'not-updating-recent': { chipName: 'The Verge', badge: false, selected: false },
+    'not-updating-chosen': { chipName: BADGED, badge: true, selected: true },
+    'not-updating-largest-font': { chipName: BADGED, badge: true, selected: false },
+  };
+  const verge = (name: string) => screen.getByRole('tab', { name });
+
+  test.each(NOT_UPDATING_WORLDS)('$label', async ({ id, spec }) => {
+    const shows = SHOWS[id];
+    await open(spec);
+    await screen.findAllByRole('link');
+    expect(screen.getByRole('tab', { name: shows.chipName, selected: shows.selected })).toBeOnTheScreen();
+    expect(screen.queryAllByTestId('not-updating-badge')).toHaveLength(shows.badge ? 1 : 0);
+    // Nothing about it in the rows (Q7): only the chip says so.
+    expect(screen.queryByText(/not updating/i)).not.toBeOnTheScreen();
+  });
+
+  test('a badged chip still opens its Feed, and its long-press Remove still works', async () => {
+    await open({ colorScheme: 'dark', feeds: 'some', failing: 'day' });
+    await screen.findAllByRole('link');
+    await userEvent.press(verge(BADGED));
+    expect(await screen.findByRole('tab', { name: BADGED, selected: true })).toBeOnTheScreen();
+    expect(verge(BADGED).props.accessibilityActions).toEqual([{ name: 'remove', label: 'Remove The Verge' }]);
+  });
+
+  test('when the Feed starts working again, the badge goes by itself', async () => {
+    await open({ colorScheme: 'dark', feeds: 'some', failing: 'day' });
+    await screen.findAllByRole('link');
+    await act(async () => world!.feeds.recover());
+    expect(verge('The Verge')).toBeOnTheScreen();
+    expect(screen.queryByTestId('not-updating-badge')).not.toBeOnTheScreen();
   });
 });
 

@@ -224,3 +224,18 @@ export const ACCOUNT_WORLDS = [
 
 export type AccountWorldId = (typeof ACCOUNT_WORLDS)[number]['id'];
 
+
+/** A Feed that has stopped updating (FEE-126): The Verge's chip carries a badge once it has failed for a day. */
+export const NOT_UPDATING_WORLDS = [
+  { id: 'not-updating', label: 'Failing for a day', spec: { colorScheme: 'dark', feeds: 'some', failing: 'day' } },
+  { id: 'not-updating-light', label: 'Failing for a day, light', spec: { colorScheme: 'light', feeds: 'some', failing: 'day' } },
+  { id: 'not-updating-recent', label: 'Failing for an hour: no badge yet', spec: { colorScheme: 'dark', feeds: 'some', failing: 'recent' } },
+  { id: 'not-updating-chosen', label: 'Failing for a day, its chip chosen', spec: { colorScheme: 'dark', feeds: 'some', failing: 'day', feed: 'f1' } },
+  {
+    id: 'not-updating-largest-font',
+    label: 'Failing for a day, largest font size',
+    spec: { colorScheme: 'dark', feeds: 'some', failing: 'day', fontScale: 2 },
+  },
+] as const satisfies readonly CatalogWorld[];
+
+export type NotUpdatingWorldId = (typeof NOT_UPDATING_WORLDS)[number]['id'];
