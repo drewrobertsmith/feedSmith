@@ -103,6 +103,7 @@ export function FeedsScreen({
   const rowsNameFeeds = order[shown.index] === '';
   // Scrolled down, new Articles wait above you, and the list holds your place (FEE-102); at the top they're in view.
   const list = useRef<LegendListRef>(null);
+  const pendingOffset = useRef(startAtOffset ?? 0);
   const [atTop, setAtTop] = useState(startAtRow === undefined && startAtOffset === undefined);
   // Scrolling sets state only when it crosses the top, never on every frame (FEE-102).
   const atTopRef = useRef(atTop);
@@ -186,6 +187,13 @@ export function FeedsScreen({
           maintainVisibleContentPosition={{ data: !atTop }}
           initialScrollIndex={startAtRow}
           initialScrollOffset={startAtOffset}
+          // Its Articles arrive after the list opens: your place is scrolled to once there's room for it (FEE-130).
+          onContentSizeChange={(_width, height) => {
+            if (pendingOffset.current > 0 && height > pendingOffset.current) {
+              list.current?.scrollToOffset({ offset: pendingOffset.current, animated: false });
+              pendingOffset.current = 0;
+            }
+          }}
           onScroll={(event) => {
             const offset = event.nativeEvent.contentOffset.y;
             trackTop(offset);
