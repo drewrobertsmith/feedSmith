@@ -66,7 +66,7 @@ These adapt `/expo-dev-loop:feature` to this app. Where they differ from the ski
 
 - **Kept:** tests first (world tests typed by world ID), the gates, the state table and gallery, motion frame by frame, the emulator rules, the decision log.
 - **Taste, guaranteed:** every UI ticket plans with `design-with-taste` (the Stop hook requires it) and checks the design against it before building.
-- **The owner's look, at the plan (D50):** every UI ticket, deletions included, first makes it work: a quick throwaway version on the emulator, shown to the owner as a capture, iterated until the owner accepts the look and behaviour. Then the throwaway is discarded and the real build makes it right (tests first, real code), then fast. Nothing from the throwaway is expected to be end-state code.
+- **The owner's look, at the plan (D50):** every UI ticket, deletions included, first makes it work: a quick throwaway version on the Android emulator, shown to the owner as a capture, iterated until the owner accepts the look and behaviour. Then the throwaway is discarded and the real build makes it right (tests first, real code), then fast. Nothing from the throwaway is expected to be end-state code.
 - **Plan:** load other skills only for an area or API this session hasn't touched yet; no fan-out by default.
 - **Review:** no reviewer agents and no separate quality-bar walk. The quality bar still decides which tests and device checks the plan includes.
 - **No screen changed:** skip Verify's device steps.
