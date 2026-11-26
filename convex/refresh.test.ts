@@ -307,6 +307,39 @@ describe('pulling down fetches every Feed now', () => {
     const s = await setup();
     await expect(s.t.action(api.feeds.refreshAll, {})).rejects.toThrow(/SIGNED_OUT/);
   });
+
+  // FEE-103: the app holds "Updating…" until its "Updated" line has caught up with what the pull recorded.
+  test('a pull answers with the newest fetch it recorded, which the "Updated" line then reads', async () => {
+    const s = await setup();
+    await follow(s, [{ guid: 'g1', ago: HOUR }]);
+    vi.setSystemTime(START + HOUR);
+    const until = await s.a.action(api.feeds.refreshAll, {});
+    expect(until).toBe(START + HOUR);
+    expect(await s.a.query(api.feeds.lastUpdated, {})).toBeGreaterThanOrEqual(until!);
+  });
+
+  test("a failed fetch is still a fetch the line counts, so the pull answers with it", async () => {
+    const s = await setup();
+    await follow(s, [{ guid: 'g1', ago: HOUR }]);
+    vi.setSystemTime(START + HOUR);
+    network.mockImplementation(async () => new Response('down', { status: 503 }));
+    const until = await s.a.action(api.feeds.refreshAll, {});
+    expect(until).toBe(START + HOUR);
+    expect(await s.a.query(api.feeds.lastUpdated, {})).toBeGreaterThanOrEqual(until!);
+  });
+
+  test('a pull that fetched nothing (every Feed fetched in the last two minutes) answers null', async () => {
+    const s = await setup();
+    await follow(s, [{ guid: 'g1', ago: HOUR }]);
+    expect(await s.a.action(api.feeds.refreshAll, {})).toBeNull();
+  });
+
+  test("a pull answers with nothing of another User's", async () => {
+    const s = await setup();
+    await follow(s, [{ guid: 'g1', ago: HOUR }]);
+    vi.setSystemTime(START + HOUR);
+    expect(await s.b.action(api.feeds.refreshAll, {})).toBeNull();
+  });
 });
 
 describe('cleaning up old Articles (P14)', () => {

@@ -12,7 +12,7 @@ import { ArticleRow } from '@/components/article-row';
 import { TopBar, TopBarIcon } from '@/components/top-bar';
 import { useEnvironment, useMinuteClock } from '@/environment';
 import { useAll, useChips, useLastUpdated, useRefresh, useRemoveFeed, type FeedChip } from '@/feeds/feeds-data';
-import { publishedAgo } from '@/feeds/format';
+import { updatedLine } from '@/feeds/use-pull';
 import { useNewArticles } from '@/feeds/use-new-articles';
 import { useShownRows } from '@/feeds/use-shown-rows';
 import { AccountButton } from '@/screens/account/account-sheet';
@@ -24,14 +24,15 @@ import { themes } from '@/theme/tokens';
 
 /**
  * The line under the Feeds title (FEE-47): how fresh All is, so you know whether pulling down is
- * worth it. Information, not a count (P7). Nothing until there's something to say.
+ * worth it. Information, not a count (P7). Nothing until there's something to say. "Updating…" lasts until
+ * a pull's results are on screen (FEE-103).
  */
 function useUpdatedLine(refreshing: boolean): string | undefined {
   const lastUpdated = useLastUpdated();
   const now = useMinuteClock();
-  if (refreshing) return 'Updating…';
-  if (lastUpdated.status !== 'ready' || lastUpdated.at === null) return undefined;
-  return `Updated ${publishedAgo(lastUpdated.at, now)}`;
+  const parts = updatedLine(refreshing, lastUpdated.status === 'ready' ? lastUpdated.at : null, now);
+  // One span, so the line keeps its kerning; FEE-104 splits it where only part of it moves (owner's call).
+  return parts && parts.still + parts.change + parts.time;
 }
 
 /**

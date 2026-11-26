@@ -108,15 +108,23 @@ export const add = action({
   },
 });
 
-/** Pulling down on Feeds: fetches every one of the signed-in User's Feeds now (P15). */
+/**
+ * Pulling down on Feeds: fetches every one of the signed-in User's Feeds now (P15). Answers with the newest
+ * fetch it recorded, or null when it fetched none, so the app holds "Updating…" until its "Updated" line,
+ * which reads the same fetches, has caught up (FEE-103).
+ */
 export const refreshAll = action({
   args: {},
-  returns: v.null(),
-  handler: async (ctx): Promise<null> => {
+  returns: v.union(v.null(), v.number()),
+  handler: async (ctx): Promise<number | null> => {
     const userId = await ctx.runQuery(internal.feeds.viewer, {});
     const feedIds = await ctx.runQuery(internal.feeds.toRefresh, { userId, now: Date.now() });
-    await inBatches(feedIds, PULL_CONCURRENCY, (feedId) => refreshOne(ctx, feedId));
-    return null;
+    let newest: number | null = null;
+    await inBatches(feedIds, PULL_CONCURRENCY, async (feedId) => {
+      const recorded = await refreshOne(ctx, feedId);
+      if (recorded !== null) newest = Math.max(newest ?? 0, recorded);
+    });
+    return newest;
   },
 });
 

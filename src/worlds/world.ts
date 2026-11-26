@@ -4,6 +4,7 @@ import { Uniwind } from 'uniwind';
 import type { Account, Auth } from '@/auth/auth-context';
 import type { SignInView } from '@/auth/sign-in-outcome';
 import type { Environment } from '@/environment';
+import { usePull } from '@/feeds/use-pull';
 import { isAddress, type AddFeedReason, type AddFeedView, type AddOutcome, type ArticleRow, type ArticleView, type FeedChip, type FeedsData } from '@/feeds/feeds-data';
 import {
   FIXTURE_ACCOUNT,
@@ -70,6 +71,11 @@ export type WorldSpec = {
   arrivals?: 'later';
   /** The list starts scrolled down, past the header (FEE-102): the gallery opens it there; tests scroll. */
   scrolled?: boolean;
+  /**
+   * A pull's results reach the screen after the pull answers (`late`: `arrive` brings them later) or before it
+   * (`early`) (FEE-103). Its Articles are `arrivals`'; without `pull`, a pull fetches nothing new.
+   */
+  pull?: 'late' | 'early';
   /** Whether a pull-down refresh is under way. */
   refreshing?: boolean;
   /** The chosen Feed's chip, by id: All shows only its Articles (P5). */
@@ -184,6 +190,8 @@ export function worldFeeds(
     articleListeners.add(listener);
     return () => void articleListeners.delete(listener);
   };
+  /** When the world's Feeds were last fetched: a while ago, or just now once new Articles arrived (FEE-103). */
+  const lastUpdatedAt = () => (feeds === 'none' ? null : arrived ? FIXTURE_NOW : FIXTURE_NOW - FIXTURE_LAST_UPDATED_AGO);
   const arrive = () => {
     if (spec.arrivals !== 'later' || arrived) return;
     arrived = true;
@@ -257,16 +265,24 @@ export function worldFeeds(
     useMarkRead: () => (id) => {
       log.read.push(id);
     },
-    useLastUpdated: () =>
-      feeds === 'loading'
-        ? { status: 'loading' }
-        : { status: 'ready', at: feeds === 'none' ? null : FIXTURE_NOW - FIXTURE_LAST_UPDATED_AGO },
-    useRefresh: () => ({
-      refreshing: spec.refreshing ?? false,
-      refresh: async () => {
+    useLastUpdated: () => {
+      useSyncExternalStore(subscribeArticles, () => articlesState);
+      if (feeds === 'loading') return { status: 'loading' };
+      return { status: 'ready', at: lastUpdatedAt() };
+    },
+    useRefresh: () => {
+      // Re-reads the time whenever the world's Articles change, as the live query would.
+      useSyncExternalStore(subscribeArticles, () => articlesState);
+      const at = lastUpdatedAt();
+      const pull = usePull(async () => {
         log.refreshes += 1;
-      },
-    }),
+        if (!spec.pull) return null;
+        // `early`: the results are in before the pull answers; `late`: the test brings them with `arrive`.
+        if (spec.pull === 'early') arrive();
+        return FIXTURE_NOW;
+      }, at);
+      return spec.refreshing ? { ...pull, refreshing: true } : pull;
+    },
   };
 }
 

@@ -16,6 +16,7 @@ import {
   type FeedsData,
   type LastUpdatedView,
 } from '@/feeds/feeds-data';
+import { usePull } from '@/feeds/use-pull';
 
 /**
  * A query that runs only while signed in, and not while the Account is being deleted. Every User
@@ -104,16 +105,10 @@ function useAddFeed() {
 
 function useRefresh() {
   const refreshAll = useAction(api.feeds.refreshAll);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const refresh = async () => {
-    setRefreshing(true);
-    // A failed pull changes nothing on screen; the schedule keeps Feeds fresh regardless.
-    await refreshAll().catch(() => null);
-    setRefreshing(false);
-  };
-
-  return { refreshing, refresh };
+  const at = useSignedInQuery(api.feeds.lastUpdated, {});
+  // A failed pull changes nothing on screen; the schedule keeps Feeds fresh regardless. A pull's results
+  // reach the line and the rows together, after the pull answers: "Updating…" lasts until then (FEE-103).
+  return usePull(() => refreshAll().catch(() => null), at);
 }
 
 function useMarkRead() {
