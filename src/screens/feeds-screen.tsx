@@ -18,6 +18,7 @@ import { AccountButton } from '@/screens/account/account-sheet';
 import { AddFeedSheet } from '@/screens/add-feed-sheet';
 import { ChipRow } from '@/screens/chip-row';
 import { NewArticlesNote } from '@/screens/new-articles-note';
+import { FeedPageTop } from '@/screens/not-updating-notice';
 import { FeedsUpdatedLine } from '@/screens/updated-line';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
@@ -142,14 +143,9 @@ export function FeedsScreen({
       {chips.length > 0 ? (
         <ChipRow chips={chips} selected={selection} onSelect={select} onRemove={confirmRemove} menuFor={menuFor} />
       ) : null}
-      {selectedChip && selection === selectedChip.id && empty ? (
-        // Never a dead end (Q34): a Feed that has never had an Article can be removed right here.
-        <View className="gap-group px-edge">
-          <AppText variant="reading" className="text-text-muted">
-            {`No Articles from ${selectedChip.title} yet.`}
-          </AppText>
-          <AppButton label={`Remove ${selectedChip.title}`} onPress={() => confirmRemove(selectedChip)} />
-        </View>
+      {selectedChip && selection === selectedChip.id ? (
+        // A Feed's page: whether it's not updating (FEE-127), and never a dead end when it has no Articles (Q34).
+        <FeedPageTop chip={selectedChip} empty={empty} onRemove={() => confirmRemove(selectedChip)} />
       ) : null}
     </View>
   );

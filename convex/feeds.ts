@@ -285,7 +285,7 @@ export const chips = query({
       faviconUrl: v.optional(v.string()),
       pinned: v.boolean(),
       /** Since when it has failed every try, and why (FEE-126); the app decides when that's been a day. */
-      failing: v.optional(v.object({ since: v.number(), reason: vFetchFailure })),
+      failing: v.optional(v.object({ since: v.number(), reason: vFetchFailure, siteUrl: v.optional(v.string()) })),
     }),
   ),
   handler: async (ctx) => {
@@ -327,7 +327,7 @@ export const chips = query({
         title: string;
         faviconUrl?: string;
         pinned: boolean;
-        failing?: { since: number; reason: FetchFailure };
+        failing?: { since: number; reason: FetchFailure; siteUrl?: string };
       } = {
         id: feed._id,
         title: feed.title,
@@ -338,6 +338,8 @@ export const chips = query({
       // Never the address (Q9): only since when and why.
       if (feed.status === 'failing' && feed.failingSince !== undefined && feed.failure) {
         chip.failing = { since: feed.failingSince, reason: feed.failure };
+        // Its site, the public homepage, for Open site (FEE-127): only for a failing Feed, never its feed address.
+        if (feed.siteUrl) chip.failing.siteUrl = feed.siteUrl;
       }
       return chip;
     });

@@ -231,6 +231,15 @@ export const NOT_UPDATING_WORLDS = [
   { id: 'not-updating-light', label: 'Failing for a day, light', spec: { colorScheme: 'light', feeds: 'some', failing: 'day' } },
   { id: 'not-updating-recent', label: 'Failing for an hour: no badge yet', spec: { colorScheme: 'dark', feeds: 'some', failing: 'recent' } },
   { id: 'not-updating-chosen', label: 'Failing for a day, its chip chosen', spec: { colorScheme: 'dark', feeds: 'some', failing: 'day', feed: 'f1' } },
+  // Its page (FEE-127): the notice says since when and why, above its Articles.
+  { id: 'not-updating-page-light', label: 'Its page, light', spec: { colorScheme: 'light', feeds: 'some', failing: 'day', feed: 'f1' } },
+  { id: 'not-updating-page-no-site', label: 'Its page, no site address', spec: { colorScheme: 'dark', feeds: 'some', failing: 'day', feed: 'f1', failingSite: 'none' } },
+  { id: 'not-updating-page-empty', label: 'Its page, no Articles yet', spec: { colorScheme: 'dark', feeds: 'some', chips: 'many', failing: 'day', feed: 'f4' } },
+  {
+    id: 'not-updating-page-largest-font',
+    label: 'Its page, largest font size',
+    spec: { colorScheme: 'dark', feeds: 'some', failing: 'day', feed: 'f1', fontScale: 2 },
+  },
   {
     id: 'not-updating-largest-font',
     label: 'Failing for a day, largest font size',

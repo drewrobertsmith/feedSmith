@@ -58,8 +58,8 @@ export type FeedChip = {
   id: string;
   title: string;
   faviconUrl?: string;
-  /** Since when it has failed every try, and why (FEE-126). Never its address (Q9). */
-  failing?: { since: number; reason: FetchFailure };
+  /** Since when it has failed every try, and why (FEE-126), and its site for Open site (FEE-127). Never its feed address (Q9). */
+  failing?: { since: number; reason: FetchFailure; siteUrl?: string };
 };
 export type ChipsView = { status: 'loading' } | { status: 'ready'; chips: FeedChip[] };
 /**
