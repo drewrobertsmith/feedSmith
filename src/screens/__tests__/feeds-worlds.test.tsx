@@ -809,30 +809,68 @@ describe('the "Updated" line moves only where it changes (FEE-104)', () => {
 
 describe('a Feed that stops updating shows a badge on its chip (FEE-126)', () => {
   type Shows = {
-    /** The Verge's chip, as TalkBack hears it. */
+    /** The failing Feed's chip, as TalkBack hears it. */
     chipName: string;
     badge: boolean;
     selected: boolean;
+    /** Its page's notice (FEE-127): whether it offers Open site; null when there's none. */
+    notice: { openSite: boolean } | null;
+    /** Its page has no Articles: the empty line sits under the notice. */
+    empty: boolean;
   };
   const BADGED = 'The Verge, not updating';
+  const SINCE = `Not updating since ${publishedDate(FIXTURE_NOW - 25 * 3_600_000)}`;
+  const NOT_A_FEED = 'There’s no feed at this address any more.';
   const SHOWS: Record<NotUpdatingWorldId, Shows> = {
-    'not-updating': { chipName: BADGED, badge: true, selected: false },
-    'not-updating-light': { chipName: BADGED, badge: true, selected: false },
+    'not-updating': { chipName: BADGED, badge: true, selected: false, notice: null, empty: false },
+    'not-updating-light': { chipName: BADGED, badge: true, selected: false, notice: null, empty: false },
     // Failing for under a day says nothing, anywhere: a passing blip never alarms.
-    'not-updating-recent': { chipName: 'The Verge', badge: false, selected: false },
-    'not-updating-chosen': { chipName: BADGED, badge: true, selected: true },
-    'not-updating-largest-font': { chipName: BADGED, badge: true, selected: false },
+    'not-updating-recent': { chipName: 'The Verge', badge: false, selected: false, notice: null, empty: false },
+    'not-updating-chosen': { chipName: BADGED, badge: true, selected: true, notice: { openSite: true }, empty: false },
+    'not-updating-page-light': { chipName: BADGED, badge: true, selected: true, notice: { openSite: true }, empty: false },
+    'not-updating-page-no-site': { chipName: BADGED, badge: true, selected: true, notice: { openSite: false }, empty: false },
+    'not-updating-page-empty': { chipName: 'Farnam Street, not updating', badge: true, selected: true, notice: { openSite: true }, empty: true },
+    'not-updating-page-largest-font': { chipName: BADGED, badge: true, selected: true, notice: { openSite: true }, empty: false },
+    'not-updating-largest-font': { chipName: BADGED, badge: true, selected: false, notice: null, empty: false },
   };
   const verge = (name: string) => screen.getByRole('tab', { name });
 
   test.each(NOT_UPDATING_WORLDS)('$label', async ({ id, spec }) => {
     const shows = SHOWS[id];
     await open(spec);
-    await screen.findAllByRole('link');
-    expect(screen.getByRole('tab', { name: shows.chipName, selected: shows.selected })).toBeOnTheScreen();
+    if (!shows.empty) await screen.findAllByRole('link');
+    expect(await screen.findByRole('tab', { name: shows.chipName, selected: shows.selected })).toBeOnTheScreen();
     expect(screen.queryAllByTestId('not-updating-badge')).toHaveLength(shows.badge ? 1 : 0);
-    // Nothing about it in the rows (Q7): only the chip says so.
-    expect(screen.queryByText(/not updating/i)).not.toBeOnTheScreen();
+    // Nothing about it in All's rows (Q7): only the chip, and the Feed's own page, say so.
+    if (!shows.notice) {
+      expect(screen.queryByText(/Not updating/)).not.toBeOnTheScreen();
+      return;
+    }
+    expect(screen.getByText(SINCE)).toBeOnTheScreen();
+    expect(screen.getByText(NOT_A_FEED)).toBeOnTheScreen();
+    expect(screen.queryAllByRole('button', { name: 'Open site' })).toHaveLength(shows.notice.openSite ? 1 : 0);
+    // One Remove, last, never a second one from the empty line (Q32).
+    expect(screen.getAllByRole('button', { name: /^Remove / })).toHaveLength(1);
+    // Its Articles stay, below the notice (Q7, Q36); with none, the empty line does.
+    if (shows.empty) expect(screen.getByText(/^No Articles from .+ yet\.$/)).toBeOnTheScreen();
+    else expect(screen.getAllByRole('link').length).toBeGreaterThan(0);
+  });
+
+  test('Open site opens the Feed\'s site in the browser (Q8)', async () => {
+    await open({ colorScheme: 'dark', feeds: 'some', failing: 'day', feed: 'f1' });
+    await userEvent.press(await screen.findByRole('button', { name: 'Open site' }));
+    expect(WebBrowser.openBrowserAsync).toHaveBeenCalledWith('https://www.theverge.com');
+  });
+
+  test('Remove on the notice asks first, then shows All (Q32, D43)', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    await open({ colorScheme: 'dark', feeds: 'some', failing: 'day', feed: 'f1' });
+    await userEvent.press(await screen.findByRole('button', { name: 'Remove The Verge' }));
+    expect(alert).toHaveBeenCalledWith('Remove The Verge?', 'Its Articles go too.', expect.any(Array));
+    const remove = alert.mock.calls[0][2]!.find((button) => button.text === 'Remove')!;
+    await act(async () => remove.onPress!());
+    expect(await screen.findByRole('tab', { name: 'All', selected: true })).toBeOnTheScreen();
+    alert.mockRestore();
   });
 
   test('a badged chip still opens its Feed, and its long-press Remove still works', async () => {

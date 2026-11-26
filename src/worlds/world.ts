@@ -79,8 +79,12 @@ export type WorldSpec = {
   pull?: 'late' | 'early';
   /** Whether a pull-down refresh is under way. */
   refreshing?: boolean;
-  /** The Verge stops updating (FEE-126): failing for a `day` (its chip badged), or `recent`ly (not yet). */
+  /**
+   * The chosen Feed (The Verge when none is) stops updating (FEE-126): failing for a `day` (its chip badged), or
+   * `recent`ly (not yet). Its site is The Verge's, or `none` (FEE-127).
+   */
   failing?: 'day' | 'recent';
+  failingSite?: 'none';
   /** The connection to the server (FEE-32): offline from the start; tests change it with the world's `setNetwork`. */
   network?: 'offline';
   /** The chosen Feed's chip, by id: All shows only its Articles (P5). */
@@ -183,14 +187,16 @@ export function worldFeeds(
     addedChips = [...addedChips, chip];
     chipListeners.forEach((listener) => listener());
   };
-  // A world's failing Feed is The Verge, failing since a day and an hour ago, or an hour ago (FEE-126).
+  // A world's failing Feed is the chosen one (The Verge by default), failing since a day and an hour ago, or an hour ago (FEE-126).
   let failingSince: number | null = spec.failing === 'day' ? FIXTURE_NOW - 25 * HOUR : spec.failing === 'recent' ? FIXTURE_NOW - HOUR : null;
   const recover = () => {
     failingSince = null;
     chipListeners.forEach((listener) => listener());
   };
+  const failingId = spec.feed ?? 'f1';
+  const failingSite = spec.failingSite === 'none' ? {} : { siteUrl: 'https://www.theverge.com' };
   const withHealth = (chip: FeedChip): FeedChip =>
-    chip.id === 'f1' && failingSince !== null ? { ...chip, failing: { since: failingSince, reason: 'not-a-feed' } } : chip;
+    chip.id === failingId && failingSince !== null ? { ...chip, failing: { since: failingSince, reason: 'not-a-feed', ...failingSite } } : chip;
   const dropChip = (id: string) => {
     removedIds = new Set([...removedIds, id]);
     chipListeners.forEach((listener) => listener());

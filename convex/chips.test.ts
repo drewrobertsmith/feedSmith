@@ -288,16 +288,29 @@ describe('a Feed that stops updating (FEE-126, Q7)', () => {
     const s = await setup([{ title: 'The Verge', ago: HOUR }]);
     await s.t.mutation(internal.refresh.recordFailure, { feedId: s.feedIds[0], now: NOW, reason: 'timeout' });
     const chip = await chipOf(s, s.feedIds[0]);
-    expect(chip.failing).toEqual({ since: NOW, reason: 'timeout' });
+    expect(chip.failing).toMatchObject({ since: NOW, reason: 'timeout' });
     // The favicon is the site's; the Feed's own address never leaves the server.
     expect(JSON.stringify(chip)).not.toContain('/feed');
+  });
+
+  test('a failing Feed with a site gives its site address, for Open site; never the feed address (FEE-127)', async () => {
+    const s = await setup([{ title: 'The Verge', ago: HOUR }]);
+    await s.t.mutation(internal.refresh.recordFailure, { feedId: s.feedIds[0], now: NOW, reason: 'timeout' });
+    expect((await chipOf(s, s.feedIds[0])).failing).toEqual({ since: NOW, reason: 'timeout', siteUrl: 'https://f0.example.com' });
+  });
+
+  test('a failing Feed with no site gives no site address', async () => {
+    const s = await setup([{ title: 'The Verge', ago: HOUR }]);
+    await s.t.run(async (ctx) => ctx.db.patch(s.feedIds[0], { siteUrl: undefined }));
+    await s.t.mutation(internal.refresh.recordFailure, { feedId: s.feedIds[0], now: NOW, reason: 'timeout' });
+    expect((await chipOf(s, s.feedIds[0])).failing).toEqual({ since: NOW, reason: 'timeout' });
   });
 
   test('repeated failures keep the first failing time and update the reason', async () => {
     const s = await setup([{ title: 'The Verge', ago: HOUR }]);
     await s.t.mutation(internal.refresh.recordFailure, { feedId: s.feedIds[0], now: NOW, reason: 'timeout' });
     await s.t.mutation(internal.refresh.recordFailure, { feedId: s.feedIds[0], now: NOW + HOUR, reason: 'not-a-feed' });
-    expect((await chipOf(s, s.feedIds[0])).failing).toEqual({ since: NOW, reason: 'not-a-feed' });
+    expect((await chipOf(s, s.feedIds[0])).failing).toMatchObject({ since: NOW, reason: 'not-a-feed' });
   });
 
   test('a working fetch clears it', async () => {
