@@ -13,12 +13,15 @@ import { spacing } from '@/theme/spacing';
 import {
   ADD_FEED_WORLDS,
   ALL_WORLDS,
+  NEW_ARTICLES_WORLDS,
   READING_WORLDS,
   type AddFeedWorldId,
   type AllWorldId,
+  type NewArticlesWorldId,
   type ReadingWorldId,
 } from '@/worlds/catalog';
 import {
+  FIXTURE_ARRIVED_ROWS,
   FIXTURE_ARTICLE,
   FIXTURE_CHOICES,
   FIXTURE_EXTRACTING_ARTICLE,
@@ -584,6 +587,97 @@ describe('Add a Feed, in its sheet over Feeds (FEE-45)', () => {
     expect(w.feedsLog.added).toEqual(['https://example.com/']);
     sheetOpen(true);
     expect(screen.getByLabelText(FIELD)).toHaveDisplayValue('https://example.com/');
+  });
+});
+
+describe('new Articles arriving while you read (FEE-102)', () => {
+  const NOTE = 'New Articles, go to top';
+  /** Scrolls the list as a finger would: past the header, or back to the top. */
+  const scrollList = async (y: number) =>
+    fireEvent.scroll(screen.getByTestId('all-list'), {
+      nativeEvent: {
+        contentOffset: { x: 0, y },
+        contentSize: { width: 412, height: 2000 },
+        layoutMeasurement: { width: 412, height: 915 },
+      },
+    });
+  const arrive = async () => {
+    await act(async () => world!.feeds.arrive());
+    await layOutList('all-list');
+  };
+  /** Opens a world, scrolled down when it says so, and lets its new Articles arrive. */
+  const openAndArrive = async (spec: WorldSpec) => {
+    await open(spec);
+    await screen.findAllByRole('link');
+    if (spec.scrolled) await scrollList(600);
+    expect(screen.queryByRole('button', { name: NOTE })).not.toBeOnTheScreen();
+    await arrive();
+  };
+
+  type Shows = { note: boolean; theme: 'dark' | 'light'; labelSize: number };
+  const SHOWS: Record<NewArticlesWorldId, Shows> = {
+    'arrive-scrolled': { note: true, theme: 'dark', labelSize: 13 },
+    'arrive-scrolled-light': { note: true, theme: 'light', labelSize: 13 },
+    'arrive-scrolled-largest-font': { note: true, theme: 'dark', labelSize: 26 },
+    'arrive-scrolled-remove-animations': { note: true, theme: 'dark', labelSize: 13 },
+    'arrive-top': { note: false, theme: 'dark', labelSize: 13 },
+    'arrive-feed-scrolled': { note: true, theme: 'dark', labelSize: 13 },
+  };
+
+  test.each(NEW_ARTICLES_WORLDS)('$label', async ({ id, spec }) => {
+    const shows = SHOWS[id];
+    await openAndArrive(spec);
+    // At the top the new Articles are in view; scrolled down they wait above, and the note says so.
+    if (!shows.note) {
+      for (const row of FIXTURE_ARRIVED_ROWS) expect(screen.getByText(row.title)).toBeOnTheScreen();
+    }
+    const note = screen.queryByRole('button', { name: NOTE });
+    if (!shows.note) {
+      expect(note).not.toBeOnTheScreen();
+      return;
+    }
+    expect(note).toBeOnTheScreen();
+    // Says only that there are new Articles, never how many (P7).
+    expect(within(note!).getByText('New Articles')).toHaveStyle({ fontSize: shows.labelSize });
+    expect(within(note!).queryByText(/\d/)).not.toBeOnTheScreen();
+    // A raised object over the rows it floats above, its label full-strength, not Gold (D5, D27).
+    expect(faceOf(note!)).toMatchObject(depthStyle(shows.theme, 'raised'));
+    expect(within(note!).getByText('New Articles')).toHaveProp('className', expect.stringContaining('text-text'));
+    expect(within(note!).getByText('New Articles')).not.toHaveProp('className', expect.stringContaining('text-accent'));
+  });
+
+  test('tapping the note goes to the top, where the new Articles are, and the note goes', async () => {
+    await openAndArrive({ colorScheme: 'dark', feeds: 'busy', arrivals: 'later', scrolled: true });
+    const scrollTo = jest.spyOn(ScrollView.prototype, 'scrollTo');
+    await userEvent.press(screen.getByRole('button', { name: NOTE }));
+    expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ y: 0 }));
+    expect(screen.queryByRole('button', { name: NOTE })).not.toBeOnTheScreen();
+    scrollTo.mockRestore();
+  });
+
+  test('scrolling to the top yourself clears the note too', async () => {
+    await openAndArrive({ colorScheme: 'dark', feeds: 'busy', arrivals: 'later', scrolled: true });
+    expect(screen.getByRole('button', { name: NOTE })).toBeOnTheScreen();
+    await scrollList(0);
+    expect(screen.queryByRole('button', { name: NOTE })).not.toBeOnTheScreen();
+    // Scrolling down again doesn't bring it back: what arrived is in view now.
+    await scrollList(600);
+    expect(screen.queryByRole('button', { name: NOTE })).not.toBeOnTheScreen();
+  });
+
+  test("switching chips while scrolled shows no note: another chip's Articles are a new list", async () => {
+    await open({ colorScheme: 'dark', feeds: 'busy', scrolled: true });
+    await screen.findAllByRole('link');
+    await scrollList(600);
+    await userEvent.press(screen.getByRole('tab', { name: 'Calm Notes' }));
+    await layOutList('all-list');
+    expect(screen.queryByRole('button', { name: NOTE })).not.toBeOnTheScreen();
+  });
+
+  test('a first load, filling an empty screen, shows no note', async () => {
+    await open({ colorScheme: 'dark', feeds: 'busy', scrolled: true });
+    expect(await screen.findAllByRole('link')).not.toHaveLength(0);
+    expect(screen.queryByRole('button', { name: NOTE })).not.toBeOnTheScreen();
   });
 });
 

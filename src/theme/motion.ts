@@ -17,4 +17,10 @@ export const motion = {
    * Short enough to stay inside the 300 ms tap-to-text budget.
    */
   articleOpen: { duration: 300, easing: [0.2, 0, 0, 1], fadeOutEnd: 1, fadeIn: 150 },
+  /**
+   * The New Articles note (FEE-102) arrives because something did: it fades in, dropping a short way
+   * from where the new Articles are, on Material's emphasized-decelerate curve, and fades out quicker
+   * when you reach them.
+   */
+  newArticlesNote: { distance: 8, duration: 200, exit: 150, easing: [0.05, 0.7, 0.1, 1] },
 } as const;

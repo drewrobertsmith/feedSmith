@@ -71,6 +71,37 @@ export const ALL_WORLDS = [
 
 export type AllWorldId = (typeof ALL_WORLDS)[number]['id'];
 
+/**
+ * New Articles arriving while Feeds is open (FEE-102): scrolled down, your place holds and a quiet note
+ * says so; at the top, they're simply in view. Two Verge Articles arrive a moment after each opens.
+ */
+export const NEW_ARTICLES_WORLDS = [
+  { id: 'arrive-scrolled', label: 'New Articles, scrolled down', spec: { colorScheme: 'dark', feeds: 'busy', arrivals: 'later', scrolled: true } },
+  {
+    id: 'arrive-scrolled-light',
+    label: 'New Articles, scrolled down, light',
+    spec: { colorScheme: 'light', feeds: 'busy', arrivals: 'later', scrolled: true },
+  },
+  {
+    id: 'arrive-scrolled-largest-font',
+    label: 'New Articles, scrolled down, largest font size',
+    spec: { colorScheme: 'dark', feeds: 'busy', arrivals: 'later', scrolled: true, fontScale: 2 },
+  },
+  {
+    id: 'arrive-scrolled-remove-animations',
+    label: 'New Articles, scrolled down, Remove animations',
+    spec: { colorScheme: 'dark', feeds: 'busy', arrivals: 'later', scrolled: true, reduceMotion: true },
+  },
+  { id: 'arrive-top', label: 'New Articles, at the top', spec: { colorScheme: 'dark', feeds: 'busy', arrivals: 'later' } },
+  {
+    id: 'arrive-feed-scrolled',
+    label: "New Articles on a Feed's page, scrolled down",
+    spec: { colorScheme: 'dark', feeds: 'busy', feed: 'f1', arrivals: 'later', scrolled: true },
+  },
+] as const satisfies readonly CatalogWorld[];
+
+export type NewArticlesWorldId = (typeof NEW_ARTICLES_WORLDS)[number]['id'];
+
 /** Adding a Feed (FEE-23). */
 export const ADD_FEED_WORLDS = [
   { id: 'add-idle', label: 'Add a Feed', spec: { colorScheme: 'dark', section: 'add-feed' } },

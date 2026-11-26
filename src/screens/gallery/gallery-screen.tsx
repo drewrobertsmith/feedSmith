@@ -39,6 +39,9 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+/** How long after a world opens its new Articles arrive (FEE-102). */
+const ARRIVAL_DELAY = 300;
+
 /** Applies the world for as long as it's shown, then hands the theme back to the phone. */
 function WorldPreview({ entry, world, theme }: { entry: GalleryEntry; world: CatalogWorld; theme: ThemeName }) {
   const spec = { ...world.spec, colorScheme: theme };
@@ -46,6 +49,12 @@ function WorldPreview({ entry, world, theme }: { entry: GalleryEntry; world: Cat
   useEffect(() => createWorld({ ...world.spec, colorScheme: theme }).dispose, [world, theme]);
   // One world's Feeds for as long as it's shown: removing a Feed changes it, and it keeps the change (FEE-97).
   const [feeds] = useState(() => worldFeeds(spec));
+  // A world whose new Articles arrive does so just after it opens, well before the visual check's second look (FEE-102).
+  useEffect(() => {
+    if (world.spec.arrivals !== 'later') return;
+    const timer = setTimeout(feeds.arrive, ARRIVAL_DELAY);
+    return () => clearTimeout(timer);
+  }, [world, feeds]);
   return (
     <AuthContext value={worldAuth(spec)}>
       <FeedsContext value={feeds}>

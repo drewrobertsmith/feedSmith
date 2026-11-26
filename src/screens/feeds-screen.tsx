@@ -1,6 +1,6 @@
-import { LegendList } from '@legendapp/list/react-native';
+import { LegendList, type LegendListRef } from '@legendapp/list/react-native';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Alert, RefreshControl, ToastAndroid, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -13,10 +13,12 @@ import { TopBar, TopBarIcon } from '@/components/top-bar';
 import { useEnvironment, useMinuteClock } from '@/environment';
 import { useAll, useChips, useLastUpdated, useRefresh, useRemoveFeed, type FeedChip } from '@/feeds/feeds-data';
 import { publishedAgo } from '@/feeds/format';
+import { useNewArticles } from '@/feeds/use-new-articles';
 import { useShownRows } from '@/feeds/use-shown-rows';
 import { AccountButton } from '@/screens/account/account-sheet';
 import { AddFeedSheet } from '@/screens/add-feed-sheet';
 import { ChipRow } from '@/screens/chip-row';
+import { NewArticlesNote } from '@/screens/new-articles-note';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
 
@@ -52,23 +54,30 @@ function useConfirmRemove(onRemoved: () => void) {
 /** A row's usual height, for the list's first layout before rows measure themselves. */
 const ESTIMATED_ROW = 112;
 
+/** How near the top still counts as at the top, where new Articles are in view (FEE-102). */
+const AT_TOP = spacing.related;
+
 /**
  * The Feeds section: All, or one Feed's Articles, newest first (Q1, P5, P12), under the chip
  * row (P9). The chosen chip lives in the route (`?feed=`), so it can be restored and linked to;
  * a link's value is untrusted, so anything but one of the User's chips means All (Q25).
- * Adding a Feed is a sheet over it (FEE-45); removing one is in its chip's menu (FEE-97). `accountOpen`,
- * `addOpen` and `menuFor` open the Account sheet, the add sheet or a chip's menu at once, for the state gallery.
+ * Adding a Feed is a sheet over it (FEE-45); removing one is in its chip's menu (FEE-97). New Articles that
+ * arrive while you're scrolled down wait above you, your place held, with a note to go to them (FEE-102).
+ * `accountOpen`, `addOpen`, `menuFor` and `startAtRow` open the Account sheet, the add sheet or a chip's menu
+ * at once, or start the list scrolled to a row, for the state gallery.
  */
 export function FeedsScreen({
   feed,
   accountOpen,
   addOpen = false,
   menuFor,
+  startAtRow,
 }: {
   feed?: string;
   accountOpen?: boolean;
   addOpen?: boolean;
   menuFor?: string;
+  startAtRow?: number;
 }) {
   const insets = useSafeAreaInsets();
   const chipsView = useChips();
@@ -84,9 +93,17 @@ export function FeedsScreen({
   const shown = useShownRows(all, chipIndex);
   // All mixes Feeds, so its rows name theirs; one Feed's chip already names it (P20).
   const rowsNameFeeds = order[shown.index] === '';
+  const { colorScheme, reduceMotion } = useEnvironment();
+  // Scrolled down, new Articles wait above you, and the list holds your place (FEE-102); at the top they're in view.
+  const list = useRef<LegendListRef>(null);
+  const [atTop, setAtTop] = useState(startAtRow === undefined);
+  const newArticles = useNewArticles(order[shown.index] ?? '', shown.articles, atTop);
+  const goToTop = () => {
+    newArticles.clear();
+    list.current?.scrollToOffset({ offset: 0, animated: !reduceMotion });
+  };
   const { refreshing, refresh } = useRefresh();
   const updated = useUpdatedLine(refreshing);
-  const { colorScheme } = useEnvironment();
   const theme = themes[colorScheme];
   const noFeeds = chipsView.status === 'ready' && chips.length === 0;
   const empty = all.status === 'ready' && all.articles.length === 0;
@@ -147,8 +164,13 @@ export function FeedsScreen({
       <View className="flex-1 bg-background">
       <ChipSwitch index={shown.index}>
         <LegendList
+          ref={list}
           testID="all-list"
           data={shown.articles}
+          // Your place holds when Articles arrive above you; at the top they push in, in view (FEE-102).
+          maintainVisibleContentPosition={{ data: !atTop }}
+          initialScrollIndex={startAtRow}
+          onScroll={(event) => setAtTop(event.nativeEvent.contentOffset.y <= AT_TOP)}
           keyExtractor={(article) => article.id}
           renderItem={({ item }) => (
             <SlideRow>
@@ -172,6 +194,7 @@ export function FeedsScreen({
           contentContainerStyle={{ paddingBottom: insets.bottom + spacing.section }}
         />
       </ChipSwitch>
+      {newArticles.waiting ? <NewArticlesNote onPress={goToTop} /> : null}
       {addSheet}
       </View>
     </SharedTitleScreen>
