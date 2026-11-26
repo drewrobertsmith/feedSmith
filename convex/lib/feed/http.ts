@@ -1,4 +1,4 @@
-import { Context, Effect, Layer } from 'effect';
+import { Context, Effect, Layer, Schedule, Schema } from 'effect';
 
 import { InvalidUrl, TooLarge, Timeout, Unreachable, type FetchError } from './errors';
 
@@ -83,6 +83,23 @@ async function readCapped(response: Response): Promise<string | null> {
 
 type Fetch = typeof globalThis.fetch;
 
+/**
+ * A failure that's likely gone a moment later: the connection failed, or the server said it's
+ * briefly busy. Retried, then reported as `Unreachable`; it never leaves this module (FEE-111).
+ */
+class Blip extends Schema.TaggedError<Blip>()('Blip', {}) {}
+
+/** Answers that mean "try again shortly". Any other error status is lasting. */
+const BUSY = new Set([429, 502, 503, 504]);
+
+/**
+ * The retry policy for blips (FEE-111): up to two more tries, about 500 ms then 1 s apart,
+ * each wait spread by 0.8–1.2× so Feeds on one host don't retry in lockstep. A server's
+ * Retry-After is ignored: it doesn't get to choose how long a fetch waits. All of it fits
+ * inside the fetch's 10 seconds (T18).
+ */
+const RETRY = Schedule.exponential('500 millis').pipe(Schedule.jittered, Schedule.upTo({ times: 2 }));
+
 /** The one way feedSmith's server reaches the network (T18). */
 export class FeedHttp extends Context.Service<
   FeedHttp,
@@ -98,10 +115,10 @@ export class FeedHttp extends Context.Service<
     const once = (url: URL, headers: Record<string, string>) =>
       Effect.tryPromise({
         try: (signal) => fetch(url.href, { redirect: 'manual', headers, signal }),
-        catch: () => new Unreachable(),
+        catch: () => new Blip(),
       });
 
-    const get = Effect.fnUntraced(function* (input: string, validators: Validators = {}): Effect.fn.Return<FetchResult, FetchError> {
+    const attempt = Effect.fnUntraced(function* (input: string, validators: Validators = {}): Effect.fn.Return<FetchResult, FetchError | Blip> {
       const etag = cleanValidator(validators.etag);
       const lastModified = cleanValidator(validators.lastModified);
       const headers: Record<string, string> = { ...HEADERS };
@@ -123,8 +140,12 @@ export class FeedHttp extends Context.Service<
           url = next;
           continue;
         }
+        if (BUSY.has(response.status)) {
+          yield* Effect.promise(async () => response.body?.cancel());
+          return yield* new Blip();
+        }
         if (!response.ok) return yield* new Unreachable();
-        const body = yield* Effect.tryPromise({ try: () => readCapped(response), catch: () => new Unreachable() });
+        const body = yield* Effect.tryPromise({ try: () => readCapped(response), catch: () => new Blip() });
         if (body === null) return yield* new TooLarge();
         const result: FetchResult = { _tag: 'Fetched', body, url: url.href };
         const newEtag = cleanValidator(response.headers.get('etag'));
@@ -137,7 +158,9 @@ export class FeedHttp extends Context.Service<
 
     return FeedHttp.of({
       get: (url, validators) =>
-        get(url, validators).pipe(
+        attempt(url, validators).pipe(
+          Effect.retry({ schedule: RETRY, while: (error) => error._tag === 'Blip' }),
+          Effect.catchTag('Blip', () => Effect.fail(new Unreachable())),
           Effect.timeoutOrElse({
             duration: options.timeoutMs ?? TIMEOUT_MS,
             orElse: () => Effect.fail(new Timeout()),
