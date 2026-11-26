@@ -834,7 +834,7 @@ describe('the Reading view', () => {
     'reading-unextracted-light': { ...fallback, theme: 'light', feed: 'Calm Notes' },
     'reading-unextracted-largest-font': { ...fallback, titleSize: 60, theme: 'dark', feed: 'Calm Notes' },
     'reading-largest-font': { ...full, heading: ARTICLE, body: 'Talks resume next year.', titleSize: 60, theme: 'dark', feed: 'The Verge' },
-        // Opening, before the Article arrives: only the headline the list had, ready for its title to land on (FEE-48).
+        // Opening, before the Article arrives: only the headline the list had, ready for the page to fade in with (FEE-48, FEE-114).
     'reading-opening': {
       heading: ARTICLE,
       body: null,
@@ -1118,40 +1118,8 @@ describe('buttons have depth, not outlines (FEE-75, D27)', () => {
   });
 });
 
-// FEE-48: opening an Article carries the row's title into the Reading view's headline, as one shared element
-// (Reanimated's shared element transitions, a container transform in Material's terms, D29).
-describe('the title carries from the row into the headline (FEE-48)', () => {
-  /** The shared-element tag on the view around `element`, if any. */
-  const tagOf = (element: { props: { sharedTransitionTag?: string }; parent: unknown }) => {
-    for (let node = element as typeof element | null; node; node = node.parent as typeof element | null) {
-      if (node.props.sharedTransitionTag) return node.props.sharedTransitionTag;
-    }
-    return undefined;
-  };
-  const [first] = FIXTURE_ROWS;
-
-  test('the row\'s title and the opened Article\'s headline share one tag', async () => {
-    await open({ colorScheme: 'dark', feeds: 'some' });
-    const rowTitle = await screen.findByText(first.title);
-    expect(tagOf(rowTitle)).toBe(`article-title-${first.id}`);
-  });
-
-  test('the Reading view\'s headline carries the same tag', async () => {
-    await open({ colorScheme: 'dark', section: 'article' });
-    const headline = await screen.findByRole('heading', { name: FIXTURE_ARTICLE.title });
-    // The gallery and tests open the first fixture row's Article.
-    expect(tagOf(headline)).toBe(`article-title-${first.id}`);
-  });
-
-  test('with Remove animations on, nothing is tagged, so opening is a plain cut (Q17)', async () => {
-    await open({ colorScheme: 'dark', feeds: 'some', reduceMotion: true });
-    expect(tagOf(await screen.findByText(first.title))).toBeUndefined();
-  });
-});
-
-// FEE-48: the title can only travel to a headline that exists from the Reading view's first frame, and a
-// headline swapped for another mid-flight is left invisible on Android. So while the Article loads, the title
-// the list already had is shown, in the same headline that stays once the Article arrives.
+// FEE-48, kept by FEE-114: while the Article loads, the title the list already had is shown, so the page fades
+// in with its headline, in the same headline that stays once the Article arrives.
 describe('the headline is there from the first frame, and stays the same headline (FEE-48)', () => {
   const [first] = FIXTURE_ROWS;
 

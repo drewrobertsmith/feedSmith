@@ -1,0 +1,39 @@
+import { createContext, use, useLayoutEffect, useRef, type ReactNode } from 'react';
+import Animated, { type useAnimatedStyle } from 'react-native-reanimated';
+
+import { rectOf, type ViewRef } from '@/components/article-row';
+import type { Rect } from '@/navigation/container-transform';
+
+/**
+ * What the transition asks of the page's lead image (FEE-114): to say where it is, once laid out and on
+ * request, and to take a style that hides it while a row's thumbnail travels to its place.
+ */
+type LeadSlotValue = {
+  /** Called with a way to measure the lead image while it's mounted; returns its cleanup. */
+  register: (measure: () => Rect | undefined) => () => void;
+  /** Called once the lead image is laid out. */
+  laidOut: () => void;
+  style: ReturnType<typeof useAnimatedStyle>;
+};
+export const LeadSlotContext = createContext<LeadSlotValue | undefined>(undefined);
+
+/**
+ * Wraps the page's lead image (FEE-114). Outside a transition (the state gallery), or not `active`, it's
+ * just its child.
+ */
+export function LeadSlot({ active, children }: { active: boolean; children: ReactNode }) {
+  const slot = use(LeadSlotContext);
+  return active && slot ? <MeasuredLead slot={slot}>{children}</MeasuredLead> : children;
+}
+
+function MeasuredLead({ slot, children }: { slot: LeadSlotValue; children: ReactNode }) {
+  const view = useRef<ViewRef>(null);
+  const { register, laidOut, style } = slot;
+  // Before layout events arrive, so the first one can measure.
+  useLayoutEffect(() => register(() => rectOf(view.current)), [register]);
+  return (
+    <Animated.View ref={view} onLayout={laidOut} collapsable={false} style={style}>
+      {children}
+    </Animated.View>
+  );
+}

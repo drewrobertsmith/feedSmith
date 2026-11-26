@@ -63,7 +63,7 @@ export type RemoveFeed = (id: string) => Promise<'ok' | 'failed'>;
 
 /**
  * The Article the Reading view opens. While it loads, `title` is the one a list already showed for it, when
- * there was one, so the headline is there from the first frame for the row's title to travel into (FEE-48).
+ * there was one, so the page fades in with its headline as it grows from the row (FEE-48, FEE-114).
  */
 export type ArticleView = { status: 'loading'; title?: string } | { status: 'missing' } | { status: 'ready'; article: ReadingArticle };
 /**

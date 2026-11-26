@@ -39,7 +39,8 @@ function ThemedStack() {
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Protected guard={session === 'signed-in'}>
             <Stack.Screen name="index" />
-            <Stack.Screen name="article/[id]" />
+            {/* The Reading view moves itself (FEE-114): the list stays drawn beneath it while it grows from a row. */}
+            <Stack.Screen name="article/[id]" options={{ presentation: 'transparentModal', animation: 'none' }} />
           </Stack.Protected>
           <Stack.Protected guard={session === 'signed-out'}>
             <Stack.Screen name="sign-in" />

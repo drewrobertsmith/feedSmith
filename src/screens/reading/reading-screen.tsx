@@ -5,12 +5,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/app-button';
 import { AppText } from '@/components/app-text';
-import { SharedTitle, SharedTitleScreen } from '@/components/shared-title';
 import { useSizeScale } from '@/environment';
 import { useArticle, useMarkRead, type Block, type ReadingArticle } from '@/feeds/feeds-data';
 import { byline, publishedDate } from '@/feeds/format';
 import { openLink } from '@/feeds/open-link';
 import { ArticleBlocks } from '@/screens/reading/article-blocks';
+import { ArticleTransition } from '@/screens/reading/article-transition';
 import { spacing } from '@/theme/spacing';
 
 /** When the link names no Article of this User's, or one that's gone. */
@@ -39,7 +39,7 @@ function PageUnavailable({ article }: { article: ReadingArticle }) {
   ];
   return (
     <View className="gap-group">
-      <ArticleBlocks blocks={blocks} />
+      <ArticleBlocks blocks={blocks} lead={!!imageUrl} />
       <AppText variant="label" className="text-text-muted">
         This Article couldn’t be brought in from its page.
       </AppText>
@@ -60,16 +60,12 @@ const textOf = (block: Block | undefined) =>
 
 /**
  * The Article's headline, Subtitle and meta: the deck is left out where the text already says it. While the
- * Article loads, only the headline shows, with the title its row had, and it's the same headline once the
- * Article arrives (FEE-48): a headline swapped for another while a title flies to it is left invisible.
+ * Article loads, only the headline shows, with the title its row had (FEE-48), so the page fades in with it.
  */
-function ArticleHeader({ id, title, article }: { id: string; title: string; article?: ReadingArticle }) {
+function ArticleHeader({ title, article }: { title: string; article?: ReadingArticle }) {
   return (
     <View className="gap-related">
-      {/* Where the row's title lands when the Article opens (FEE-48). */}
-      <SharedTitle articleId={id}>
-        <AppText variant="headline">{title}</AppText>
-      </SharedTitle>
+      <AppText variant="headline">{title}</AppText>
       {article ? <ArticleMeta article={article} /> : null}
     </View>
   );
@@ -134,16 +130,28 @@ function ArticleEnd({ link }: { link: string }) {
   );
 }
 
+/** The lead image, unless the text opens with an image of its own (often the same one, resized). */
+const leadOf = (article: ReadingArticle) =>
+  article.page !== 'unavailable' && article.imageUrl && article.blocks[0]?.type !== 'image'
+    ? article.imageUrl
+    : undefined;
+
+/**
+ * Whether the page's first picture comes right after its header, for a row's thumbnail to land on (FEE-114):
+ * the lead image, the text's own opening image, or the image of a page that couldn't be read.
+ */
+const opensWithImage = (article: ReadingArticle) =>
+  article.page === 'unavailable' ? !!article.imageUrl : !!leadOf(article) || article.blocks[0]?.type === 'image';
+
 /** Below the header: the fallback for a page that couldn't be read, or the lead image, the text and its end. */
 function ArticleBody({ article }: { article: ReadingArticle }) {
   if (article.page === 'unavailable') return <PageUnavailable article={article} />;
-  // The lead image, unless the text opens with an image of its own (often the same one, resized).
-  const lead = article.imageUrl && article.blocks[0]?.type !== 'image' ? article.imageUrl : undefined;
+  const lead = leadOf(article);
   return (
     <>
       {lead ? (
         <View testID="lead-image">
-          <ArticleBlocks blocks={[{ type: 'image', src: lead }]} />
+          <ArticleBlocks blocks={[{ type: 'image', src: lead }]} lead />
         </View>
       ) : null}
       <View className="gap-group">
@@ -153,7 +161,7 @@ function ArticleBody({ article }: { article: ReadingArticle }) {
             Bringing in the full Article from its page…
           </AppText>
         ) : null}
-        <ArticleBlocks blocks={article.blocks} link={article.link} />
+        <ArticleBlocks blocks={article.blocks} link={article.link} lead={!lead} />
       </View>
       {article.link ? <ArticleEnd link={article.link} /> : null}
     </>
@@ -181,11 +189,13 @@ export function ReadingScreen({ id }: { id: string }) {
   // While it loads, the title its row had (FEE-48); opened from a link, nothing until the Article arrives.
   const article = view.status === 'ready' ? view.article : undefined;
   const title = article?.title ?? (view.status === 'loading' ? view.title : undefined);
-  if (title === undefined) return <View className="flex-1 bg-background" />;
   return (
-    // Only the screen in front carries titles (FEE-48).
-    <SharedTitleScreen>
-      <View className="flex-1 bg-background">
+    // Opened from a row, the page grows from it and goes back into it (FEE-114).
+    <ArticleTransition id={id} articleReady={ready} hasLead={!!article && opensWithImage(article)}>
+      {title === undefined ? (
+        <View className="flex-1 bg-background" />
+      ) : (
+        <View className="flex-1 bg-background">
         <ScrollView
           className="flex-1"
           contentContainerClassName="items-center px-edge"
@@ -195,7 +205,7 @@ export function ReadingScreen({ id }: { id: string }) {
           }}
         >
           <View className="w-full gap-section" style={{ maxWidth: MEASURE * scale }}>
-            <ArticleHeader id={id} title={title} article={article} />
+            <ArticleHeader title={title} article={article} />
             {article ? <ArticleBody article={article} /> : null}
           </View>
         </ScrollView>
@@ -206,7 +216,8 @@ export function ReadingScreen({ id }: { id: string }) {
           className="absolute left-0 right-0 top-0 bg-background"
           style={{ height: insets.top }}
         />
-      </View>
-    </SharedTitleScreen>
+        </View>
+      )}
+    </ArticleTransition>
   );
 }
