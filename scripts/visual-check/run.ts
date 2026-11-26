@@ -86,6 +86,11 @@ function prepareDevice(): () => void {
     demo('network', ['-e', 'wifi', 'show', '-e', 'level', '4']);
     demo('network', ['-e', 'mobile', 'hide']);
     demo('notifications', ['-e', 'visible', 'false']);
+    // A key press (Back, a hardware keyboard) takes Android out of touch mode, and it then draws a focus
+    // highlight on whichever view holds focus, into the pictures. A touch put down and cancelled on the
+    // status bar brings touch mode back without pressing anything (the visual drift seen after FEE-114).
+    shell('input', 'motionevent', 'DOWN', '540', '10');
+    shell('input', 'motionevent', 'CANCEL', '540', '10');
   } catch (error) {
     restore();
     throw error;
