@@ -1,6 +1,6 @@
 import { LegendList, type LegendListRef } from '@legendapp/list/react-native';
 import { router } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { Alert, RefreshControl, ToastAndroid, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -54,6 +54,28 @@ function usePullUnlessOffline() {
   return { refreshing: refreshing && !offline, onRefresh: offline ? ignorePull : refresh, offline };
 }
 
+/**
+ * Your place in Feeds (FEE-130, Q4): the chip you're on and how far down its list, kept in memory and written when
+ * the app leaves the screen (Q21). The list's Articles arrive after it opens, so a restored place is scrolled to
+ * once there's room for it.
+ */
+function useListPlace(list: RefObject<LegendListRef | null>, selection: string | null, startAtOffset: number | undefined) {
+  const keeper = usePlaceKeeper();
+  const pending = useRef(startAtOffset ?? 0);
+  useEffect(() => {
+    keeper.update({ feed: selection ?? undefined });
+  }, [keeper, selection]);
+  return {
+    onScroll: (offset: number) => keeper.update({ listOffset: offset }),
+    onContentSizeChange: (_width: number, height: number) => {
+      if (pending.current > 0 && height > pending.current) {
+        list.current?.scrollToOffset({ offset: pending.current, animated: false });
+        pending.current = 0;
+      }
+    },
+  };
+}
+
 /** A row's usual height, for the list's first layout before rows measure themselves. */
 const ESTIMATED_ROW = 112;
 
@@ -103,7 +125,6 @@ export function FeedsScreen({
   const rowsNameFeeds = order[shown.index] === '';
   // Scrolled down, new Articles wait above you, and the list holds your place (FEE-102); at the top they're in view.
   const list = useRef<LegendListRef>(null);
-  const pendingOffset = useRef(startAtOffset ?? 0);
   const [atTop, setAtTop] = useState(startAtRow === undefined && startAtOffset === undefined);
   // Scrolling sets state only when it crosses the top, never on every frame (FEE-102).
   const atTopRef = useRef(atTop);
@@ -126,11 +147,7 @@ export function FeedsScreen({
   const empty = all.status === 'ready' && all.articles.length === 0;
 
   const select = (feedId: string | null) => router.setParams({ feed: feedId ?? undefined });
-  // The chip you're on is part of your place (FEE-130); a new chip starts its list at the top.
-  const keeper = usePlaceKeeper();
-  useEffect(() => {
-    keeper.update({ feed: selection ?? undefined });
-  }, [keeper, selection]);
+  const listPlace = useListPlace(list, selection, startAtOffset);
   const [adding, setAdding] = useState(addOpen);
   const addFeed = () => setAdding(true);
   // A Feed added, or one already followed: the sheet closes on its chip (FEE-45, T22).
@@ -187,18 +204,10 @@ export function FeedsScreen({
           maintainVisibleContentPosition={{ data: !atTop }}
           initialScrollIndex={startAtRow}
           initialScrollOffset={startAtOffset}
-          // Its Articles arrive after the list opens: your place is scrolled to once there's room for it (FEE-130).
-          onContentSizeChange={(_width, height) => {
-            if (pendingOffset.current > 0 && height > pendingOffset.current) {
-              list.current?.scrollToOffset({ offset: pendingOffset.current, animated: false });
-              pendingOffset.current = 0;
-            }
-          }}
+          onContentSizeChange={listPlace.onContentSizeChange}
           onScroll={(event) => {
-            const offset = event.nativeEvent.contentOffset.y;
-            trackTop(offset);
-            // Kept in memory only; written when the app leaves the screen (FEE-130, Q21).
-            keeper.update({ listOffset: offset });
+            trackTop(event.nativeEvent.contentOffset.y);
+            listPlace.onScroll(event.nativeEvent.contentOffset.y);
           }}
           keyExtractor={(article) => article.id}
           renderItem={({ item }) => (
