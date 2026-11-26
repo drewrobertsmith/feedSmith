@@ -1,5 +1,6 @@
 import { createContext, use, useState, type ReactNode } from 'react';
-import { Pressable, View, type GestureResponderEvent, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, type GestureResponderEvent, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
+import Animated, { cubicBezier } from 'react-native-reanimated';
 
 import { useEnvironment } from '@/environment';
 import { depth, depthStyle, rippleColor, SHAPE_RADIUS, type DepthLevel, type DepthShape } from '@/theme/depth';
@@ -40,6 +41,7 @@ export function DepthPressable({
   onPressIn,
   onPressOut,
   disabled,
+  settle,
   children,
   ...props
 }: Omit<PressableProps, 'style' | 'children'> & {
@@ -47,6 +49,11 @@ export function DepthPressable({
   level: Exclude<DepthLevel, 'pressed'>;
   /** A pill or circle (`round`), or a card's corners for a control holding a few lines. */
   shape?: DepthShape;
+  /**
+   * How it changes level, as a Material control changes state (FEE-117): its face and shadow ease from one to
+   * the other over `duration` ms on `easing`. Without it, the face changes at once.
+   */
+  settle?: { duration: number; easing: readonly [number, number, number, number] };
   /** Classes placing the control in its parent, such as `self-start`. */
   frameClassName?: string;
   /** Classes laying out the control's content inside its face. */
@@ -72,7 +79,17 @@ export function DepthPressable({
   };
   return (
     <Pressable {...props} {...handlers} className={frameClassName}>
-      <View style={[depthStyle(colorScheme, shown), { borderRadius: SHAPE_RADIUS[shape], overflow: 'hidden' }]}>
+      <Animated.View
+        style={[
+          depthStyle(colorScheme, shown),
+          { borderRadius: SHAPE_RADIUS[shape], overflow: 'hidden' },
+          settle && {
+            transitionProperty: ['backgroundColor', 'boxShadow'],
+            transitionDuration: settle.duration,
+            transitionTimingFunction: cubicBezier(...settle.easing),
+          },
+        ]}
+      >
         <Pressable
           {...handlers}
           accessible={false}
@@ -82,7 +99,7 @@ export function DepthPressable({
         >
           <ControlFace value={depth[colorScheme][shown].face}>{children}</ControlFace>
         </Pressable>
-      </View>
+      </Animated.View>
     </Pressable>
   );
 }

@@ -1,3 +1,5 @@
+import { motion } from '@/theme/motion';
+
 /** A chip's label is at most this many characters, so one long name can't fill the row (FEE-44). */
 export const CHIP_LABEL_CHARS = 16;
 
@@ -48,4 +50,10 @@ export type ChipTone = 'accent' | 'textMuted';
 /** Chosen is Gold (D5); every other chip is muted, so the row never competes with the Articles. */
 export function chipTone({ selected }: { selected: boolean }): ChipTone {
   return selected ? 'accent' : 'textMuted';
+}
+
+/** How a chip changes state (FEE-117): its face and label ease over a short, standard curve, or at once (Q17). */
+export function chipSettle(reduceMotion: boolean): { duration: number; easing: readonly [number, number, number, number] } {
+  const { duration, easing } = motion.chipSelect;
+  return { duration: reduceMotion ? 0 : duration, easing };
 }

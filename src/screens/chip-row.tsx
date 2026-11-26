@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, View, type LayoutChangeEvent, type ScrollViewInstance } from 'react-native';
+import Reanimated, { cubicBezier } from 'react-native-reanimated';
 
-import { AppText } from '@/components/app-text';
 import { DepthPressable } from '@/components/depth-pressable';
 import { FeedIcon } from '@/components/feed-icon';
 import { NativeMenu } from '@/components/native-menu';
 import { useEnvironment } from '@/environment';
 import type { FeedChip } from '@/feeds/feeds-data';
-import { chipLabel, chipTone, fadeRanges, revealOffset, transparent, type ChipTone } from '@/screens/chip-row-layout';
-import { motion } from '@/theme/motion';
+import { chipLabel, chipSettle, chipTone, fadeRanges, revealOffset, transparent, type ChipTone } from '@/screens/chip-row-layout';
+import { typeScale } from '@/theme/type';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
 
@@ -38,31 +38,12 @@ function Chip({
   onLongPress?: () => void;
   remove?: { label: string; onRemove: () => void };
 }) {
-  const { reduceMotion } = useEnvironment();
-  const [scale] = useState(() => new Animated.Value(1));
-  const wasSelected = useRef(selected);
-
-  useEffect(() => {
-    // Only a chip that becomes chosen moves; "Remove animations" keeps just the colour change (Q17).
-    if (selected && !wasSelected.current && !reduceMotion) {
-      scale.setValue(motion.chipSelect.from);
-      Animated.spring(scale, {
-        toValue: 1,
-        damping: motion.chipSelect.damping,
-        stiffness: motion.chipSelect.stiffness,
-        useNativeDriver: true,
-      }).start();
-    }
-    wasSelected.current = selected;
-  }, [selected, reduceMotion, scale]);
-
-  // A chip that goes mid-spring stops it (Q20).
-  useEffect(() => () => scale.stopAnimation(), [scale]);
-
+  const settle = useChipSettle();
   return (
-    <Animated.View style={{ transform: [{ scale }] }} onLayout={onLayout}>
+    <View onLayout={onLayout}>
       <DepthPressable
         level={selected ? 'raised' : 'soft'}
+        settle={settle}
         role="tab"
         aria-label={accessibleName}
         aria-selected={selected}
@@ -76,18 +57,39 @@ function Chip({
       >
         {children}
       </DepthPressable>
-    </Animated.View>
+    </View>
   );
 }
 
-const TONE_CLASS: Record<ChipTone, string> = { accent: 'text-accent', textMuted: 'text-text-muted' };
+/** How a chip changes state (FEE-117): eased, or at once with Remove animations on (Q17). */
+function useChipSettle() {
+  return chipSettle(useEnvironment().reduceMotion);
+}
 
-/** A chip's words: TalkBack hears the chip's own name instead. */
+/**
+ * A chip's words, in `chipTone`'s colour (Gold when chosen, D5), easing with the chip's face (FEE-117). Drawn
+ * as the label variant (D6), like `AppText`, which takes no style to ease. TalkBack hears the chip's own name.
+ */
 function ChipLabel({ label, tone }: { label: string; tone: ChipTone }) {
+  const { colorScheme, fontScale } = useEnvironment();
+  const { duration, easing } = useChipSettle();
+  const { fontSize, lineHeight, ...face } = typeScale.label;
   return (
-    <AppText variant="label" className={TONE_CLASS[tone]} accessible={false} numberOfLines={1}>
+    <Reanimated.Text
+      accessible={false}
+      numberOfLines={1}
+      style={{
+        ...face,
+        fontSize: fontSize * fontScale,
+        lineHeight: lineHeight * fontScale,
+        color: themes[colorScheme][tone],
+        transitionProperty: 'color',
+        transitionDuration: duration,
+        transitionTimingFunction: cubicBezier(...easing),
+      }}
+    >
       {label}
-    </AppText>
+    </Reanimated.Text>
   );
 }
 
