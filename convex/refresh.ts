@@ -1,11 +1,13 @@
 import { v } from 'convex/values';
+import { Effect } from 'effect';
 
 import { internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { internalAction, internalMutation, internalQuery, type ActionCtx } from './_generated/server';
 import { DELETE_BATCH } from './lib/feed/blocks';
 import { deleteArticles } from './lib/deleteArticles';
-import { fetchFeed } from './lib/feed/fetch';
+import { fetchFeedEffect } from './lib/feed/fetch';
+import { FeedHttp } from './lib/feed/http';
 import { KEEP_NEWEST, markFailing, markWorking, RETENTION, scheduleOf, storeNewArticles } from './lib/feed/record';
 import { bookNextFetch, ensureFetchBooked } from './lib/feed/timer';
 import { vStoredArticle, vValidators } from './lib/feed/validators';
@@ -14,39 +16,53 @@ import { vStoredArticle, vValidators } from './lib/feed/validators';
 const LEASE = 10 * 60_000;
 /** Feeds started per tick; the rest wait for the next one. */
 const PER_TICK = 50;
+/** Fetches a Feed and records the outcome, answering when it recorded it. Every outcome, failures included, is a value. */
+const fetchAndRecord = Effect.fnUntraced(function* (
+  ctx: ActionCtx,
+  feedId: Id<'feeds'>,
+  feed: { url: string; etag?: string; lastModified?: string },
+): Effect.fn.Return<number, never, FeedHttp> {
+  const outcome = yield* fetchFeedEffect(feed.url, { etag: feed.etag, lastModified: feed.lastModified });
+  const now = Date.now();
+  if (outcome._tag === 'Fetched') {
+    yield* Effect.promise(() =>
+      ctx.runMutation(internal.refresh.recordFetch, { feedId, now, siteUrl: outcome.siteUrl, articles: outcome.articles, ...outcome.validators }),
+    );
+  } else if (outcome._tag === 'NotModified') {
+    yield* Effect.promise(() => ctx.runMutation(internal.refresh.recordNotModified, { feedId, now }));
+  } else {
+    // Failed, or a page where a feed used to be: either way the Feed isn't working.
+    yield* Effect.promise(() => ctx.runMutation(internal.refresh.recordFailure, { feedId, now }));
+  }
+  return now;
+});
+
 /**
  * Fetches one Feed and records what happened. Shared by the cron and pulling down. Answers when it
  * recorded the fetch (null for a Feed that's gone), so a pull can say when the "Updated" line catches up (FEE-103).
+ * A defect (a bug, or a limit hit while storing) is kept apart from those outcomes, and still recorded as a
+ * failure, so the Feed backs off instead of retrying when its lease ends. It isn't logged: it may carry the URL (Q9, FEE-110).
  */
-export async function refreshOne(ctx: ActionCtx, feedId: Id<'feeds'>): Promise<number | null> {
-  const feed = await ctx.runQuery(internal.refresh.forRefresh, { feedId });
+export const refreshFeedEffect = Effect.fnUntraced(function* (
+  ctx: ActionCtx,
+  feedId: Id<'feeds'>,
+): Effect.fn.Return<number | null, never, FeedHttp> {
+  const feed = yield* Effect.promise(() => ctx.runQuery(internal.refresh.forRefresh, { feedId }));
   if (!feed) return null;
-  let now = Date.now();
-  try {
-    const outcome = await fetchFeed(feed.url, { etag: feed.etag, lastModified: feed.lastModified });
-    now = Date.now();
-    if (outcome._tag === 'Fetched') {
-      await ctx.runMutation(internal.refresh.recordFetch, {
-        feedId,
-        now,
-        siteUrl: outcome.siteUrl,
-        articles: outcome.articles,
-        ...outcome.validators,
-      });
-    } else if (outcome._tag === 'NotModified') {
-      await ctx.runMutation(internal.refresh.recordNotModified, { feedId, now });
-    } else {
-      // Failed, or a page where a feed used to be: either way the Feed isn't working.
-      await ctx.runMutation(internal.refresh.recordFailure, { feedId, now });
-    }
-  } catch {
-    // Anything unexpected (a limit hit while storing) still counts as a failure, so the Feed
-    // backs off instead of retrying when its lease ends. The error isn't logged: it may carry the URL (Q9).
-    now = Date.now();
-    await ctx.runMutation(internal.refresh.recordFailure, { feedId, now });
-  }
-  // When this fetch was recorded, as the "Updated" line will read it (FEE-103).
-  return now;
+  return yield* fetchAndRecord(ctx, feedId, feed).pipe(
+    Effect.catchDefect(() =>
+      Effect.promise(async () => {
+        const now = Date.now();
+        await ctx.runMutation(internal.refresh.recordFailure, { feedId, now });
+        return now;
+      }),
+    ),
+  );
+});
+
+/** `refreshFeedEffect` on the live network, for Promise callers. */
+export function refreshOne(ctx: ActionCtx, feedId: Id<'feeds'>): Promise<number | null> {
+  return Effect.runPromise(refreshFeedEffect(ctx, feedId).pipe(Effect.provide(FeedHttp.layer)));
 }
 
 /** What a fetch needs to know about a Feed. Internal: the URL never leaves the server (Q9). */

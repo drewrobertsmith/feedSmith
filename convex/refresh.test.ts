@@ -15,6 +15,19 @@ vi.mock('@convex-dev/auth/server', async (original) => ({
     (await ctx.auth.getUserIdentity())?.subject ?? null,
 }));
 
+/** Storing a fetch can be made to break, as a limit hit mid-store would (FEE-110). */
+const storing = vi.hoisted(() => ({ broken: false }));
+vi.mock('./lib/feed/record', async (original) => {
+  const real = await original<typeof import('./lib/feed/record')>();
+  return {
+    ...real,
+    storeNewArticles: async (...args: Parameters<typeof real.storeNewArticles>) => {
+      if (storing.broken) throw new Error('storing https://a.example.com/feed broke');
+      return real.storeNewArticles(...args);
+    },
+  };
+});
+
 const modules = import.meta.glob('./**/*.ts');
 
 const MINUTE = 60_000;
@@ -35,6 +48,7 @@ const rss = (items: { guid: string; ago: number; title?: string }[], now = Date.
 const network = vi.fn<(url: string, init: RequestInit) => Promise<Response>>();
 
 beforeEach(() => {
+  storing.broken = false;
   vi.useFakeTimers();
   vi.setSystemTime(START);
   network.mockReset();
@@ -273,6 +287,33 @@ describe('a network blip is retried, not counted against the Feed (FEE-111)', ()
     network.mockImplementation(async () => new Response('gone', { status: 404 }));
     await refreshLater(s, feed._id);
     expect(network).toHaveBeenCalledTimes(1);
+    expect(await feedOf(s, feed._id)).toMatchObject({ status: 'failing', failures: 1 });
+  });
+});
+
+describe('a bug is kept apart from an ordinary failure (FEE-110)', () => {
+  test('a defect while storing a fetch is recorded as a failure, the Feed backs off, and nothing logged names its URL (Q7, Q9)', async () => {
+    const s = await setup();
+    const feed = await follow(s, [{ guid: 'g1', ago: HOUR }]);
+    const logged = (['log', 'info', 'warn', 'error', 'debug'] as const).map((level) => vi.spyOn(console, level).mockImplementation(() => {}));
+    storing.broken = true;
+    network.mockImplementation(async () => new Response(rss([{ guid: 'g2', ago: 0 }])));
+    vi.setSystemTime(START + HOUR);
+    await refresh(s, feed._id);
+    const failed = (await feedOf(s, feed._id))!;
+    expect(failed).toMatchObject({ status: 'failing', failures: 1 });
+    expect(failed.nextFetchAt).toBe(failed.lastFetchedAt! + backoff(1));
+    expect(await s.a.query(api.articles.all, {})).toHaveLength(1);
+    expect(JSON.stringify(logged.flatMap((spy) => spy.mock.calls))).not.toContain(URL_A);
+    logged.forEach((spy) => spy.mockRestore());
+  });
+
+  test('a pull whose storing breaks for one Feed still records it as failing, and still answers', async () => {
+    const s = await setup();
+    const feed = await follow(s, [{ guid: 'g1', ago: HOUR }]);
+    storing.broken = true;
+    vi.setSystemTime(START + HOUR);
+    expect(await s.a.action(api.feeds.refreshAll, {})).toBe(START + HOUR);
     expect(await feedOf(s, feed._id)).toMatchObject({ status: 'failing', failures: 1 });
   });
 });
