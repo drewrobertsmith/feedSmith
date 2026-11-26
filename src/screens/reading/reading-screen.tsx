@@ -10,19 +10,25 @@ import { useArticle, useMarkRead, type Block, type ReadingArticle } from '@/feed
 import { byline, publishedDate } from '@/feeds/format';
 import { openLink } from '@/feeds/open-link';
 import { ArticleBlocks } from '@/screens/reading/article-blocks';
+import { useLeaveArticle } from '@/screens/reading/article-leave-context';
 import { ArticleTransition } from '@/screens/reading/article-transition';
 import { spacing } from '@/theme/spacing';
 
 /** When the link names no Article of this User's, or one that's gone. */
 export function ArticleMissing() {
   const insets = useSafeAreaInsets();
+  const leave = useLeaveArticle();
   return (
     <View className="flex-1 gap-group bg-background px-edge" style={{ paddingTop: insets.top + spacing.section }}>
       <AppText variant="title">This Article isn’t available.</AppText>
       <AppText variant="reading" className="text-text-muted">
         It may have been removed from its Feed.
       </AppText>
-      <AppButton label="Back to All" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
+      <AppButton
+        label="Back to All"
+        // The page closes the way Back closes it, then goes (FEE-115).
+        onPress={() => leave(() => (router.canGoBack() ? router.back() : router.replace('/')))}
+      />
     </View>
   );
 }
@@ -73,6 +79,7 @@ function ArticleHeader({ title, article }: { title: string; article?: ReadingArt
 
 /** Beneath the headline: the deck, the credit, then the Feed and date. */
 function ArticleMeta({ article }: { article: ReadingArticle }) {
+  const leave = useLeaveArticle();
   const { subtitle, authors, feedId, feedTitle, publishedAt, page, blocks } = article;
   const credit = byline(authors);
   // A summary-only Article's text is its Subtitle; a Feed's text often opens with it too.
@@ -96,7 +103,8 @@ function ArticleMeta({ article }: { article: ReadingArticle }) {
           <Pressable
             role="link"
             aria-label={`${feedTitle}, open its Articles`}
-            onPress={() => router.dismissTo({ pathname: '/', params: { feed: feedId } })}
+            // The page closes first, then Feeds shows the Feed chosen, so the two never move at once (FEE-115).
+            onPress={() => leave(() => router.dismissTo({ pathname: '/', params: { feed: feedId } }))}
             hitSlop={spacing.related}
             className="shrink flex-row items-baseline gap-inside"
           >
@@ -185,7 +193,14 @@ export function ReadingScreen({ id }: { id: string }) {
     if (ready) markOpened();
   }, [ready, id]);
 
-  if (view.status === 'missing') return <ArticleMissing />;
+  if (view.status === 'missing') {
+    // Settled at once: there's nothing more to wait for, and it opens and leaves like any page (FEE-115).
+    return (
+      <ArticleTransition id={id} articleReady hasLead={false}>
+        <ArticleMissing />
+      </ArticleTransition>
+    );
+  }
   // While it loads, the title its row had (FEE-48); opened from a link, nothing until the Article arrives.
   const article = view.status === 'ready' ? view.article : undefined;
   const title = article?.title ?? (view.status === 'loading' ? view.title : undefined);

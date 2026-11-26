@@ -27,6 +27,7 @@ import {
   type Size,
 } from '@/navigation/container-transform';
 import { usePredictiveBack, type BackEvent } from '@/navigation/predictive-back';
+import { ArticleLeaveContext } from '@/screens/reading/article-leave-context';
 import { LeadSlotContext } from '@/screens/reading/lead-slot-context';
 import { motion } from '@/theme/motion';
 import { palette, themes } from '@/theme/tokens';
@@ -74,11 +75,6 @@ function frameOf(
   });
 }
 
-/** The navigator drops the page at once: the transition has already moved it. */
-const goBack = (id: string) => {
-  clearOrigin(id);
-  router.back();
-};
 
 /**
  * Android's back gesture, while `enabled` (FEE-114): `back` follows the finger, a cancel springs it home with
@@ -312,9 +308,21 @@ function useContainerTransform({ id, articleReady, hasLead }: Omit<TransitionPro
     flying.set(flight?.lead !== undefined && flightShown);
   }, [flight, flightShown, flying]);
 
-  /** Back: into the row where it is now, else away on the axis; the navigator then drops the page at once. */
-  const closeArticle = () => {
-    const place = measureRow(id);
+  // Where the page goes once it has closed: back, or wherever a link leads (FEE-115).
+  const leaveTo = useRef<() => void>(undefined);
+  /** The navigator drops the page at once: the transition has already moved it. */
+  const finishClosing = () => {
+    clearOrigin(id);
+    (leaveTo.current ?? router.back)();
+  };
+  /**
+   * Back: into the row where it is now, else away on the axis; the navigator then drops the page at once. Left
+   * by a link (`leave`), it always goes on the axis, since the list it lands on isn't the row's (FEE-115).
+   */
+  const closeArticle = ({ leave }: { leave?: () => void } = {}) => {
+    if (phase === 'closing') return;
+    leaveTo.current = leave;
+    const place = leave ? undefined : measureRow(id);
     const into = place && isOnScreen(place.row, screen) ? place : undefined;
     const leadNow = measureLead.current?.();
     // Opening marked it Read (P7), so it goes back into a Read row.
@@ -340,13 +348,13 @@ function useContainerTransform({ id, articleReady, hasLead }: Omit<TransitionPro
           easing: EMPHASIZED,
         },
         (done) => {
-          if (done) scheduleOnRN(goBack, id);
+          if (done) scheduleOnRN(finishClosing);
         },
       ),
     );
   };
 
-  useBackGesture(focused && phase === 'open', { back, edge }, closeArticle);
+  useBackGesture(focused && phase === 'open', { back, edge }, () => closeArticle());
 
   const onLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
@@ -383,6 +391,7 @@ function useContainerTransform({ id, articleReady, hasLead }: Omit<TransitionPro
     onFlightDrawn: () => setFlightShown(true),
     pageRef,
     leadSlot: { register: registerLead, laidOut: onLeadLayout, displayed: onLeadDrawn, style: leadStyle },
+    leaveArticle: (leave: () => void) => closeArticle({ leave }),
     styles,
   };
 }
@@ -390,7 +399,7 @@ function useContainerTransform({ id, articleReady, hasLead }: Omit<TransitionPro
 /** The page drawn at full size throughout and only clipped and scaled, so its text never reflows mid-move. */
 function MovingArticle({ children, ...props }: TransitionProps) {
   const theme = themes[useEnvironment().colorScheme];
-  const { onLayout, screen, rowPath, rowShown, flight, onFlightDrawn, pageRef, leadSlot, styles } =
+  const { onLayout, screen, rowPath, rowShown, flight, onFlightDrawn, pageRef, leadSlot, leaveArticle, styles } =
     useContainerTransform(props);
   return (
     <View style={StyleSheet.absoluteFill} onLayout={onLayout}>
@@ -416,7 +425,9 @@ function MovingArticle({ children, ...props }: TransitionProps) {
             styles.pageStyle,
           ]}
         >
-          <LeadSlotContext value={leadSlot}>{children}</LeadSlotContext>
+          <ArticleLeaveContext value={leaveArticle}>
+            <LeadSlotContext value={leadSlot}>{children}</LeadSlotContext>
+          </ArticleLeaveContext>
         </Animated.View>
         {rowShown && rowPath ? (
           <Animated.View
