@@ -2,13 +2,14 @@ import { faceOf } from '../../../test/depth';
 import { act, fireEvent, userEvent, within } from '@testing-library/react-native';
 import { screen } from 'expo-router/testing-library';
 import { useState } from 'react';
-import { Alert, Animated, ScrollView, ToastAndroid } from 'react-native';
+import { Alert, Animated, ScrollView, StyleSheet, ToastAndroid } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { Uniwind } from 'uniwind';
 
 import { NativeSheet } from '@/components/native-sheet';
 import { publishedAgo, publishedDate } from '@/feeds/format';
 import { depthStyle } from '@/theme/depth';
+import { themes } from '@/theme/tokens';
 import { spacing } from '@/theme/spacing';
 import {
   ADD_FEED_WORLDS,
@@ -221,8 +222,8 @@ describe('All', () => {
     expect(faceOf(calm)).toMatchObject(depthStyle(colorScheme, 'soft'));
     for (const chip of [all, calm]) expect(chip).not.toHaveStyle({ borderWidth: expect.any(Number) });
     // Still quieter than the chosen one: muted text, with Gold only on the chosen label (D5).
-    expect(within(calm).getByText('Calm Notes')).toHaveProp('className', expect.stringContaining('text-text-muted'));
-    expect(within(all).getByText('All')).toHaveProp('className', expect.stringContaining('text-accent'));
+    expect(within(calm).getByText('Calm Notes')).toHaveStyle({ color: themes[colorScheme].textMuted });
+    expect(within(all).getByText('All')).toHaveStyle({ color: themes[colorScheme].accent });
   });
 
   test.each(['dark', 'light'] as const)('in %s, a chip under the finger sinks to the pressed level, and rises again when let go', async (colorScheme) => {
@@ -287,26 +288,24 @@ describe('All', () => {
     expect(await screen.findByRole('tab', { selected: true })).toHaveAccessibleName('All');
   });
 
-  describe('selecting a chip moves (D7, Q17)', () => {
+  // FEE-117: a chip changes state the Material way: its face and label ease (`chipSettle`), nothing springs.
+  describe('choosing a chip eases its colour, with no bounce (D12, Q17)', () => {
     let spring: jest.SpyInstance;
     beforeEach(() => {
       spring = jest.spyOn(Animated, 'spring');
     });
     afterEach(() => spring.mockRestore());
 
-    test('with motion on, the chosen chip springs', async () => {
+    test.each([false, true])('with Remove animations %s, the chosen chip changes with nothing springing or scaling', async (reduceMotion) => {
       const user = userEvent.setup();
-      await open({ colorScheme: 'dark', feeds: 'some' });
+      await open({ colorScheme: 'dark', feeds: 'some', reduceMotion });
       await user.press(await screen.findByRole('tab', { name: 'Calm Notes' }));
-      expect(spring).toHaveBeenCalled();
-    });
-
-    test('with Remove animations on, it changes without moving', async () => {
-      const user = userEvent.setup();
-      await open({ colorScheme: 'dark', feeds: 'some', reduceMotion: true });
-      await user.press(await screen.findByRole('tab', { name: 'Calm Notes' }));
+      const chip = screen.getByRole('tab', { name: 'Calm Notes' });
+      expect(chip).toBeSelected();
+      expect(faceOf(chip)).toMatchObject(depthStyle('dark', 'raised'));
+      expect(within(chip).getByText('Calm Notes')).toHaveStyle({ color: themes.dark.accent });
       expect(spring).not.toHaveBeenCalled();
-      expect(screen.getByRole('tab', { name: 'Calm Notes' })).toBeSelected();
+      expect(JSON.stringify(StyleSheet.flatten(chip.props.style) ?? {})).not.toContain('scale');
     });
   });
 

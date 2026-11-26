@@ -1,4 +1,15 @@
-import { chipLabel, fadeRanges, revealOffset, transparent } from '@/screens/chip-row-layout';
+import { chipLabel, chipSettle, fadeRanges, revealOffset, transparent } from '@/screens/chip-row-layout';
+import { motion } from '@/theme/motion';
+
+// FEE-117: a chip changes state the Material way: eased over a short, standard curve, or at once (Q17).
+describe('how a chip changes state (FEE-117)', () => {
+  test('with motion on, its face and label ease over the chip duration', () => {
+    expect(chipSettle(false)).toEqual({ duration: motion.chipSelect.duration, easing: motion.chipSelect.easing });
+  });
+  test('with Remove animations on, at once (Q17)', () => {
+    expect(chipSettle(true).duration).toBe(0);
+  });
+});
 
 describe("a chip's label is short (FEE-44)", () => {
   test.each([

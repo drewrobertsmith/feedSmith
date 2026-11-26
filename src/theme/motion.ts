@@ -3,8 +3,12 @@
  * `{ damping, stiffness }` for React Native's Animated; "Remove animations" skips it (Q17).
  */
 export const motion = {
-  /** A chosen chip settles into place from slightly smaller: quick, with a little give. */
-  chipSelect: { from: 0.9, damping: 11, stiffness: 320 },
+  /**
+   * Choosing a chip (FEE-117): its face and label ease to the chosen look, and the one no longer chosen eases
+   * back, as a Material 3 chip changes state: short, on Material's standard curve, with nothing scaling or
+   * bouncing, since it's one of the app's most frequent actions.
+   */
+  chipSelect: { duration: 150, easing: [0.2, 0, 0, 1] },
   /**
    * Choosing another chip slides the list's rows in from that side, a short way and a little
    * faded, on the fast-start, gentle-settle curve (FEE-42). The header stays still.
