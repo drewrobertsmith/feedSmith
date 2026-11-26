@@ -97,6 +97,7 @@ Then treat `repos/effect/` as the source of truth for Effect patterns: before us
 - Effect programs live in `convex/lib/`; Convex functions are thin shells that run them (`Effect.runPromise(… .pipe(Effect.provide(…)))`).
 - Each outside dependency is one service (today `FeedHttp`). Typed errors become the reasons Users see in one place (`REASONS` in `convex/lib/feed/fetch.ts`).
 - Decode untrusted JSON with `Schema`; keep expected failures typed and handle defects apart (`Effect.catchDefect`).
+- Run server programs on `ServerLayer` and log only with `Effect.log*` (annotate ids, never URLs): its logger scrubs URLs from every line (T45, Q9). Lint forbids `console` in `convex/lib/feed/`.
 - Never wrap Convex queries, mutations or crons in Effect, never replace Convex validators with Schema, and never use Effect in the app (`src/`). Lint refuses `effect` in `src/` and any import from `repos/`.
 
 ## Vendored repositories

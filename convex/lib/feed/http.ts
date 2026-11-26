@@ -98,7 +98,12 @@ const BUSY = new Set([429, 502, 503, 504]);
  * Retry-After is ignored: it doesn't get to choose how long a fetch waits. All of it fits
  * inside the fetch's 10 seconds (T18).
  */
-const RETRY = Schedule.exponential('500 millis').pipe(Schedule.jittered, Schedule.upTo({ times: 2 }));
+const RETRY = Schedule.exponential('500 millis').pipe(
+  Schedule.jittered,
+  Schedule.upTo({ times: 2 }),
+  // One line per retry, carrying the caller's fields (a Feed's id), never the URL (FEE-113).
+  Schedule.tap(() => Effect.logWarning('network blip, retrying')),
+);
 
 /** The one way feedSmith's server reaches the network (T18). */
 export class FeedHttp extends Context.Service<

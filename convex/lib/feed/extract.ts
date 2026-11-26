@@ -80,7 +80,7 @@ export function extractFromPage(html: string, url: string): ExtractOutcome {
  * redirects, ten seconds, 2 MB) and extracts it. A page that can't be fetched fails with its
  * reason, typed; a page that's fetched but has no Article is a `Failed` outcome (FEE-110).
  */
-export const fetchAndExtractEffect = Effect.fnUntraced(function* (link: string): Effect.fn.Return<ExtractOutcome, FetchError, FeedHttp> {
+export const fetchAndExtractEffect = Effect.fn('fetchAndExtract')(function* (link: string): Effect.fn.Return<ExtractOutcome, FetchError, FeedHttp> {
   const http = yield* FeedHttp;
   const response = yield* http.get(link);
   if (response._tag === 'NotModified') return { _tag: 'Failed' };

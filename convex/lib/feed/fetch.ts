@@ -3,12 +3,14 @@ import { Effect } from 'effect';
 import type { FetchError } from './errors';
 import { FeedHttp, type Validators } from './http';
 import { parseFeed } from './parse';
+import { ServerLayer } from './server';
 import { articlesToStore } from './store';
 import type { AddFeedReason, StoredArticle } from './validators';
 
 export type FetchFailure = Exclude<AddFeedReason, 'no-feed-found'>;
 
-const REASONS = {
+/** The one place a fetch's typed failure becomes the reason the app shows (T44). */
+export const REASONS = {
   InvalidUrl: 'invalid-url',
   Unreachable: 'unreachable',
   Timeout: 'timeout',
@@ -28,7 +30,7 @@ export type FetchOutcome =
  * into what's stored. Every failure becomes a value: it never fails. Interrupting it aborts
  * the request still in flight (FEE-108).
  */
-export const fetchFeedEffect = Effect.fnUntraced(
+export const fetchFeedEffect = Effect.fn('fetchFeed')(
   function* (url: string, validators?: Validators): Effect.fn.Return<FetchOutcome, FetchError, FeedHttp> {
     const http = yield* FeedHttp;
     const response = yield* http.get(url, validators);
@@ -47,7 +49,7 @@ export const fetchFeedEffect = Effect.fnUntraced(
   Effect.catch((error) => Effect.succeed({ _tag: 'Failed' as const, reason: REASONS[error._tag] })),
 );
 
-/** `fetchFeedEffect` on the live network, for Promise callers. */
+/** `fetchFeedEffect` on the live network and logger, for Promise callers. */
 export function fetchFeed(url: string, validators?: Validators): Promise<FetchOutcome> {
-  return Effect.runPromise(fetchFeedEffect(url, validators).pipe(Effect.provide(FeedHttp.layer)));
+  return Effect.runPromise(fetchFeedEffect(url, validators).pipe(Effect.provide(ServerLayer)));
 }

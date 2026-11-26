@@ -2,6 +2,8 @@
 import { convexTest } from 'convex-test';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
+import { captureLogs } from '../test/log-lines';
+
 import { api, internal } from './_generated/api';
 import verge from './lib/feed/fixtures/verge.xml?raw';
 import rateLimiterTest from '@convex-dev/rate-limiter/test';
@@ -286,6 +288,41 @@ describe('a guessing search ends on time, and cancels what it no longer needs (F
     await timed(a, 'daring fireball');
     expect(most).toBeGreaterThan(1);
     expect(most).toBeLessThanOrEqual(4);
+  });
+});
+
+describe('what a guessing search logs (FEE-113)', () => {
+  test('a strong match logs how it ended, the fetches it used and the Feeds found, and never the name or a site', async () => {
+    const { a } = await setup();
+    web({ 'https://theverge.com/': () => page('The Verge', [FEED]), [FEED]: feed });
+    const logs = captureLogs();
+    await a.action(api.catalog.find, { name: 'the verge' });
+    expect(logs.lines('guessing search')).toEqual([
+      expect.objectContaining({ level: 'INFO', annotations: expect.objectContaining({ ended: 'strong-match', fetches: expect.any(Number), found: 1 }) }),
+    ]);
+    expect(logs.all()).not.toMatch(/verge/i);
+    logs.restore();
+  });
+
+  test('a search with nothing left to try says so', async () => {
+    const { a } = await setup();
+    const logs = captureLogs();
+    await a.action(api.catalog.find, { name: 'daring fireball' });
+    expect(logs.lines('guessing search')).toEqual([expect.objectContaining({ annotations: expect.objectContaining({ ended: 'exhausted', found: 0 }) })]);
+    expect(logs.all()).not.toMatch(/daring|fireball/i);
+    logs.restore();
+  });
+
+  test('a search cut by its deadline says so', async () => {
+    vi.useFakeTimers();
+    const { a } = await setup();
+    network.mockImplementation(() => new Promise<Response>(() => {}));
+    const logs = captureLogs();
+    const done = a.action(api.catalog.find, { name: 'the verge' });
+    await vi.advanceTimersByTimeAsync(20_100);
+    await done;
+    expect(logs.lines('guessing search')).toEqual([expect.objectContaining({ annotations: expect.objectContaining({ ended: 'deadline', found: 0 }) })]);
+    logs.restore();
   });
 });
 
