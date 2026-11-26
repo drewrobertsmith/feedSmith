@@ -14,13 +14,17 @@ import { vStoredArticle, vValidators } from './lib/feed/validators';
 const LEASE = 10 * 60_000;
 /** Feeds started per tick; the rest wait for the next one. */
 const PER_TICK = 50;
-/** Fetches one Feed and records what happened. Shared by the cron and pulling down. */
-export async function refreshOne(ctx: ActionCtx, feedId: Id<'feeds'>) {
+/**
+ * Fetches one Feed and records what happened. Shared by the cron and pulling down. Answers when it
+ * recorded the fetch (null for a Feed that's gone), so a pull can say when the "Updated" line catches up (FEE-103).
+ */
+export async function refreshOne(ctx: ActionCtx, feedId: Id<'feeds'>): Promise<number | null> {
   const feed = await ctx.runQuery(internal.refresh.forRefresh, { feedId });
-  if (!feed) return;
+  if (!feed) return null;
+  let now = Date.now();
   try {
     const outcome = await fetchFeed(feed.url, { etag: feed.etag, lastModified: feed.lastModified });
-    const now = Date.now();
+    now = Date.now();
     if (outcome._tag === 'Fetched') {
       await ctx.runMutation(internal.refresh.recordFetch, {
         feedId,
@@ -38,8 +42,11 @@ export async function refreshOne(ctx: ActionCtx, feedId: Id<'feeds'>) {
   } catch {
     // Anything unexpected (a limit hit while storing) still counts as a failure, so the Feed
     // backs off instead of retrying when its lease ends. The error isn't logged: it may carry the URL (Q9).
-    await ctx.runMutation(internal.refresh.recordFailure, { feedId, now: Date.now() });
+    now = Date.now();
+    await ctx.runMutation(internal.refresh.recordFailure, { feedId, now });
   }
+  // When this fetch was recorded, as the "Updated" line will read it (FEE-103).
+  return now;
 }
 
 /** Runs `work` over `items`, at most `limit` at a time. */

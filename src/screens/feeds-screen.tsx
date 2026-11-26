@@ -1,7 +1,7 @@
 import { LegendList, type LegendListRef } from '@legendapp/list/react-native';
 import { router } from 'expo-router';
-import { useRef, useState } from 'react';
-import { Alert, RefreshControl, ToastAndroid, View } from 'react-native';
+import { useRef, useState, type ReactNode } from 'react';
+import { Alert, RefreshControl, Text, ToastAndroid, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/app-button';
@@ -12,7 +12,7 @@ import { ArticleRow } from '@/components/article-row';
 import { TopBar, TopBarIcon } from '@/components/top-bar';
 import { useEnvironment, useMinuteClock } from '@/environment';
 import { useAll, useChips, useLastUpdated, useRefresh, useRemoveFeed, type FeedChip } from '@/feeds/feeds-data';
-import { publishedAgo } from '@/feeds/format';
+import { updatedLine } from '@/feeds/use-pull';
 import { useNewArticles } from '@/feeds/use-new-articles';
 import { useShownRows } from '@/feeds/use-shown-rows';
 import { AccountButton } from '@/screens/account/account-sheet';
@@ -24,14 +24,21 @@ import { themes } from '@/theme/tokens';
 
 /**
  * The line under the Feeds title (FEE-47): how fresh All is, so you know whether pulling down is
- * worth it. Information, not a count (P7). Nothing until there's something to say.
+ * worth it. Information, not a count (P7). Nothing until there's something to say. Drawn in parts, so
+ * only what changes changes: "Updat" stays, then "ing…" or "ed", then the time (FEE-103).
  */
-function useUpdatedLine(refreshing: boolean): string | undefined {
+function useUpdatedLine(refreshing: boolean): ReactNode {
   const lastUpdated = useLastUpdated();
   const now = useMinuteClock();
-  if (refreshing) return 'Updating…';
-  if (lastUpdated.status !== 'ready' || lastUpdated.at === null) return undefined;
-  return `Updated ${publishedAgo(lastUpdated.at, now)}`;
+  const parts = updatedLine(refreshing, lastUpdated.status === 'ready' ? lastUpdated.at : null, now);
+  if (!parts) return undefined;
+  return (
+    <>
+      <Text>{parts.still}</Text>
+      <Text>{parts.change}</Text>
+      {parts.time ? <Text>{parts.time}</Text> : null}
+    </>
+  );
 }
 
 /**

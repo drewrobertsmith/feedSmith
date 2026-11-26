@@ -30,7 +30,7 @@ import {
   FIXTURE_UNEXTRACTED_ARTICLE,
 } from '@/worlds/fixtures';
 import type { ArticleView } from '@/feeds/feeds-data';
-import { createWorld, type World, type WorldSpec } from '@/worlds/world';
+import { createWorld, type CatalogWorld, type World, type WorldSpec } from '@/worlds/world';
 import { layOutList, renderWorld } from '../../../test/world-router';
 
 jest.mock('expo-web-browser', () => ({ openBrowserAsync: jest.fn() }));
@@ -678,6 +678,77 @@ describe('new Articles arriving while you read (FEE-102)', () => {
     await open({ colorScheme: 'dark', feeds: 'busy', scrolled: true });
     expect(await screen.findAllByRole('link')).not.toHaveLength(0);
     expect(screen.queryByRole('button', { name: NOTE })).not.toBeOnTheScreen();
+  });
+});
+
+describe('the "Updated" line changes with the rows, never ahead (FEE-103)', () => {
+  /**
+   * Pulling down, and when its results reach the screen: after the pull answers, or before it. They open
+   * looking exactly like All (and the gallery would play their arrival at once), so they live here, not in
+   * the catalog's gallery.
+   */
+  const PULL_WORLDS = [
+    { id: 'pull-results-late', label: 'A pull whose results arrive after it answers', spec: { colorScheme: 'dark', feeds: 'busy', arrivals: 'later', pull: 'late' } },
+    { id: 'pull-results-early', label: 'A pull whose results arrive before it answers', spec: { colorScheme: 'dark', feeds: 'busy', arrivals: 'later', pull: 'early' } },
+  ] as const satisfies readonly CatalogWorld[];
+  type PullWorldId = (typeof PULL_WORLDS)[number]['id'];
+  const NEW_TITLE = FIXTURE_ARRIVED_ROWS[0].title;
+  const pull = async () => {
+    const control = screen.getByTestId('all-list').props.refreshControl;
+    await act(async () => control.props.onRefresh());
+  };
+  const lineText = () => screen.getByText(/^Updat/);
+
+  test('a background fetch: the new rows and "Updated just now" arrive in the same render', async () => {
+    await open({ colorScheme: 'dark', feeds: 'busy', arrivals: 'later' });
+    await screen.findAllByRole('link');
+    expect(screen.getByText('Updated 5 min ago')).toBeOnTheScreen();
+    await act(async () => world!.feeds.arrive());
+    await layOutList('all-list');
+    expect(screen.getByText('Updated just now')).toBeOnTheScreen();
+    expect(screen.getByText(NEW_TITLE)).toBeOnTheScreen();
+  });
+
+  type Shows = {
+    /** The line right after the pull answers. */
+    answered: string;
+    /** Whether the pull's new Articles are on screen then. */
+    rowsWhenAnswered: boolean;
+  };
+  const SHOWS: Record<PullWorldId, Shows> = {
+    // The pull answered first: "Updating…" holds, never showing the old time, until its results are in.
+    'pull-results-late': { answered: 'Updating…', rowsWhenAnswered: false },
+    // The results came first: as the pull answers, the line turns straight to "Updated just now".
+    'pull-results-early': { answered: 'Updated just now', rowsWhenAnswered: true },
+  };
+
+  test.each(PULL_WORLDS)('$label', async ({ id, spec }) => {
+    const shows = SHOWS[id];
+    await open(spec);
+    await screen.findAllByRole('link');
+    expect(screen.getByText('Updated 5 min ago')).toBeOnTheScreen();
+    await pull();
+    await layOutList('all-list');
+    expect(screen.getByText(shows.answered)).toBeOnTheScreen();
+    expect(screen.queryByText(NEW_TITLE) !== null).toBe(shows.rowsWhenAnswered);
+    expect(screen.getByTestId('all-list').props.refreshControl.props.refreshing).toBe(shows.answered === 'Updating…');
+    if (!shows.rowsWhenAnswered) {
+      await act(async () => world!.feeds.arrive());
+      await layOutList('all-list');
+      expect(screen.getByText('Updated just now')).toBeOnTheScreen();
+      expect(screen.getByText(NEW_TITLE)).toBeOnTheScreen();
+      expect(screen.getByTestId('all-list').props.refreshControl.props.refreshing).toBe(false);
+    }
+    // Never a count, only when (P7, D20).
+    expect(lineText()).not.toHaveTextContent(/\d+ (new|Articles)/);
+  });
+
+  test('a pull that fetched nothing new ends at once, the line back to its time', async () => {
+    await open({ colorScheme: 'dark', feeds: 'some' });
+    await screen.findAllByRole('link');
+    await pull();
+    expect(screen.getByText('Updated 5 min ago')).toBeOnTheScreen();
+    expect(screen.getByTestId('all-list').props.refreshControl.props.refreshing).toBe(false);
   });
 });
 
