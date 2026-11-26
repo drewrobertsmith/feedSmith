@@ -358,6 +358,82 @@ describe('finding a Feed from a website (T21)', () => {
     expect((await a.query(api.articles.all, {}))[0].feedTitle).toBe('Site Example');
   });
 
+  // FEE-89: a site named only by its page title gets the part before the tagline.
+  const LONG_TITLE = 'Pluralistic: Daily links from Cory Doctorow – No trackers, no ads. Black type, white background.';
+
+  test('a site named only by a long page title is added by the part before its tagline', async () => {
+    const { a } = await setup();
+    route({
+      'https://www.site.example.com/': () => html(`<title>${LONG_TITLE}</title><link rel="alternate" type="application/rss+xml" href="/rss.xml">`),
+      'https://www.site.example.com/rss.xml': () => rssOf('Pluralistic'),
+    });
+    expect(await a.action(api.feeds.add, { url: 'https://www.site.example.com/' })).toMatchObject({ ok: true });
+    expect((await a.query(api.articles.all, {}))[0].feedTitle).toBe('Pluralistic');
+  });
+
+  describe('a Feed already named by a long page title is shortened once, on its next fetch (FEE-89)', () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    /** A Feed stored before FEE-89, with the name its site's homepage gave then. */
+    async function existing(title: string) {
+      const { t, a } = await setup();
+      const feedId = await t.run(async (ctx) => {
+        const userId = (await ctx.db.query('users').first())!._id;
+        return ctx.db.insert('feeds', { userId, url: 'https://www.site.example.com/rss.xml', title, siteUrl: 'https://www.site.example.com/' });
+      });
+      const fetched = () =>
+        t.mutation(internal.refresh.recordFetch, { feedId, now: Date.now(), siteUrl: 'https://www.site.example.com/', articles: [] });
+      const name = async () => (await t.run((ctx) => ctx.db.get(feedId)))!.title;
+      /** Runs what the fetch scheduled now (the name check), not the Feed's next fetch, booked for later. */
+      const settle = async () => {
+        vi.advanceTimersByTime(1);
+        await t.finishInProgressScheduledFunctions();
+      };
+      return { t, a, fetched, name, settle };
+    }
+    const homepageFetches = () => network.mock.calls.filter(([url]) => url === 'https://www.site.example.com/').length;
+
+    test('its name came from the page title: it becomes the part before the tagline', async () => {
+      route({ 'https://www.site.example.com/': () => html(`<title>${LONG_TITLE}</title>`) });
+      const { fetched, name, settle } = await existing(LONG_TITLE);
+      await fetched();
+      await settle();
+      expect(await name()).toBe('Pluralistic');
+    });
+
+    test('a name the site states itself stays whole, and is checked only once', async () => {
+      route({
+        'https://www.site.example.com/': () =>
+          html('<meta property="og:site_name" content="Stratechery by Ben Thompson"><title>Stratechery by Ben Thompson – On…</title>'),
+      });
+      const { fetched, name, settle } = await existing('Stratechery by Ben Thompson');
+      await fetched();
+      await settle();
+      await fetched();
+      await settle();
+      expect(await name()).toBe('Stratechery by Ben Thompson');
+      expect(homepageFetches()).toBe(1);
+    });
+
+    test('a name with no tagline never costs a homepage fetch', async () => {
+      route({ 'https://www.site.example.com/': () => html('<title>Farnam Street</title>') });
+      const { fetched, name, settle } = await existing('Farnam Street');
+      await fetched();
+      await settle();
+      expect(await name()).toBe('Farnam Street');
+      expect(homepageFetches()).toBe(0);
+    });
+
+    test("a name that isn't the page's whole title (the Feed's own, or one given since) is left alone", async () => {
+      route({ 'https://www.site.example.com/': () => html(`<title>${LONG_TITLE}</title>`) });
+      const { fetched, name, settle } = await existing('Pluralistic: the newsletter');
+      await fetched();
+      await settle();
+      expect(await name()).toBe('Pluralistic: the newsletter');
+    });
+  });
+
   test("when the homepage can't be read, the Feed keeps its own title", async () => {
     const { a } = await setup();
     route({ 'https://www.site.example.com/rss.xml': () => rssOf('Own Title') });

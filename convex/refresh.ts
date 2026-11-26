@@ -12,6 +12,7 @@ import { ServerLayer } from './lib/feed/server';
 import { KEEP_NEWEST, markFailing, markWorking, RETENTION, scheduleOf, storeNewArticles } from './lib/feed/record';
 import { bookNextFetch, ensureFetchBooked } from './lib/feed/timer';
 import { vStoredArticle, vValidators } from './lib/feed/validators';
+import { nameFromTitle } from './lib/feed/name';
 
 /** How long a Feed handed to a fetch stays out of the next tick, so a slow fetch isn't doubled. */
 const LEASE = 10 * 60_000;
@@ -122,6 +123,12 @@ export const recordFetch = internalMutation({
     if (siteUrl && siteUrl !== feed.siteUrl) await ctx.db.patch(feedId, { siteUrl });
     await storeNewArticles(ctx, feed.userId, feedId, articles, now);
     await markWorking(ctx, feedId, now, { etag, lastModified });
+    // A name that would cut at a tagline may have come whole from a page title before FEE-89: check it, once.
+    const site = siteUrl ?? feed.siteUrl;
+    if (!feed.nameChecked && site && nameFromTitle(feed.title) !== feed.title) {
+      await ctx.db.patch(feedId, { nameChecked: true });
+      await ctx.scheduler.runAfter(0, internal.feeds.shortenName, { feedId, siteUrl: site });
+    }
     return null;
   },
 });

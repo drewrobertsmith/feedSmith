@@ -17,6 +17,11 @@ export default defineSchema({
     siteUrl: v.optional(v.string()),
     /** The icon the site names for itself (T21); else `/favicon.ico` on `siteUrl`. */
     iconUrl: v.optional(v.string()),
+    /**
+     * Set once its name has been checked against its site's page title (FEE-89), so a name that came whole
+     * from a long <title> is shortened once, on a fetch, and never checked again.
+     */
+    nameChecked: v.optional(v.boolean()),
     /** Set when Pinned (P9): Pinned chips follow All in this order, at most three. */
     pinOrder: v.optional(v.number()),
     /**
