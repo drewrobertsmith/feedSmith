@@ -1,4 +1,5 @@
 import { v, type Infer } from 'convex/values';
+import { Effect, Schema } from 'effect';
 
 import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
@@ -7,10 +8,9 @@ import { requireUserId } from './lib/currentUser';
 import { faviconOf, hostOf, siteHost } from './lib/feed/face';
 import { fetchFeed } from './lib/feed/fetch';
 import { candidates, hostMatch, isStrong, nameMatch, rank, searchTerms, siteLabel } from './lib/feed/find';
-import { safeUrl } from './lib/feed/http';
+import { FeedHttp, safeUrl } from './lib/feed/http';
 import { Budget, proveSite } from './lib/feed/prove';
 import { rateLimiter } from './rateLimits';
-import { inBatches } from './refresh';
 
 /** Catalog entries one search reads from the search index, at most (Q10). */
 const SEARCH_LIMIT = 20;
@@ -25,12 +25,15 @@ const MAX_URL = 2048;
 const MAX_FETCHES = 40;
 /** Sites guessed at once. */
 const CONCURRENCY = 4;
-/** No fetch starts after this long; each one in flight still keeps its own 10-second limit (T18). */
+/** A search ends this long after it starts, cancelling every fetch still running (FEE-109). */
 const DEADLINE_MS = 20_000;
 /** Entries not found or fetched for this long are dropped. */
 const KEEP_MS = 365 * 24 * 60 * 60_000;
 /** Entries one cleanup deletes before booking the next. */
 const FORGET_BATCH = 200;
+
+/** The site of that very name is proven: the search has its answer, and stops (FEE-109). */
+class StrongMatch extends Schema.TaggedError<StrongMatch>()('StrongMatch', {}) {}
 
 const vSource = v.union(v.literal('declared'), v.literal('common-path'));
 
@@ -152,7 +155,7 @@ export const startGuessing = internalMutation({
 /**
  * Finds Feeds for a site's name by guessing its address and proving it (FEE-80, T35): a few sites
  * at a time, under one fetch budget and deadline, stopping once the site of that very name is
- * proven. Each proven Feed joins the catalog at once, so `search` shows it as it's found. Nothing
+ * proven. The deadline and the stop both cancel whatever is still being fetched (FEE-109). Each proven Feed joins the catalog at once, so `search` shows it as it's found. Nothing
  * is guessed when feedSmith already knows the Feed (`known`), and a User past their allowance of
  * guessing searches is answered `limited` without fetching (FEE-88). Returns the proven Feeds' addresses.
  */
@@ -169,18 +172,29 @@ export const find = action({
     if (start === 'known') return { found: [] };
     if (start === 'limited') return { found: [], limited: true as const };
 
-    const budget = new Budget(MAX_FETCHES, Date.now() + DEADLINE_MS);
+    const budget = new Budget(MAX_FETCHES);
     const tried = new Set<string>();
     const found: string[] = [];
-    let done = false;
-    await inBatches(hosts, CONCURRENCY, async (host) => {
-      if (done) return;
-      const proven = await proveSite(host, name, budget, tried);
+    // One site at a time per lane, four lanes. A proven Feed is remembered and returned as one
+    // step, never cut in half; a strong match then ends the search, cancelling the rest.
+    const guess = Effect.fnUntraced(function* (host: string) {
+      const proven = yield* proveSite(host, name, budget, tried);
       if (!proven) return;
-      await ctx.runMutation(internal.catalog.remember, { ...proven, now: Date.now() });
-      found.push(proven.url);
-      if (isStrong(name, proven)) done = true;
+      yield* Effect.uninterruptible(
+        Effect.promise(() => ctx.runMutation(internal.catalog.remember, { ...proven, now: Date.now() })).pipe(
+          Effect.tap(() => Effect.sync(() => found.push(proven.url))),
+        ),
+      );
+      if (isStrong(name, proven)) return yield* new StrongMatch();
     });
+    await Effect.runPromise(
+      Effect.forEach(hosts, guess, { concurrency: CONCURRENCY, discard: true }).pipe(
+        Effect.catchTag('StrongMatch', () => Effect.void),
+        // The deadline cancels every fetch still running and aborts its request (FEE-109).
+        Effect.timeoutOption(DEADLINE_MS),
+        Effect.provide(FeedHttp.layer),
+      ),
+    );
     return { found };
   },
 });

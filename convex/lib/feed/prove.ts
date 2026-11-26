@@ -1,7 +1,10 @@
+import { Effect } from 'effect';
+
 import { findFeedLinks, siteMeta } from './discover';
 import { siteHost } from './face';
-import { fetchFeed, type FetchOutcome } from './fetch';
+import { fetchFeedEffect, type FetchOutcome } from './fetch';
 import { COMMON_PATHS, looksParked, nameMatch } from './find';
+import type { FeedHttp } from './http';
 
 /** A Feed proven for a typed name: a real site of that name, with a feed that parses (FEE-80). */
 export type Proven = {
@@ -18,23 +21,23 @@ export type Proven = {
 const DECLARED_TRIES = 3;
 
 /**
- * A search's fetch budget: at most `fetches` fetches, and none started after `deadline`. Every
- * fetch goes through `fetchFeed`, so each keeps the fetch policy (T18): https, 10 seconds, 2 MB,
- * three redirects, no private addresses.
+ * A search's fetch budget: at most `fetches` fetches started. Every fetch goes through
+ * `fetchFeedEffect`, so each keeps the fetch policy (T18): https, 10 seconds, 2 MB, three
+ * redirects, no private addresses. The search's deadline is the search's own (FEE-109).
  */
 export class Budget {
   #left: number;
-  readonly #deadline: number;
 
-  constructor(fetches: number, deadline: number) {
+  constructor(fetches: number) {
     this.#left = fetches;
-    this.#deadline = deadline;
   }
 
-  fetch(url: string): Promise<FetchOutcome> {
-    if (this.#left <= 0 || Date.now() >= this.#deadline) return Promise.resolve({ _tag: 'Failed', reason: 'timeout' });
-    this.#left--;
-    return fetchFeed(url);
+  fetch(url: string): Effect.Effect<FetchOutcome, never, FeedHttp> {
+    return Effect.suspend(() => {
+      if (this.#left <= 0) return Effect.succeed({ _tag: 'Failed', reason: 'timeout' } as const);
+      this.#left--;
+      return fetchFeedEffect(url);
+    });
   }
 }
 
@@ -43,8 +46,13 @@ export class Budget {
  * at a site already tried in this search), isn't parked, names itself like what was typed, and
  * has a feed that parses, declared by the page or else at a common address.
  */
-export async function proveSite(host: string, typed: string, budget: Budget, tried: Set<string>): Promise<Proven | null> {
-  const page = await budget.fetch(`https://${host}/`);
+export const proveSite = Effect.fnUntraced(function* (
+  host: string,
+  typed: string,
+  budget: Budget,
+  tried: Set<string>,
+): Effect.fn.Return<Proven | null, never, FeedHttp> {
+  const page = yield* budget.fetch(`https://${host}/`);
   if (page._tag !== 'Page') return null;
   const site = new URL(page.url);
   const shown = siteHost(site.href);
@@ -62,11 +70,11 @@ export async function proveSite(host: string, typed: string, budget: Budget, tri
       ? links.slice(0, DECLARED_TRIES).map((link) => ({ url: link.url, source: 'declared' as const }))
       : COMMON_PATHS.map((path) => ({ url: new URL(path, site.origin).href, source: 'common-path' as const }));
   for (const attempt of tries) {
-    const outcome = await budget.fetch(attempt.url);
+    const outcome = yield* budget.fetch(attempt.url);
     if (outcome._tag !== 'Fetched') continue;
     const proven: Proven = { url: attempt.url, name: meta.name, host: shown, siteUrl: site.origin, source: attempt.source };
     if (meta.iconUrl) proven.iconUrl = meta.iconUrl;
     return proven;
   }
   return null;
-}
+});

@@ -17,13 +17,16 @@ vi.mock('@convex-dev/auth/server', async (original) => ({
 const modules = import.meta.glob('./**/*.ts');
 
 /** The fake network: nothing answers unless a test says so; nothing reaches the real one. */
-const network = vi.fn<(url: string) => Promise<Response>>();
+const network = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>();
 beforeEach(() => {
   network.mockReset();
   network.mockImplementation(async () => new Response('', { status: 404 }));
-  vi.stubGlobal('fetch', (url: string) => network(url));
+  vi.stubGlobal('fetch', (url: string, init?: RequestInit) => network(url, init));
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
 
 const fetched = () => network.mock.calls.map(([url]) => url);
 
@@ -186,6 +189,103 @@ describe('finding a Feed by its site’s name', () => {
       [FEED]: feed,
     });
     expect((await a.action(api.catalog.find, { name: 'the verge' })).found).toEqual([FEED]);
+  });
+});
+
+describe('a guessing search ends on time, and cancels what it no longer needs (FEE-109)', () => {
+  /** Requests that never answer, each with the signal that should abort it. */
+  const hanging: AbortSignal[] = [];
+  const hang = (_url: string, init?: RequestInit) => {
+    hanging.push(init!.signal!);
+    return new Promise<Response>(() => {});
+  };
+  beforeEach(() => {
+    hanging.length = 0;
+    vi.useFakeTimers();
+  });
+
+  /** Runs `find` on the fake clock: how long it took (or null if still running at `limit`), and its answer. */
+  async function timed(a: Awaited<ReturnType<typeof setup>>['a'], name: string, limit = 30_000) {
+    let answer: { found: string[] } | undefined;
+    const pending = a.action(api.catalog.find, { name }).then((result) => (answer = result));
+    let elapsed = 0;
+    while (answer === undefined && elapsed < limit) {
+      await vi.advanceTimersByTimeAsync(100);
+      elapsed += 100;
+    }
+    if (answer === undefined) return { elapsed: null, answer };
+    await pending;
+    return { elapsed, answer };
+  }
+
+  test('sites that never answer can\'t hold it past its 20-second deadline, and their requests are aborted', async () => {
+    const { a } = await setup();
+    network.mockImplementation(hang);
+    const { elapsed, answer } = await timed(a, 'the verge');
+    expect(elapsed).not.toBeNull();
+    expect(elapsed!).toBeLessThanOrEqual(20_100);
+    expect(answer).toEqual({ found: [] });
+    expect(hanging.length).toBeGreaterThan(0);
+    expect(hanging.filter((signal) => !signal.aborted)).toEqual([]);
+  });
+
+  test('a request started just before the deadline is cut at the deadline, not left to its own 10 seconds', async () => {
+    const { a } = await setup();
+    // Each site takes just under 10 seconds to say no, so a third round starts at 19.9 seconds.
+    const started: { at: number; signal: AbortSignal }[] = [];
+    network.mockImplementation((_url, init) => {
+      started.push({ at: Date.now(), signal: init!.signal! });
+      return new Promise((resolve) => setTimeout(() => resolve(new Response('', { status: 404 })), 9_950));
+    });
+    const begin = Date.now();
+    const { elapsed } = await timed(a, 'daring fireball');
+    expect(elapsed).not.toBeNull();
+    expect(elapsed!).toBeLessThanOrEqual(20_100);
+    const late = started.filter(({ at }) => at - begin > 19_000);
+    expect(late.length).toBeGreaterThan(0);
+    expect(late.every(({ signal }) => signal.aborted)).toBe(true);
+  });
+
+  test('a Feed proven before the deadline is still returned and remembered', async () => {
+    const { a } = await setup();
+    // A site with a near-matching name proves quickly but isn't the strong match, so the search goes on.
+    const sites: Record<string, () => Response> = {
+      'https://theverge.com/': () => page('Verge Weekly', [FEED]),
+      [FEED]: feed,
+    };
+    network.mockImplementation(async (url, init) => (sites[url] ? sites[url]() : hang(url, init)));
+    const { elapsed, answer } = await timed(a, 'the verge');
+    expect(elapsed!).toBeLessThanOrEqual(20_100);
+    expect(answer!.found).toEqual([FEED]);
+    expect(await a.query(api.catalog.search, { name: 'verge weekly' })).toEqual([
+      expect.objectContaining({ kind: 'new', url: FEED, host: 'theverge.com' }),
+    ]);
+  });
+
+  test('a strong match ends it at once, and the requests still running are aborted', async () => {
+    const { a } = await setup();
+    const sites: Record<string, () => Response> = { 'https://theverge.com/': () => page('The Verge', [FEED]), [FEED]: feed };
+    network.mockImplementation(async (url, init) => (sites[url] ? sites[url]() : hang(url, init)));
+    const { elapsed, answer } = await timed(a, 'the verge');
+    expect(elapsed!).toBeLessThanOrEqual(500);
+    expect(answer!.found).toEqual([FEED]);
+    expect(hanging.length).toBeGreaterThan(0);
+    expect(hanging.filter((signal) => !signal.aborted)).toEqual([]);
+  });
+
+  test('it tries at most four sites at a time', async () => {
+    const { a } = await setup();
+    let inFlight = 0;
+    let most = 0;
+    network.mockImplementation(async () => {
+      most = Math.max(most, ++inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      inFlight--;
+      return new Response('', { status: 404 });
+    });
+    await timed(a, 'daring fireball');
+    expect(most).toBeGreaterThan(1);
+    expect(most).toBeLessThanOrEqual(4);
   });
 });
 
