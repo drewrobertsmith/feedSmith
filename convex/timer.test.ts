@@ -96,7 +96,7 @@ describe('the fetch scheduler sleeps until a Feed is due (FEE-55)', () => {
 
     // A second Feed falls due sooner: its first check writes its schedule.
     const feedId = await t.run((ctx) => ctx.db.insert('feeds', { userId, url: 'https://b.example.com/feed', title: 'B' }));
-    await t.mutation(internal.refresh.recordFailure, { feedId, now: START });
+    await t.mutation(internal.refresh.recordFailure, { feedId, now: START, reason: 'unreachable' });
 
     const ticks = await pendingTicks(t);
     expect(ticks).toHaveLength(1);
@@ -178,7 +178,7 @@ test("a schedule written while the run is due doesn't book a second one", async 
 
   // A second Feed's check lands while the booked run is due but hasn't started.
   const feedId = await t.run((ctx) => ctx.db.insert('feeds', { userId, url: 'https://b.example.com/feed', title: 'B' }));
-  await t.mutation(internal.refresh.recordFailure, { feedId, now: due + 1 });
+  await t.mutation(internal.refresh.recordFailure, { feedId, now: due + 1, reason: 'unreachable' });
 
   expect(await pendingTicks(t)).toHaveLength(1);
 });

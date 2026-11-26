@@ -11,7 +11,7 @@ import type { FeedHttp } from './lib/feed/http';
 import { ServerLayer } from './lib/feed/server';
 import { KEEP_NEWEST, markFailing, markWorking, RETENTION, scheduleOf, storeNewArticles } from './lib/feed/record';
 import { bookNextFetch, ensureFetchBooked } from './lib/feed/timer';
-import { vStoredArticle, vValidators } from './lib/feed/validators';
+import { vFetchFailure, vStoredArticle, vValidators } from './lib/feed/validators';
 import { nameFromTitle } from './lib/feed/name';
 
 /** How long a Feed handed to a fetch stays out of the next tick, so a slow fetch isn't doubled. */
@@ -50,8 +50,9 @@ const fetchAndRecord = Effect.fnUntraced(function* (
   } else if (outcome._tag === 'NotModified') {
     yield* Effect.promise(() => ctx.runMutation(internal.refresh.recordNotModified, { feedId, now }));
   } else {
-    // Failed, or a page where a feed used to be: either way the Feed isn't working.
-    yield* Effect.promise(() => ctx.runMutation(internal.refresh.recordFailure, { feedId, now }));
+    // Failed, or a page where a feed used to be: either way the Feed isn't working, and a page is no feed.
+    const reason = outcome._tag === 'Page' ? 'not-a-feed' : outcome.reason;
+    yield* Effect.promise(() => ctx.runMutation(internal.refresh.recordFailure, { feedId, now, reason }));
   }
   yield* Effect.logInfo('fetch').pipe(Effect.annotateLogs(described(outcome)));
   return { at: now, failed: outcome._tag === 'Failed' || outcome._tag === 'Page' };
@@ -77,7 +78,8 @@ export const refreshFeedEffect = Effect.fn('refreshFeed')(function* (
         Effect.andThen(
           Effect.promise(async () => {
             const now = Date.now();
-            await ctx.runMutation(internal.refresh.recordFailure, { feedId, now });
+            // An unexpected error while fetching or storing counts as unreachable (FEE-126).
+            await ctx.runMutation(internal.refresh.recordFailure, { feedId, now, reason: 'unreachable' });
             return { at: now, failed: true };
           }),
         ),
@@ -144,10 +146,10 @@ export const recordNotModified = internalMutation({
 });
 
 export const recordFailure = internalMutation({
-  args: { feedId: v.id('feeds'), now: v.number() },
+  args: { feedId: v.id('feeds'), now: v.number(), reason: vFetchFailure },
   returns: v.null(),
-  handler: async (ctx, { feedId, now }) => {
-    await markFailing(ctx, feedId, now);
+  handler: async (ctx, { feedId, now, reason }) => {
+    await markFailing(ctx, feedId, now, reason);
     return null;
   },
 });

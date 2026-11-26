@@ -4,7 +4,7 @@ import type { MutationCtx, QueryCtx } from '../../_generated/server';
 import type { Validators } from './http';
 import { backoff, nextCheckIn, PACE_WINDOW } from './pace';
 import { bringFetchForward } from './timer';
-import type { StoredArticle } from './validators';
+import type { FetchFailure, StoredArticle } from './validators';
 
 /** Articles that aren't Saved are kept this long after publication (P14)... */
 export const RETENTION = 30 * 24 * 60 * 60_000;
@@ -88,9 +88,17 @@ async function writeSchedule(ctx: MutationCtx, feed: Doc<'feeds'>, schedule: Doc
   await bringFetchForward(ctx, fields.nextFetchAt);
 }
 
-/** Sets whether a Feed works (P15), only when that changes: the screens read the Feed. */
-async function setStatus(ctx: MutationCtx, feed: Doc<'feeds'>, status: 'working' | 'failing') {
-  if (feed.status !== status) await ctx.db.patch(feed._id, { status });
+/**
+ * Sets whether a Feed works (P15), and since when and why it fails (FEE-126), only when that changes: the
+ * screens read the Feed. The first failure sets since when; later ones keep it and update why.
+ */
+async function setHealth(ctx: MutationCtx, feed: Doc<'feeds'>, health: { failing: false } | { failing: true; now: number; reason: FetchFailure }) {
+  const next = health.failing
+    ? { status: 'failing' as const, failingSince: feed.failingSince ?? health.now, failure: health.reason }
+    : { status: 'working' as const, failingSince: undefined, failure: undefined };
+  if (feed.status !== next.status || feed.failingSince !== next.failingSince || feed.failure !== next.failure) {
+    await ctx.db.patch(feed._id, next);
+  }
 }
 
 /**
@@ -113,11 +121,11 @@ export async function markWorking(ctx: MutationCtx, feedId: Id<'feeds'>, now: nu
     etag: validators ? validators.etag : schedule?.etag,
     lastModified: validators ? validators.lastModified : schedule?.lastModified,
   });
-  await setStatus(ctx, feed, 'working');
+  await setHealth(ctx, feed, { failing: false });
 }
 
 /** Marks a Feed failing and backs its next try off (Q7). Its Articles stay. */
-export async function markFailing(ctx: MutationCtx, feedId: Id<'feeds'>, now: number) {
+export async function markFailing(ctx: MutationCtx, feedId: Id<'feeds'>, now: number, reason: FetchFailure) {
   const feed = await ctx.db.get(feedId);
   if (!feed) return;
   const schedule = await scheduleOf(ctx, feedId);
@@ -131,5 +139,5 @@ export async function markFailing(ctx: MutationCtx, feedId: Id<'feeds'>, now: nu
     etag: schedule?.etag,
     lastModified: schedule?.lastModified,
   });
-  await setStatus(ctx, feed, 'failing');
+  await setHealth(ctx, feed, { failing: true, now, reason });
 }

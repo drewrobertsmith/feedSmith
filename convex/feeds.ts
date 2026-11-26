@@ -14,7 +14,7 @@ import { fetchFeed, type FetchOutcome } from './lib/feed/fetch';
 import { safeUrl } from './lib/feed/http';
 import { ServerLayer } from './lib/feed/server';
 import { markWorking, scheduleOf, storeNewArticles } from './lib/feed/record';
-import { vAddFeedReason, vFeedChoice, vStoredArticle, vValidators, type AddFeedReason } from './lib/feed/validators';
+import { vAddFeedReason, vFeedChoice, vFetchFailure, vStoredArticle, vValidators, type AddFeedReason, type FetchFailure } from './lib/feed/validators';
 import { refreshFeedEffect } from './refresh';
 
 const MAX_URL = 2048;
@@ -279,7 +279,14 @@ const CHIP_LIMIT = 200;
 export const chips = query({
   args: {},
   returns: v.array(
-    v.object({ id: v.id('feeds'), title: v.string(), faviconUrl: v.optional(v.string()), pinned: v.boolean() }),
+    v.object({
+      id: v.id('feeds'),
+      title: v.string(),
+      faviconUrl: v.optional(v.string()),
+      pinned: v.boolean(),
+      /** Since when it has failed every try, and why (FEE-126); the app decides when that's been a day. */
+      failing: v.optional(v.object({ since: v.number(), reason: vFetchFailure })),
+    }),
   ),
   handler: async (ctx) => {
     const userId = await requireUserId(ctx);
@@ -315,13 +322,23 @@ export const chips = query({
       return y.newest - x.newest;
     });
     return ranked.map(({ feed }) => {
-      const chip: { id: typeof feed._id; title: string; faviconUrl?: string; pinned: boolean } = {
+      const chip: {
+        id: typeof feed._id;
+        title: string;
+        faviconUrl?: string;
+        pinned: boolean;
+        failing?: { since: number; reason: FetchFailure };
+      } = {
         id: feed._id,
         title: feed.title,
         pinned: feed.pinOrder !== undefined,
       };
       const faviconUrl = faviconOf(feed);
       if (faviconUrl) chip.faviconUrl = faviconUrl;
+      // Never the address (Q9): only since when and why.
+      if (feed.status === 'failing' && feed.failingSince !== undefined && feed.failure) {
+        chip.failing = { since: feed.failingSince, reason: feed.failure };
+      }
       return chip;
     });
   },

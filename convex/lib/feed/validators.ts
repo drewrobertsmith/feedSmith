@@ -49,6 +49,16 @@ export const vAddFeedReason = v.union(
   v.literal('no-feed-found'),
 );
 
+/** Why a Feed's latest fetch failed (FEE-126): a fetch's reasons, without discovery's. */
+export const vFetchFailure = v.union(
+  v.literal('invalid-url'),
+  v.literal('unreachable'),
+  v.literal('timeout'),
+  v.literal('too-large'),
+  v.literal('not-a-feed'),
+);
+export type FetchFailure = Infer<typeof vFetchFailure>;
+
 /** A feed a web page advertises, offered to choose from (T21). */
 export const vFeedChoice = v.object({ url: v.string(), title: v.string() });
 

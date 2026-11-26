@@ -1,7 +1,7 @@
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
 
-import { vBlock, vExtraction, vOmittedKind } from './lib/feed/validators';
+import { vBlock, vExtraction, vFetchFailure, vOmittedKind } from './lib/feed/validators';
 
 export default defineSchema({
   users: defineTable({
@@ -29,6 +29,12 @@ export default defineSchema({
      * routine check never touches the Feed (FEE-54). Optional only for Feeds stored before FEE-24.
      */
     status: v.optional(v.union(v.literal('working'), v.literal('failing'))),
+    /**
+     * Since when it has failed every try, and why its latest try failed (FEE-126): the chip's badge and the
+     * Feed's notice. Written only when they change, and cleared by a working fetch.
+     */
+    failingSince: v.optional(v.number()),
+    failure: v.optional(vFetchFailure),
     /** Deprecated (FEE-54): moved to `feedSchedules` by `migrations.moveFeedSchedules`; removed once every deployment has run it. */
     failures: v.optional(v.number()),
     lastFetchedAt: v.optional(v.number()),

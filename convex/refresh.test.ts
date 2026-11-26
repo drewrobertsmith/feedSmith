@@ -386,7 +386,7 @@ describe('fetches that overlap or misbehave', () => {
   test('an older result never overwrites a newer one', async () => {
     const s = await setup();
     const feed = await follow(s, [{ guid: 'g1', ago: HOUR }]);
-    await s.t.mutation(internal.refresh.recordFailure, { feedId: feed._id, now: START - MINUTE });
+    await s.t.mutation(internal.refresh.recordFailure, { feedId: feed._id, now: START - MINUTE, reason: 'unreachable' });
     expect(await feedOf(s, feed._id)).toMatchObject({ status: 'working', failures: 0, lastFetchedAt: START });
   });
 
