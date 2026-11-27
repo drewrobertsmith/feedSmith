@@ -166,7 +166,7 @@ export const refreshAll = action({
 /**
  * Try again, on a not-updating Feed's page (FEE-128): fetches one of the signed-in User's Feeds now, recorded as a
  * scheduled fetch is, so a failure still backs off (Q7). Answers whether it works now, or not-found for an id that
- * isn't one of the User's Feeds, with nothing fetched (Q10). Counted against no budget yet (FEE-90).
+ * isn't one of the User's Feeds, with nothing fetched (Q10). Not limited, like adding and pulling down (T36).
  */
 export const tryAgain = action({
   args: { id: v.string() },
