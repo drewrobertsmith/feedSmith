@@ -6,6 +6,7 @@ import { AppSymbol } from '@/components/app-symbol';
 import { DepthPressable } from '@/components/depth-pressable';
 import { FeedIcon } from '@/components/feed-icon';
 import { NativeMenu } from '@/components/native-menu';
+import { useStartState } from '@/navigation/start-state';
 import { useEnvironment, useMinuteClock, useSizeScale } from '@/environment';
 import type { FeedChip } from '@/feeds/feeds-data';
 import { chipLabel, chipSettle, chipTone, fadeRanges, notUpdating, revealOffset, transparent, type ChipTone } from '@/screens/chip-row-layout';
@@ -139,15 +140,13 @@ type Menu = { id: string; open: boolean; box?: Box };
  * The chip row under the Feeds top bar (P5, P9, D12): All, then the Feeds in the server's order. For
  * choosing what to read: adding a Feed is the top bar's + (FEE-44), and a Feed's only other action,
  * Remove, waits behind a long-press (FEE-97). Where the row runs off-screen it fades, and a chip chosen
- * from elsewhere (a link) scrolls into view. `menuFor`, a Feed's id, opens its menu at once, for the
- * state gallery.
+ * from elsewhere (a link) scrolls into view. A world may start with a chip's menu open (FEE-105).
  */
 export function ChipRow({
   chips,
   selected,
   onSelect,
   onRemove,
-  menuFor,
 }: {
   chips: FeedChip[];
   /** The chosen Feed's id, or null for All. */
@@ -155,7 +154,6 @@ export function ChipRow({
   onSelect: (feedId: string | null) => void;
   /** Remove chosen from a Feed's menu, or by TalkBack: the screen asks first (T23). */
   onRemove: (chip: FeedChip) => void;
-  menuFor?: string;
 }) {
   const { colorScheme, reduceMotion } = useEnvironment();
   const background = themes[colorScheme].background;
@@ -166,7 +164,8 @@ export function ChipRow({
   const scroller = useRef<ScrollViewInstance>(null);
   /** Each chip's place in the row, by Feed id (All is ''), measured as it lays out. */
   const chipAt = useRef(new Map<string, Box>());
-  const [menu, setMenu] = useState<Menu | null>(menuFor ? { id: menuFor, open: true } : null);
+  const { chipMenu } = useStartState();
+  const [menu, setMenu] = useState<Menu | null>(chipMenu ? { id: chipMenu, open: true } : null);
   const place = (event: LayoutChangeEvent, id: string) => {
     const { x, y, width, height } = event.nativeEvent.layout;
     chipAt.current.set(id, { x, y, width, height });

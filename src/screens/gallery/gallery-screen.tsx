@@ -11,6 +11,7 @@ import { GALLERY, type GalleryEntry } from '@/screens/gallery/registry';
 import { spacing } from '@/theme/spacing';
 import type { ThemeName } from '@/theme/tokens';
 import { FeedsContext } from '@/feeds/feeds-data';
+import { StartContext } from '@/navigation/start-state';
 import { createWorld, worldAuth, worldEnvironment, worldFeeds, type CatalogWorld } from '@/worlds/world';
 
 const ALL = GALLERY.flatMap((entry) => entry.worlds.map((world) => ({ entry, world })));
@@ -39,6 +40,9 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
     </View>
   );
 }
+
+/** A world that starts with nothing open, at the top. */
+const NOWHERE = {};
 
 /** How long after a world opens its new Articles arrive (FEE-102). */
 const ARRIVAL_DELAY = 300;
@@ -75,7 +79,10 @@ function WorldPreview({ entry, world, theme, shot }: { entry: GalleryEntry; worl
   return (
     <AuthContext value={worldAuth(spec)}>
       <FeedsContext value={feeds}>
-        <EnvironmentProvider environment={worldEnvironment(spec)}>{entry.render(spec)}</EnvironmentProvider>
+        <EnvironmentProvider environment={worldEnvironment(spec)}>
+          {/* Where the world starts, as its Feeds are provided: screens take no props for it (FEE-105). */}
+          <StartContext value={entry.start?.(spec) ?? NOWHERE}>{entry.render(spec)}</StartContext>
+        </EnvironmentProvider>
       </FeedsContext>
     </AuthContext>
   );

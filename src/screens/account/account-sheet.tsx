@@ -1,7 +1,7 @@
 import type { SymbolViewProps } from 'expo-symbols';
-import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
+import { useSheet } from '@/navigation/start-state';
 import { useAuth } from '@/auth/auth-context';
 import { AppSymbol } from '@/components/app-symbol';
 import { AppText } from '@/components/app-text';
@@ -123,11 +123,10 @@ function AccountSheetContent() {
 /**
  * The account circle at the top right of Feeds (P17): the User's initial in D5's
  * "yours" Gold, on a soft face (D27). Tapping it opens the Account sheet.
- * `initiallyOpen` is for the state gallery's open-sheet worlds.
  */
-export function AccountButton({ initiallyOpen = false }: { initiallyOpen?: boolean }) {
+export function AccountButton() {
   const { account } = useAuth();
-  const [open, setOpen] = useState(initiallyOpen);
+  const [open, setOpen] = useSheet('account');
   const close = () => setOpen(false);
   // Grows with the initial inside it, so large text never outgrows the circle (Q16).
   const size = CIRCLE * useSizeScale();

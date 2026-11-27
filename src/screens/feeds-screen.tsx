@@ -16,6 +16,7 @@ import { useNewArticles } from '@/feeds/use-new-articles';
 import { useShownRows } from '@/feeds/use-shown-rows';
 import { usePlaceKeeper } from '@/navigation/place-context';
 import { AccountButton } from '@/screens/account/account-sheet';
+import { useSheet, useStartState } from '@/navigation/start-state';
 import { AddFeedSheet } from '@/screens/add-feed-sheet';
 import { ChipRow } from '@/screens/chip-row';
 import { NewArticlesNote } from '@/screens/new-articles-note';
@@ -88,27 +89,17 @@ const AT_TOP = spacing.related;
  * a link's value is untrusted, so anything but one of the User's chips means All (Q25).
  * Adding a Feed is a sheet over it (FEE-45); removing one is in its chip's menu (FEE-97). New Articles that
  * arrive while you're scrolled down wait above you, your place held, with a note to go to them (FEE-102).
- * `startAtOffset` opens the list where you left it (FEE-130). `accountOpen`, `addOpen`, `menuFor`, `newAddressOpen` and
- * `startAtRow` open the Account sheet, the add sheet, a chip's menu or the chosen Feed's new-address sheet
- * at once, or start the list scrolled to a row, for the state gallery.
+ * `startAtOffset` opens the list where you left it (FEE-130). A state gallery world may start with a sheet or a
+ * chip's menu open, or the list scrolled to a row, through its start state (FEE-105).
  */
 export function FeedsScreen({
   feed,
-  accountOpen,
-  addOpen = false,
-  menuFor,
-  newAddressOpen,
-  startAtRow,
   startAtOffset,
 }: {
   feed?: string;
-  accountOpen?: boolean;
-  addOpen?: boolean;
-  menuFor?: string;
-  newAddressOpen?: boolean;
-  startAtRow?: number;
   startAtOffset?: number;
 }) {
+  const { startAtRow } = useStartState();
   const insets = useSafeAreaInsets();
   const chipsView = useChips();
   const chips = chipsView.status === 'ready' ? chipsView.chips : [];
@@ -150,7 +141,7 @@ export function FeedsScreen({
 
   const select = (feedId: string | null) => router.setParams({ feed: feedId ?? undefined });
   const listPlace = useListPlace(list, selection, startAtOffset);
-  const [adding, setAdding] = useState(addOpen);
+  const [adding, setAdding] = useSheet('add-feed');
   const addFeed = () => setAdding(true);
   // A Feed added, or one already followed: the sheet closes on its chip (FEE-45, T22).
   const showFeed = (feedId: string) => {
@@ -167,10 +158,10 @@ export function FeedsScreen({
         summary={<FeedsUpdatedLine refreshing={refreshing} offline={offline} />}
         // Adding a Feed is always here, in the same place (Q31, D18); the empty state has its own button.
         action={chips.length > 0 ? <TopBarIcon label="Add a Feed" icon={{ ios: 'plus', android: 'add' }} onPress={addFeed} /> : undefined}
-        trailing={<AccountButton initiallyOpen={accountOpen} />}
+        trailing={<AccountButton />}
       />
       {chips.length > 0 ? (
-        <ChipRow chips={chips} selected={selection} onSelect={select} onRemove={confirmRemove} menuFor={menuFor} />
+        <ChipRow chips={chips} selected={selection} onSelect={select} onRemove={confirmRemove} />
       ) : null}
       {selectedChip && selection === selectedChip.id ? (
         // A Feed's page: whether it's not updating (FEE-127), and never a dead end when it has no Articles (Q34).
@@ -180,7 +171,6 @@ export function FeedsScreen({
           empty={empty}
           onRemove={() => confirmRemove(selectedChip)}
           onFeed={select}
-          newAddressOpen={newAddressOpen}
         />
       ) : null}
     </View>
