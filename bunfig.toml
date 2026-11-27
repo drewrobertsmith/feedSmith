@@ -1,0 +1,14 @@
+[install]
+# The two-week rule (T52): nothing installs a package version released less than 14 days ago, dependencies of
+# dependencies included. `expo install` installs through Bun, so it obeys this too.
+minimumReleaseAge = 1209600
+
+# Owner-approved exceptions, each recorded with its reason in docs/security.md. An entry lets in any version of that
+# package, so it goes here only with the approval, and comes out once its installed version is two weeks old.
+minimumReleaseAgeExcludes = [
+  # 4.8.0 / 0.14.0, released 2026-11-19 (FEE-48): two weeks old on 2026-12-03.
+  "react-native-reanimated",
+  "react-native-worklets",
+  # 2.1.0, released 2026-11-19 (FEE-36): two weeks old on 2026-12-03.
+  "@convex-dev/auth",
+]
