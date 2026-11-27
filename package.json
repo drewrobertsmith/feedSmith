@@ -79,6 +79,7 @@
     "visual:check": "bun scripts/visual-check/run.ts check",
     "visual:approve": "bun scripts/visual-check/run.ts approve",
     "repos:effect": "scripts/vendor-effect.sh",
+    "deps:check": "bun scripts/deps/check.ts",
     "expo:docs": "EXPO_NO_TELEMETRY=1 expo-agent-cli docs:sync",
     "expo:docs:search": "EXPO_NO_TELEMETRY=1 expo-agent-cli docs:search --no-followups",
     "expo:build-log": "EXPO_NO_TELEMETRY=1 expo-agent-cli inspect:build-log"

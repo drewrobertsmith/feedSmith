@@ -1,0 +1,101 @@
+# The weekly dependency round (FEE-142, T53): take the safe group, run the gates, open one PR for the owner to
+# merge. If the gates fail, no PR: a Linear ticket instead, so the round goes through the dev loop.
+name: Dependency round
+
+on:
+  schedule:
+    # Mondays, 14:00 UTC (8am in Chicago).
+    - cron: '0 14 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: dependency-round
+  cancel-in-progress: false
+
+jobs:
+  round:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: develop
+          # The security gate compares with develop.
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.13
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      # Exit 3 means nothing to take and nothing for the owner to look at.
+      - name: Take the safe group
+        id: round
+        run: |
+          set +e
+          bun run deps:check --apply > round.md
+          code=$?
+          set -e
+          cat round.md
+          if [ "$code" = 3 ]; then echo "act=none" >> "$GITHUB_OUTPUT"; exit 0; fi
+          if [ "$code" != 0 ]; then exit "$code"; fi
+          cat round.md >> "$GITHUB_STEP_SUMMARY"
+          # Nothing moved: the owner's list stays in this run's summary. Majors wait for weeks, so no ticket each week.
+          if git diff --quiet; then echo "act=none" >> "$GITHUB_OUTPUT"; else echo "act=pr" >> "$GITHUB_OUTPUT"; fi
+
+      # The project's gates, as .claude/expo-dev-loop.json lists them.
+      - name: Gates
+        id: gates
+        if: steps.round.outputs.act == 'pr'
+        env:
+          CI: '1'
+        run: |
+          set +e
+          failed=''
+          for gate in typecheck lint test doctor security; do
+            echo "::group::$gate"
+            bun run "$gate" > "gate-$gate.log" 2>&1 || failed="$failed $gate"
+            cat "gate-$gate.log"
+            echo "::endgroup::"
+          done
+          echo "failed=${failed# }" >> "$GITHUB_OUTPUT"
+
+      - name: Open the PR
+        if: steps.round.outputs.act == 'pr' && steps.gates.outputs.failed == ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          branch="chore/deps-$(date -u +%Y-%m-%d)"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c "$branch"
+          git add package.json bun.lock repos
+          git commit -m "Dependency round, $(date -u +%Y-%m-%d)"
+          git push -u origin "$branch"
+          { cat round.md; printf '\n---\nOpened by the weekly dependency round (FEE-142, T53). The gates passed.\n'; } > body.md
+          gh pr create --base develop --head "$branch" --title "Dependency round, $(date -u +%Y-%m-%d)" --body-file body.md
+
+      # The gates failed: no PR, a Linear ticket, so the round goes through the dev loop.
+      - name: File a Linear ticket
+        if: steps.round.outputs.act == 'pr' && steps.gates.outputs.failed != ''
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          FAILED: ${{ steps.gates.outputs.failed }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          date=$(date -u +%Y-%m-%d)
+          title="Dependency round, $date: the gates failed ($FAILED)"
+          intro="The safe group was applied, but these gates failed: **$FAILED**. No PR was opened. Take this round through the dev loop. Run: $RUN_URL"
+          description=$(printf '%s\n\n%s\n\nFiled by the weekly dependency round (FEE-142, T53).' "$intro" "$(cat round.md)")
+          payload=$(jq -n --arg title "$title" --arg description "$description" \
+            '{query: "mutation($input: IssueCreateInput!) { issueCreate(input: $input) { success issue { url } } }",
+              variables: {input: {teamId: "34ac9182-ca1e-4aab-93bb-f8ff6881cf40", title: $title, description: $description}}}')
+          curl -sSf --max-time 30 https://api.linear.app/graphql \
+            -H "Authorization: $LINEAR_API_KEY" -H 'Content-Type: application/json' -d "$payload" | tee linear.json
+          jq -e '.data.issueCreate.success' linear.json > /dev/null
