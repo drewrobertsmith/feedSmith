@@ -576,6 +576,119 @@ describe('Try again fetches one failing Feed now (FEE-128)', () => {
   });
 });
 
+describe('New address moves a Feed to a new address, keeping its Articles (FEE-129)', () => {
+  const URL_B = 'https://b.example.com/feed';
+  const page = (links: string[]) =>
+    new Response(links.map((href) => `<link rel="alternate" type="application/rss+xml" title="${href}" href="${href}">`).join(''), {
+      headers: { 'content-type': 'text/html' },
+    });
+  /** User A's Feed at URL_A, holding g1, now failing: not-a-feed. */
+  async function failing(s: Awaited<ReturnType<typeof setup>>) {
+    const feed = await follow(s, [{ guid: 'g1', ago: HOUR }]);
+    await s.t.run((ctx) => ctx.db.patch(feed._id, { iconUrl: 'https://a.example.com/icon.png' }));
+    network.mockImplementation(async () => new Response('<html><body>Moved</body></html>'));
+    vi.setSystemTime(START + HOUR);
+    await refresh(s, feed._id);
+    network.mockReset();
+    return (await feedOf(s, feed._id))!;
+  }
+  /** The network answers by address; anything else is a 404. */
+  const route = (routes: Record<string, () => Response>) =>
+    network.mockImplementation(async (url) => routes[url]?.() ?? new Response('gone', { status: 404 }));
+
+  test('signed out, it is refused, and nothing is fetched (Q10)', async () => {
+    const s = await setup();
+    const feed = await failing(s);
+    await expect(s.t.action(api.feeds.newAddress, { id: feed._id, url: URL_B })).rejects.toThrow(/SIGNED_OUT/);
+    expect(network).not.toHaveBeenCalled();
+  });
+
+  test("User B can't change User A's Feed's address: not found, nothing fetched, nothing changed (Q10)", async () => {
+    const s = await setup();
+    const feed = await failing(s);
+    expect(await s.b.action(api.feeds.newAddress, { id: feed._id, url: URL_B })).toEqual({ ok: false, reason: 'not-found' });
+    expect(network).not.toHaveBeenCalled();
+    expect(await feedOf(s, feed._id)).toEqual(feed);
+  });
+
+  test('a working feed at the new address replaces the old one: same Feed, name, icon and Articles, none repeated, working again', async () => {
+    const s = await setup();
+    const feed = await failing(s);
+    route({ [URL_B]: () => new Response(rss([{ guid: 'g1', ago: 2 * HOUR }, { guid: 'g2', ago: MINUTE }])) });
+    vi.setSystemTime(START + 2 * HOUR);
+    // It answers with the Feed's id only: never an address (Q9).
+    expect(await s.a.action(api.feeds.newAddress, { id: feed._id, url: URL_B })).toEqual({ ok: true, feedId: feed._id });
+    const moved = (await feedOf(s, feed._id))!;
+    expect(moved).toMatchObject({ url: URL_B, title: feed.title, iconUrl: 'https://a.example.com/icon.png', status: 'working', failures: 0, lastFetchedAt: START + 2 * HOUR });
+    expect(moved).not.toHaveProperty('failingSince');
+    expect(moved).not.toHaveProperty('failure');
+    const articles = await s.a.query(api.articles.all, {});
+    expect(articles.map((article: { title: string }) => article.title).sort()).toEqual(['g1', 'g2']);
+    expect(await s.t.run(async (ctx) => (await ctx.db.query('feeds').collect()).length)).toBe(1);
+  });
+
+  test("a website leads to its one feed, as adding does (T21); several are offered to choose, and nothing changes yet", async () => {
+    const s = await setup();
+    const feed = await failing(s);
+    route({ 'https://b.example.com/': () => page(['/one.xml', '/two.xml']) });
+    const result = await s.a.action(api.feeds.newAddress, { id: feed._id, url: 'b.example.com' });
+    expect(result).toMatchObject({ ok: false, reason: 'choose' });
+    expect(await feedOf(s, feed._id)).toEqual(feed);
+
+    route({ 'https://b.example.com/': () => page(['/one.xml']), 'https://b.example.com/one.xml': () => new Response(rss([{ guid: 'g1', ago: HOUR }])) });
+    expect(await s.a.action(api.feeds.newAddress, { id: feed._id, url: 'b.example.com' })).toEqual({ ok: true, feedId: feed._id });
+    expect(await feedOf(s, feed._id)).toMatchObject({ url: 'https://b.example.com/one.xml', status: 'working' });
+  });
+
+  test("an address another of the User's Feeds uses is refused with that Feed, before anything is fetched (T22)", async () => {
+    const s = await setup();
+    const feed = await failing(s);
+    const other = await s.t.run((ctx) => ctx.db.insert('feeds', { userId: s.userA, url: URL_B, title: 'Calm Notes' }));
+    expect(await s.a.action(api.feeds.newAddress, { id: feed._id, url: URL_B })).toEqual({ ok: false, reason: 'already-added', title: 'Calm Notes', feedId: other });
+    expect(network).not.toHaveBeenCalled();
+    expect(await feedOf(s, feed._id)).toEqual(feed);
+  });
+
+  test("another User's Feed at that address doesn't count: Feeds are per User", async () => {
+    const s = await setup();
+    const feed = await failing(s);
+    const [, userB] = await s.t.run(async (ctx) => (await ctx.db.query('users').collect()).map((user) => user._id));
+    await s.t.run((ctx) => ctx.db.insert('feeds', { userId: userB, url: URL_B, title: 'Theirs' }));
+    route({ [URL_B]: () => new Response(rss([{ guid: 'g1', ago: HOUR }])) });
+    expect(await s.a.action(api.feeds.newAddress, { id: feed._id, url: URL_B })).toEqual({ ok: true, feedId: feed._id });
+  });
+
+  test("the Feed's own address is no other Feed's: it's fetched, and fails as before", async () => {
+    const s = await setup();
+    const feed = await failing(s);
+    route({});
+    expect(await s.a.action(api.feeds.newAddress, { id: feed._id, url: URL_A })).toMatchObject({ ok: false });
+    expect(network).toHaveBeenCalled();
+  });
+
+  test.each([
+    ['not an address', 'ftp://b.example.com/feed', 'invalid-url'],
+    ['a page with no feed', 'https://b.example.com/', 'no-feed-found'],
+    ['a dead address', URL_B, 'unreachable'],
+  ])("%s returns adding's reason, and the Feed is unchanged", async (_case, url, reason) => {
+    const s = await setup();
+    const feed = await failing(s);
+    route({ 'https://b.example.com/': () => page([]), [URL_B]: () => new Response('down', { status: 500 }) });
+    expect(await s.a.action(api.feeds.newAddress, { id: feed._id, url })).toEqual({ ok: false, reason });
+    expect(await feedOf(s, feed._id)).toEqual(feed);
+  });
+
+  test('nothing the server logs names either address (Q9)', async () => {
+    const s = await setup();
+    const feed = await failing(s);
+    const logs = captureLogs();
+    route({ [URL_B]: () => new Response(rss([{ guid: 'g1', ago: HOUR }])) });
+    await s.a.action(api.feeds.newAddress, { id: feed._id, url: URL_B });
+    expect(logs.all()).not.toMatch(/example\.com/);
+    logs.restore();
+  });
+});
+
 describe('cleaning up old Articles (P14)', () => {
   test('deletes Articles and their bodies 30 days after publication, and keeps newer ones', async () => {
     const s = await setup();

@@ -88,8 +88,8 @@ const AT_TOP = spacing.related;
  * a link's value is untrusted, so anything but one of the User's chips means All (Q25).
  * Adding a Feed is a sheet over it (FEE-45); removing one is in its chip's menu (FEE-97). New Articles that
  * arrive while you're scrolled down wait above you, your place held, with a note to go to them (FEE-102).
- * `startAtOffset` opens the list where you left it (FEE-130). `accountOpen`, `addOpen`, `menuFor` and `startAtRow`
- * open the Account sheet, the add sheet or a chip's menu
+ * `startAtOffset` opens the list where you left it (FEE-130). `accountOpen`, `addOpen`, `menuFor`, `newAddressOpen` and
+ * `startAtRow` open the Account sheet, the add sheet, a chip's menu or the chosen Feed's new-address sheet
  * at once, or start the list scrolled to a row, for the state gallery.
  */
 export function FeedsScreen({
@@ -97,6 +97,7 @@ export function FeedsScreen({
   accountOpen,
   addOpen = false,
   menuFor,
+  newAddressOpen,
   startAtRow,
   startAtOffset,
 }: {
@@ -104,6 +105,7 @@ export function FeedsScreen({
   accountOpen?: boolean;
   addOpen?: boolean;
   menuFor?: string;
+  newAddressOpen?: boolean;
   startAtRow?: number;
   startAtOffset?: number;
 }) {
@@ -172,7 +174,14 @@ export function FeedsScreen({
       ) : null}
       {selectedChip && selection === selectedChip.id ? (
         // A Feed's page: whether it's not updating (FEE-127), and never a dead end when it has no Articles (Q34).
-        <FeedPageTop key={selectedChip.id} chip={selectedChip} empty={empty} onRemove={() => confirmRemove(selectedChip)} />
+        <FeedPageTop
+          key={selectedChip.id}
+          chip={selectedChip}
+          empty={empty}
+          onRemove={() => confirmRemove(selectedChip)}
+          onFeed={select}
+          newAddressOpen={newAddressOpen}
+        />
       ) : null}
     </View>
   );

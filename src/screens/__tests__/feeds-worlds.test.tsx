@@ -15,11 +15,13 @@ import { spacing } from '@/theme/spacing';
 import {
   ADD_FEED_WORLDS,
   ALL_WORLDS,
+  NEW_ADDRESS_WORLDS,
   NEW_ARTICLES_WORLDS,
   NOT_UPDATING_WORLDS,
   READING_WORLDS,
   type AddFeedWorldId,
   type AllWorldId,
+  type NewAddressWorldId,
   type NewArticlesWorldId,
   type NotUpdatingWorldId,
   type ReadingWorldId,
@@ -905,6 +907,8 @@ describe('a Feed that stops updating shows a badge on its chip (FEE-126)', () =>
     expect(screen.getByText(SINCE)).toBeOnTheScreen();
     expect(screen.getByText(NOT_A_FEED)).toBeOnTheScreen();
     expect(screen.queryAllByRole('button', { name: 'Open site' })).toHaveLength(shows.notice.openSite ? 1 : 0);
+    // New address, always there (FEE-129).
+    expect(screen.getByRole('button', { name: 'New address' })).toBeOnTheScreen();
     // Try again is the first fix, always there (FEE-128).
     if (shows.notice.tryAgain === 'busy') expect(screen.getByRole('button', { name: 'Trying again…', busy: true, disabled: true })).toBeOnTheScreen();
     else expect(screen.getByRole('button', { name: 'Try again', busy: false, disabled: false })).toBeOnTheScreen();
@@ -977,6 +981,111 @@ describe('a Feed that stops updating shows a badge on its chip (FEE-126)', () =>
     await act(async () => world!.feeds.recover());
     expect(verge('The Verge')).toBeOnTheScreen();
     expect(screen.queryByTestId('not-updating-badge')).not.toBeOnTheScreen();
+  });
+});
+
+describe('New address, from a not-updating Feed’s page (FEE-129)', () => {
+  const FIELD = 'Website or feed URL';
+  const HEADING = 'New address for The Verge';
+  const openSheet = async (spec: WorldSpec) => {
+    const w = await open({ feeds: 'some', failing: 'day', feed: 'f1', ...spec });
+    await userEvent.press(await screen.findByRole('button', { name: 'New address' }));
+    return w;
+  };
+  const sheetOpen = (isOpen: boolean) =>
+    expect(jest.mocked(NativeSheet)).toHaveBeenLastCalledWith(expect.objectContaining({ open: isOpen }), undefined);
+  beforeEach(() => jest.mocked(NativeSheet).mockClear());
+  type Shows = { button: 'Use this address' | 'Checking…'; error: string | null; choices: number; titleSize: number };
+  const base = { button: 'Use this address', error: null, choices: 0, titleSize: 24 } as const;
+  const SHOWS: Record<NewAddressWorldId, Shows> = {
+    'new-address': base,
+    'new-address-light': base,
+    'new-address-busy': { ...base, button: 'Checking…' },
+    'new-address-choose': { ...base, choices: FIXTURE_CHOICES.length },
+    'new-address-not-a-feed': { ...base, error: 'That address isn’t an RSS or Atom feed. Try the site’s feed URL.' },
+    'new-address-already': base,
+    'new-address-largest-font': { ...base, choices: FIXTURE_CHOICES.length, titleSize: 48 },
+  };
+
+  test.each(NEW_ADDRESS_WORLDS)('$label', async ({ id, spec }) => {
+    const shows = SHOWS[id];
+    await openSheet(spec);
+    sheetOpen(true);
+    expect(screen.getByRole('heading', { name: HEADING })).toHaveStyle({ fontSize: shows.titleSize });
+    expect(screen.getByText('Its name and Articles stay.')).toBeOnTheScreen();
+    // It starts empty, with nothing that could read as the old address (Q9).
+    const field = screen.getByLabelText(FIELD);
+    expect(field).toHaveDisplayValue('');
+    expect(field.props.placeholder).toBeUndefined();
+    const button = screen.getByRole('button', { name: shows.button });
+    if (shows.button === 'Checking…') expect(button).toBeDisabled();
+    if (shows.error) expect(screen.getByRole('alert')).toHaveTextContent(shows.error);
+    else expect(screen.queryByRole('alert')).not.toBeOnTheScreen();
+    expect(screen.queryAllByRole('button', { name: /, theverge\.com$/ })).toHaveLength(shows.choices);
+  });
+
+  test('a working address closes the sheet onto the Feed’s page: same Feed, no notice, no badge', async () => {
+    const user = userEvent.setup();
+    const w = await openSheet({ colorScheme: 'dark' });
+    await user.type(screen.getByLabelText(FIELD), 'theverge.com/rss');
+    await user.press(screen.getByRole('button', { name: 'Use this address' }));
+    expect(w.feedsLog.moved).toEqual([{ id: 'f1', url: 'theverge.com/rss' }]);
+    sheetOpen(false);
+    expect(await screen.findByRole('tab', { name: 'The Verge', selected: true })).toBeOnTheScreen();
+    expect(screen.queryByText(/Not updating/)).not.toBeOnTheScreen();
+    expect(screen.queryByTestId('not-updating-badge')).not.toBeOnTheScreen();
+    expect(screen.getAllByRole('link').length).toBeGreaterThan(0);
+  });
+
+  test('choosing one of a site’s feeds gives the Feed that address', async () => {
+    const user = userEvent.setup();
+    const w = await openSheet({ colorScheme: 'dark', newAddress: 'choose' });
+    const [first] = FIXTURE_CHOICES;
+    await user.press(screen.getByRole('button', { name: `${first.title}, theverge.com` }));
+    expect(w.feedsLog.moved).toEqual([{ id: 'f1', url: first.url }]);
+  });
+
+  test('an address another Feed uses says so quietly and opens that Feed; this one is unchanged (T22)', async () => {
+    const toast = jest.spyOn(ToastAndroid, 'show').mockImplementation(() => {});
+    const user = userEvent.setup();
+    await openSheet({ colorScheme: 'dark', newAddress: 'already' });
+    await user.type(screen.getByLabelText(FIELD), 'calmnotes.example');
+    await user.press(screen.getByRole('button', { name: 'Use this address' }));
+    expect(toast).toHaveBeenCalledWith('You already follow Calm Notes.', ToastAndroid.SHORT);
+    sheetOpen(false);
+    expect(await screen.findByRole('tab', { name: 'Calm Notes', selected: true })).toBeOnTheScreen();
+    expect(screen.getByRole('tab', { name: 'The Verge, not updating' })).toBeOnTheScreen();
+    toast.mockRestore();
+  });
+
+  test('a failed address keeps the sheet open with what was typed', async () => {
+    const user = userEvent.setup();
+    await openSheet({ colorScheme: 'dark', newAddress: 'not-a-feed' });
+    await user.type(screen.getByLabelText(FIELD), 'example.com');
+    await user.press(screen.getByRole('button', { name: 'Use this address' }));
+    sheetOpen(true);
+    expect(screen.getByLabelText(FIELD)).toHaveDisplayValue('example.com');
+    expect(screen.getByText(/Not updating since/)).toBeOnTheScreen();
+  });
+
+  test('Back keeps what was typed for the next opening (D33), and sends nothing', async () => {
+    const user = userEvent.setup();
+    const w = await openSheet({ colorScheme: 'dark' });
+    await user.type(screen.getByLabelText(FIELD), 'theverge');
+    await act(async () => jest.mocked(NativeSheet).mock.lastCall![0].onClose());
+    sheetOpen(false);
+    await user.press(screen.getByRole('button', { name: 'New address' }));
+    expect(screen.getByLabelText(FIELD)).toHaveDisplayValue('theverge');
+    expect(w.feedsLog.moved).toEqual([]);
+  });
+
+  test('text that isn’t an address says so and sends nothing (FEE-96)', async () => {
+    const user = userEvent.setup();
+    const w = await openSheet({ colorScheme: 'dark' });
+    await user.type(screen.getByLabelText(FIELD), 'the verge');
+    await user.press(screen.getByRole('button', { name: 'Use this address' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter a website or feed URL, like theverge.com.');
+    expect(w.feedsLog.moved).toEqual([]);
   });
 });
 

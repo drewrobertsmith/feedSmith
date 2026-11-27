@@ -8,7 +8,9 @@ import { connectionOf, type Connection } from '@/feeds/connection';
 import {
   FeedsContext,
   isAddress,
+  type AddFeedReason,
   type AddFeedView,
+  type AddressForm,
   type AddOutcome,
   type AllView,
   type ArticleView,
@@ -86,20 +88,28 @@ function usePrefetchArticle() {
   };
 }
 
-function useAddFeed() {
-  const addFeed = useAction(api.feeds.add);
+type AddressResult =
+  | { ok: true; feedId: string }
+  | { ok: false; reason: 'already-added'; title: string; feedId: string }
+  | { ok: false; reason: 'choose'; choices: { url: string; title: string }[] }
+  | { ok: false; reason: AddFeedReason | 'not-found' };
+
+/**
+ * A form that sends an address to the server: adding a Feed, or giving one a new address (FEE-129). Only an address
+ * is sent; anything else (a name, say) never is (FEE-96).
+ */
+function useAddressForm(send: (url: string) => Promise<AddressResult>): AddressForm {
   const [view, setView] = useState<AddFeedView>({ status: 'idle' });
 
   const add = async (typed: string): Promise<AddOutcome> => {
     const text = typed.trim();
-    // Only an address is added; anything else (a name, say) is never sent (FEE-96).
     if (!isAddress(text)) {
       setView({ status: 'error', reason: 'invalid-url' });
       return { kind: 'stay' };
     }
     setView({ status: 'busy' });
     try {
-      const result = await addFeed({ url: text });
+      const result = await send(text);
       if (result.ok) {
         setView({ status: 'idle' });
         return { kind: 'added', feedId: result.feedId };
@@ -109,7 +119,8 @@ function useAddFeed() {
         return { kind: 'already', title: result.title, feedId: result.feedId };
       }
       if (result.reason === 'choose') setView({ status: 'choose', choices: result.choices });
-      else setView({ status: 'error', reason: result.reason });
+      // A Feed removed meanwhile can't be reached at any address.
+      else setView({ status: 'error', reason: result.reason === 'not-found' ? 'unreachable' : result.reason });
       return { kind: 'stay' };
     } catch {
       // The call itself failed (no connection, or the server is down).
@@ -119,6 +130,16 @@ function useAddFeed() {
   };
 
   return { view, add };
+}
+
+function useAddFeed(): AddressForm {
+  const addFeed = useAction(api.feeds.add);
+  return useAddressForm((url) => addFeed({ url }));
+}
+
+function useNewAddress(feedId: string): AddressForm {
+  const newAddress = useAction(api.feeds.newAddress);
+  return useAddressForm((url) => newAddress({ id: feedId, url }));
 }
 
 function useRefresh() {
@@ -173,6 +194,7 @@ const convexFeeds: FeedsData = {
   useArticle,
   usePrefetchArticle,
   useAddFeed,
+  useNewAddress,
   useRefresh,
   useMarkRead,
   useLastUpdated,
