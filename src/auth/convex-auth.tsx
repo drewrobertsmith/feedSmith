@@ -4,13 +4,15 @@ import { ConvexReactClient, useConvexAuth, useMutation, useQuery } from 'convex/
 import { ConvexError } from 'convex/values';
 import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 import { api } from '../../convex/_generated/api';
 import { APP_RETURN } from '../../convex/lib/appReturn';
 import { AUTH_ERRORS } from '../../convex/lib/authErrors';
 import { AuthContext, type Auth } from '@/auth/auth-context';
 import { signInOutcome, type SignInView } from '@/auth/sign-in-outcome';
+import { identify } from '@/monitoring/identify';
+import { trail } from '@/monitoring/trail';
 
 /**
  * Convex Auth accepts only http(s) return addresses, so Google returns to this
@@ -35,6 +37,13 @@ function ConvexAuthBridge({ children }: { children: ReactNode }) {
   const deleteOnServer = useMutation(api.account.deleteAccount);
   const [deletion, setDeletion] = useState<Auth['deletion']>('idle');
 
+  // Crash reports name the signed-in User by their opaque id only, and no one once signed out (T50).
+  const userId = isAuthenticated ? account?.id : undefined;
+  useEffect(() => {
+    if (userId !== undefined) identify(userId);
+    else if (!isLoading && !isAuthenticated) identify(null);
+  }, [userId, isLoading, isAuthenticated]);
+
   const auth: Auth = {
     session: isLoading ? 'loading' : isAuthenticated ? 'signed-in' : 'signed-out',
     account: isAuthenticated ? (account ?? null) : null,
@@ -43,6 +52,7 @@ function ConvexAuthBridge({ children }: { children: ReactNode }) {
     // whether or not that call reached it, so the phone always signs out (Q26).
     signOut: async () => {
       setSigningOut(true);
+      trail('auth.signed-out');
       // It already swallows a failed server call; the catch only keeps the busy state from sticking.
       await signOut().catch(() => null);
       setSigningOut(false);
@@ -50,12 +60,15 @@ function ConvexAuthBridge({ children }: { children: ReactNode }) {
     signingOut,
     deleteAccount: async () => {
       setDeletion('deleting');
+      trail('account.deletion-started');
       const deleted = await deleteOnServer({}).then(
         () => true,
         // Already gone counts as deleted; anything else (no connection, a server error) leaves it all intact.
         (error: unknown) => error instanceof ConvexError && error.data === AUTH_ERRORS.accountGone,
       );
+      trail('account.deleted', { outcome: deleted ? 'ok' : 'failed' });
       if (!deleted) return setDeletion('failed');
+      identify(null);
       // The server has revoked every session; this clears the tokens on the phone (Q26).
       await signOut().catch(() => null);
       setDeletion('idle');
@@ -73,7 +86,9 @@ function ConvexAuthBridge({ children }: { children: ReactNode }) {
       if (error !== undefined) return setView(signInOutcome({ status: 'error', userError: { error } }));
       if (code === undefined) return;
       setView({ status: 'busy' });
-      setView(signInOutcome(await signIn({ code })));
+      const result = await signIn({ code });
+      trail('auth.signed-in', { outcome: result.status === 'complete' ? 'ok' : 'failed' });
+      setView(signInOutcome(result));
     },
   };
 

@@ -1,7 +1,11 @@
 import { addBreadcrumb } from '@sentry/react-native';
 
-/** The User's actions a crash report can show (T50). Auth actions join with FEE-138. */
+/** The User's actions a crash report can show (T50). */
 export type TrailAction =
+  | 'auth.signed-in'
+  | 'auth.signed-out'
+  | 'account.deletion-started'
+  | 'account.deleted'
   | 'article.prefetched'
   | 'article.opened'
   | 'article.read'
