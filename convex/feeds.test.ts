@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import verge from './lib/feed/fixtures/verge.xml?raw';
+import rateLimiterTest from '@convex-dev/rate-limiter/test';
+import twins from './lib/feed/fixtures/page-format-twins.html?raw';
 import schema from './schema';
 
 // As in auth.test.ts: the test identity's subject is the user id.
@@ -497,5 +499,59 @@ describe('adding a Feed leaves the catalog alone (FEE-96)', () => {
     route({ 'https://site.example.com/': () => home(DECLARES), 'https://site.example.com/rss.xml': () => new Response(verge) });
     expect(await a.action(api.feeds.add, { url: 'https://site.example.com/rss.xml' })).toMatchObject({ ok: true });
     expect(await catalog(t)).toEqual([expect.objectContaining({ name: 'Old Name', seenAt: 1 })]);
+  });
+});
+
+describe("a site's feed in two formats is one feed, not a choice (FEE-133)", () => {
+  const PAGE = 'https://reactnative.dev/blog';
+  const ATOM = 'https://reactnative.dev/blog/atom.xml';
+  const RSS = 'https://reactnative.dev/blog/rss.xml';
+  const atom = () =>
+    new Response(
+      `<feed xmlns="http://www.w3.org/2005/Atom"><title>React Native Blog</title><link href="https://reactnative.dev/blog"/><entry><id>${PAGE}/2026/10/19/react-native-0.88</id><title>React Native 0.88</title><updated>2026-10-19T00:00:00Z</updated><author><name>Fabrizio Cucci</name></author><content type="html">&lt;p&gt;Today we are excited.&lt;/p&gt;</content></entry></feed>`,
+      { headers: { 'content-type': 'application/xml' } },
+    );
+  const serve = () =>
+    network.mockImplementation(async (url) => {
+      if (url === PAGE) return new Response(twins, { headers: { 'content-type': 'text/html' } });
+      if (url === ATOM) return atom();
+      return new Response('nope', { status: 404 });
+    });
+  const feeds = (t: Awaited<ReturnType<typeof setup>>['t']) => t.run((ctx) => ctx.db.query('feeds').collect());
+
+  test('adding the page adds its Atom feed at once, with no choice, bylines and all', async () => {
+    const { t, a } = await setup();
+    serve();
+    const added = await a.action(api.feeds.add, { url: 'reactnative.dev/blog' });
+    expect(added).toMatchObject({ ok: true });
+    expect((await feeds(t)).map((feed) => feed.url)).toEqual([ATOM]);
+    expect(network.mock.calls.map(([url]) => url)).not.toContain(RSS);
+    const [row] = await a.query(api.articles.all, { feedId: (added as { feedId: string }).feedId } as never);
+    expect(row).toMatchObject({ title: 'React Native 0.88', authors: ['Fabrizio Cucci'] });
+  });
+
+  test('already following its RSS twin, adding the page opens that Feed and adds nothing (T22)', async () => {
+    const { t, a } = await setup();
+    const user = await t.run(async (ctx) => (await ctx.db.query('users').first())!._id);
+    const followed = await t.run((ctx) => ctx.db.insert('feeds', { userId: user, url: RSS, title: 'React Native Blog' }));
+    serve();
+    expect(await a.action(api.feeds.add, { url: 'reactnative.dev/blog' })).toEqual({
+      ok: false,
+      reason: 'already-added',
+      title: 'React Native Blog',
+      feedId: followed,
+    });
+    expect(await feeds(t)).toHaveLength(1);
+    expect(network.mock.calls.map(([url]) => url)).not.toContain(ATOM);
+  });
+
+  test('New address on the page moves the Feed straight to its Atom feed (FEE-129)', async () => {
+    const { t, a } = await setup();
+    rateLimiterTest.register(t);
+    const user = await t.run(async (ctx) => (await ctx.db.query('users').first())!._id);
+    const feedId = await t.run((ctx) => ctx.db.insert('feeds', { userId: user, url: 'https://old.example.com/feed', title: 'React Native' }));
+    serve();
+    expect(await a.action(api.feeds.newAddress, { id: feedId, url: 'reactnative.dev/blog' })).toEqual({ ok: true, feedId });
+    expect((await feeds(t))[0].url).toBe(ATOM);
   });
 });

@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 import { findFeedLinks, MAX_FEED_LINKS, siteMeta } from './discover';
+import twins from './fixtures/page-format-twins.html?raw';
 
 const PAGE = 'https://www.example.com/';
 const head = (inner: string) => `<!doctype html><html><head>${inner}</head><body><p>Hi</p></body></html>`;
@@ -16,6 +17,44 @@ describe("a page's feed links (T21)", () => {
       { url: 'https://www.example.com/rss/index.xml', title: 'All posts' },
       { url: 'https://www.example.com/reviews.atom', title: 'Reviews' },
     ]);
+  });
+
+  test("one feed in two formats is one feed: Atom, with its RSS twin noted (FEE-133)", () => {
+    // React Native's blog, as served: unquoted attributes, RSS listed first, a JSON Feed beside them.
+    expect(findFeedLinks(twins, 'https://reactnative.dev/blog')).toEqual([
+      { url: 'https://reactnative.dev/blog/atom.xml', title: 'React Native Atom Feed', twins: ['https://reactnative.dev/blog/rss.xml'] },
+    ]);
+  });
+
+  test('RSS and Atom in different folders, or two of one format, are different feeds (FEE-133)', () => {
+    const folders = head(`
+      <link rel="alternate" type="application/rss+xml" title="Posts" href="/posts/rss.xml">
+      <link rel="alternate" type="application/atom+xml" title="Notes" href="/notes/atom.xml">`);
+    expect(findFeedLinks(folders, PAGE).map((link) => link.url)).toEqual([
+      'https://www.example.com/posts/rss.xml',
+      'https://www.example.com/notes/atom.xml',
+    ]);
+    const crowded = head(`
+      <link rel="alternate" type="application/rss+xml" title="Posts" href="/blog/rss.xml">
+      <link rel="alternate" type="application/rss+xml" title="Comments" href="/blog/comments.xml">
+      <link rel="alternate" type="application/atom+xml" title="Posts, Atom" href="/blog/atom.xml">`);
+    // Comments are a feed of their own; the posts' RSS and Atom are one.
+    expect(findFeedLinks(crowded, PAGE).map((link) => link.title)).toEqual(['Comments', 'Posts, Atom']);
+    // Two generic feeds of one format beside an Atom one: no telling which is its twin, so all three are offered.
+    const ambiguous = head(`
+      <link rel="alternate" type="application/rss+xml" title="A" href="/blog/rss.xml">
+      <link rel="alternate" type="application/rss+xml" title="B" href="/blog/feed.xml">
+      <link rel="alternate" type="application/atom+xml" title="C" href="/blog/atom.xml">`);
+    expect(findFeedLinks(ambiguous, PAGE)).toHaveLength(3);
+    // Named for what they hold, not their format: two feeds, though they share a folder.
+    const named = head(`
+      <link rel="alternate" type="application/rss+xml" title="All posts" href="/rss.xml">
+      <link rel="alternate" type="application/atom+xml" title="Reviews" href="/reviews.atom">`);
+    expect(findFeedLinks(named, PAGE)).toHaveLength(2);
+    const elsewhere = head(`
+      <link rel="alternate" type="application/rss+xml" title="Ours" href="/blog/rss.xml">
+      <link rel="alternate" type="application/atom+xml" title="Theirs" href="https://other.example.com/blog/atom.xml">`);
+    expect(findFeedLinks(elsewhere, PAGE)).toHaveLength(2);
   });
 
   test('a link without a title is named by its address', () => {

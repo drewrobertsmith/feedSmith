@@ -93,9 +93,13 @@ async function findFeed(ctx: ActionCtx, userId: Id<'users'>, url: string, self?:
   // One spelling per Feed: the parsed URL, its host lower-cased and its spaces trimmed.
   const typed = url.length <= MAX_URL ? safeUrl(withScheme(url))?.href : undefined;
   if (!typed) return { ok: false, reason: 'invalid-url' };
-  const followedOther = async (at: string) => {
-    const following = await ctx.runQuery(internal.feeds.followed, { userId, url: at });
-    return following !== null && following.feedId !== self ? following : null;
+  /** Another of the User's Feeds at any of these addresses: one feed's twins in other formats count too (FEE-133). */
+  const followedOther = async (...addresses: string[]) => {
+    for (const at of addresses) {
+      const following = await ctx.runQuery(internal.feeds.followed, { userId, url: at });
+      if (following !== null && following.feedId !== self) return following;
+    }
+    return null;
   };
 
   // Already followed at this URL: known before fetching anything.
@@ -109,10 +113,11 @@ async function findFeed(ctx: ActionCtx, userId: Id<'users'>, url: string, self?:
     // A web page: its feed links are its feeds, followed one level only (T21).
     const links = findFeedLinks(outcome.body, outcome.url);
     if (links.length === 0) return { ok: false, reason: 'no-feed-found' };
-    if (links.length > 1) return { ok: false, reason: 'choose', choices: links };
+    // A choice offers each feed by its address and title only.
+    if (links.length > 1) return { ok: false, reason: 'choose', choices: links.map(({ url, title }) => ({ url, title })) };
     meta = siteMeta(outcome.body, outcome.url);
     feedUrl = links[0].url;
-    const followingLink = await followedOther(feedUrl);
+    const followingLink = await followedOther(feedUrl, ...(links[0].twins ?? []));
     if (followingLink !== null) return { ok: false, reason: 'already-added', ...followingLink };
     outcome = await fetchFeed(feedUrl);
   }
