@@ -53,6 +53,10 @@ Findings from rnsec (`security`, `security:full`), the dependency audit and any 
 
 Verdicts: **fixed**, **false positive**, **accepted risk** (with the reason and who accepted it).
 
+## Two weeks before a version installs
+
+Bun refuses any package version released less than two weeks ago, dependencies of dependencies included (`minimumReleaseAge` in `bunfig.toml`, T52); `expo install` installs through Bun, so it obeys this too. A version already in `bun.lock` isn't checked again. An exception is two things together: a row above with the reason and the owner's approval, and the package's name in `minimumReleaseAgeExcludes`. The name comes out once its installed version is two weeks old. Today: `react-native-reanimated`, `react-native-worklets` and `@convex-dev/auth`, all released 2026-11-19, out on 2026-12-03.
+
 ## Trusted install scripts
 
 Every dependency allowed to run lifecycle scripts (bun `trustedDependencies`, pnpm `onlyBuiltDependencies`), with the version and what its script does.
