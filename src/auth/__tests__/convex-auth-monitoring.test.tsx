@@ -35,11 +35,19 @@ const identified = jest.mocked(identify);
 const trailed = jest.mocked(trail);
 
 let auth: Auth;
-function Probe() {
-  auth = useAuth();
+const seeAuth = (seen: Auth) => {
+  auth = seen;
+};
+function Probe({ onAuth }: { onAuth: (seen: Auth) => void }) {
+  onAuth(useAuth());
   return null;
 }
-const show = () => render(<ConvexAuth><Probe /></ConvexAuth>);
+const app = () => (
+  <ConvexAuth>
+    <Probe onAuth={seeAuth} />
+  </ConvexAuth>
+);
+const show = () => render(app());
 
 beforeEach(() => {
   mockSession = { isLoading: false, isAuthenticated: true };
@@ -60,7 +68,7 @@ describe('who crash reports name', () => {
   test('no one, once signed out', async () => {
     const { rerender } = await show();
     mockSession = { isLoading: false, isAuthenticated: false };
-    await rerender(<ConvexAuth><Probe /></ConvexAuth>);
+    await rerender(app());
     expect(identified).toHaveBeenLastCalledWith(null);
   });
 
