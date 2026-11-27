@@ -95,3 +95,7 @@ jest.mock('@/components/native-text-field', () => {
 
 // expo-sqlite's key-value store is native; tests keep places in memory, and the app's own store reads nothing (FEE-130).
 jest.mock('expo-sqlite/kv-store', () => ({ Storage: { getItemSync: () => null, setItemSync: () => {} } }));
+
+// The Sentry SDK ships ESM that Jest can't load, and has nothing to send to here. Breadcrumbs from the
+// adapters (`trail`, FEE-137) go nowhere; a test that checks what reaches Sentry mocks it itself.
+jest.mock('@sentry/react-native', () => ({ addBreadcrumb: jest.fn() }));
