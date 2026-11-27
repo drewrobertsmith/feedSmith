@@ -38,11 +38,35 @@ function scrubTransaction<T extends Transaction>(event: T): T {
  */
 const navigation = Sentry.reactNavigationIntegration();
 
+/** Expo Router 58's container: its `addListener` knows only `state` (FEE-139). */
+type Container = { addListener: (type: 'state', listener: () => void) => unknown };
+
+/**
+ * Sentry starts a screen's span on the container's dispatch event (`__unsafe_action__`) and names it on `state`.
+ * Expo Router 58's container emits only `state`, so every screen after the first went unnamed (FEE-139): here each
+ * screen change stands in for its dispatch, starting the span just before Sentry's own `state` listener names it.
+ * Sentry already drops a change that stays on the same screen. Everything else is Expo Router's container as is.
+ */
+function dispatchOnStateChange(container: Container) {
+  return new Proxy(container, {
+    get(target, key) {
+      if (key === 'addListener') {
+        return (type: string, listener: (event?: unknown) => void) =>
+          type === '__unsafe_action__'
+            ? target.addListener('state', () => listener(undefined))
+            : target.addListener(type as 'state', listener);
+      }
+      const value = Reflect.get(target, key);
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+}
+
 /** Connects Expo Router's navigation container to Sentry. Call once, in the root layout. */
 export function useScreenTracking() {
   const ref = useNavigationContainerRef();
   useEffect(() => {
-    navigation.registerNavigationContainer(ref);
+    if (ref.current) navigation.registerNavigationContainer(dispatchOnStateChange(ref.current));
   }, [ref]);
 }
 

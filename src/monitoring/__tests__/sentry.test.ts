@@ -15,7 +15,19 @@ jest.mock('@sentry/react-native', () => ({
   reactNavigationIntegration: jest.fn(() => ({ name: 'ReactNavigation', registerNavigationContainer: jest.fn() })),
 }));
 
-const mockNavigationRef = { current: null };
+/** Expo Router 58's navigation container, as far as Sentry uses it: listeners by event, and the current route. */
+function fakeContainer() {
+  const listeners: { type: string; listener: (event?: unknown) => void }[] = [];
+  return {
+    addListener: (type: string, listener: (event?: unknown) => void) => {
+      listeners.push({ type, listener });
+      return () => {};
+    },
+    getCurrentRoute: () => ({ name: 'article/[id]', key: 'article-1' }),
+    emit: (type: string) => listeners.filter((l) => l.type === type).forEach(({ listener }) => listener({ data: {} })),
+  };
+}
+const mockNavigationRef: { current: ReturnType<typeof fakeContainer> | null } = { current: null };
 jest.mock('expo-router', () => ({ useNavigationContainerRef: () => mockNavigationRef }));
 
 const init = jest.mocked(Sentry.init);
@@ -103,12 +115,44 @@ describe('initSentry: screens, traces and profiles', () => {
     expect(names).toEqual(['MobileReplay', 'ReactNavigation']);
   });
 
-  test("registers Expo Router's navigation container with it", async () => {
+  function registered() {
     const navigation = (initOptions().integrations as { name: string; registerNavigationContainer?: jest.Mock }[]).find(
       ({ name }) => name === 'ReactNavigation',
     )!;
+    navigation.registerNavigationContainer!.mockClear();
+    return navigation.registerNavigationContainer!;
+  }
+
+  test("registers Expo Router's navigation container with it", async () => {
+    mockNavigationRef.current = fakeContainer();
+    const register = registered();
     await renderHook(() => useScreenTracking());
-    expect(navigation.registerNavigationContainer).toHaveBeenCalledWith(mockNavigationRef);
+    const container = register.mock.calls[0][0];
+    expect(container.getCurrentRoute()).toEqual({ name: 'article/[id]', key: 'article-1' });
+  });
+
+  // FEE-139: Expo Router 58's container emits only `state`, never the dispatch event (`__unsafe_action__`) Sentry
+  // starts a screen's span on, so every screen after the first went unnamed. Each screen change stands in for it.
+  test('every screen change starts a span before Sentry names it', async () => {
+    const expoContainer = fakeContainer();
+    mockNavigationRef.current = expoContainer;
+    const register = registered();
+    await renderHook(() => useScreenTracking());
+    const container = register.mock.calls[0][0];
+    const seen: string[] = [];
+    container.addListener('__unsafe_action__', (event?: unknown) => seen.push(`start ${String(event)}`));
+    container.addListener('state', () => seen.push('name'));
+
+    expoContainer.emit('state');
+    expoContainer.emit('state');
+    expect(seen).toEqual(['start undefined', 'name', 'start undefined', 'name']);
+  });
+
+  test('registers nothing before the navigation container exists', async () => {
+    mockNavigationRef.current = null;
+    const register = registered();
+    await renderHook(() => useScreenTracking());
+    expect(register).not.toHaveBeenCalled();
   });
 
   test('sends trace headers only to the Convex deployment', () => {
