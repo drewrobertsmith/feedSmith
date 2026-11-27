@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 import type { SymbolViewProps } from 'expo-symbols';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -9,6 +10,7 @@ import { AppSymbol } from '@/components/app-symbol';
 import { AppText } from '@/components/app-text';
 import { DepthPressable } from '@/components/depth-pressable';
 import { NativeSheet } from '@/components/native-sheet';
+import { buildLine } from '@/screens/account/build-line';
 import { useEnvironment, useSizeScale } from '@/environment';
 import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
@@ -17,6 +19,13 @@ const CIRCLE = 32;
 const ICON = 24;
 /** A row tall enough for a thumb (Android's 48 dp). */
 const ROW = 48;
+
+/** Which build is installed (FEE-140), worked out once: it can't change while the app runs. */
+const BUILD = buildLine({
+  release: process.env.EXPO_PUBLIC_SENTRY_RELEASE,
+  version: Constants.expoConfig?.version ?? '',
+  dev: __DEV__,
+});
 
 /** One thing to do in the sheet: an icon and its words, the whole row tappable. */
 function SheetRow({
@@ -67,7 +76,7 @@ function SheetRow({
 
 /**
  * The Account sheet (P17): who is signed in, then, behind a divider, Sign out and Delete account
- * last (Q32). Manage Feeds is gone (FEE-97).
+ * last (Q32), and below them which build this is (FEE-140). Manage Feeds is gone (FEE-97).
  */
 function AccountSheetContent({ onDelete }: { onDelete: () => void }) {
   const { account, signOut, signingOut, deletion } = useAuth();
@@ -110,6 +119,10 @@ function AccountSheetContent({ onDelete }: { onDelete: () => void }) {
           Couldn&apos;t delete your account. Check your connection and try again.
         </AppText>
       ) : null}
+      {/* Which build this is, last and quiet: plain text to read, nothing to press (FEE-140). */}
+      <AppText variant="label" className="px-edge pt-related text-text-muted">
+        {BUILD}
+      </AppText>
     </View>
   );
 }
