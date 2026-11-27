@@ -12,6 +12,9 @@ const dsn =
 export function initSentry() {
   Sentry.init({
     dsn,
+    // Named after the commit by the build's app config, the same name its source maps upload under (T50).
+    // Unset outside a git checkout, when Sentry's default name applies.
+    release: process.env.EXPO_PUBLIC_SENTRY_RELEASE,
     sendDefaultPii: true,
     enableLogs: true,
     // Only `Sentry.logger` calls become logs; console output stays on the phone (Q26).
