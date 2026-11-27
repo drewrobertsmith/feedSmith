@@ -34,6 +34,8 @@ export const deleteAccount = mutation({
       .withIndex('by_user_url', (q) => q.eq('userId', userId))
       .collect();
     await Promise.all(feeds.map((feed) => ctx.db.delete(feed._id)));
+    // Each Feed's page budget (T24) is keyed by the Feed: it goes too.
+    await Promise.all(feeds.map((feed) => rateLimiter.reset(ctx, 'pageRead', { key: feed._id })));
     // Each Feed's fetch schedule goes with it (FEE-54): one per Feed, so as few as the Feeds.
     const schedules = await ctx.db
       .query('feedSchedules')

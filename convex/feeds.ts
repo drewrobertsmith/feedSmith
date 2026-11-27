@@ -15,6 +15,7 @@ import { safeUrl } from './lib/feed/http';
 import { ServerLayer } from './lib/feed/server';
 import { markWorking, scheduleOf, storeNewArticles } from './lib/feed/record';
 import { vAddFeedReason, vFeedChoice, vFetchFailure, vStoredArticle, vValidators, type AddFeedReason, type FetchFailure } from './lib/feed/validators';
+import { rateLimiter } from './rateLimits';
 import { refreshFeedEffect } from './refresh';
 
 const MAX_URL = 2048;
@@ -593,6 +594,8 @@ export const remove = mutation({
       await ctx.scheduler.runAfter(0, internal.feeds.nameSaved, { feedId: feed._id, feedTitle: feed.title, cursor: named.continueCursor });
     }
     await ctx.db.delete(feed._id);
+    // Its page budget (T24) is keyed by the Feed, so it goes with it (Q28).
+    await rateLimiter.reset(ctx, 'pageRead', { key: feed._id });
     await ctx.scheduler.runAfter(0, internal.feeds.removeArticles, { feedId: feed._id });
     return { ok: true as const };
   },

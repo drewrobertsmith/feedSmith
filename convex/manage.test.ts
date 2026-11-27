@@ -6,6 +6,7 @@ import { runScheduledNow } from '../test/convex-scheduled';
 
 import { api } from './_generated/api';
 import type { Id } from './_generated/dataModel';
+import rateLimiterTest from '@convex-dev/rate-limiter/test';
 import schema from './schema';
 
 vi.mock('@convex-dev/auth/server', async (original) => ({
@@ -24,6 +25,7 @@ const NOW = Date.UTC(2026, 10, 21, 12);
 
 async function setup(titles: string[], articlesEach = 2) {
   const t = convexTest(schema, modules);
+  rateLimiterTest.register(t);
   const ids = await t.run(async (ctx) => {
     const a = await ctx.db.insert('users', { email: 'a@example.com' });
     const b = await ctx.db.insert('users', { email: 'b@example.com' });

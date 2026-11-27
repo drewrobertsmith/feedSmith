@@ -10,6 +10,8 @@ import type { Id } from './_generated/dataModel';
 import article from './lib/feed/fixtures/page-article.html?raw';
 import index from './lib/feed/fixtures/page-index.html?raw';
 import paywall from './lib/feed/fixtures/page-paywall.html?raw';
+import rateLimiterTest from '@convex-dev/rate-limiter/test';
+import { PAGE_BURST, rateLimiter } from './rateLimits';
 import schema from './schema';
 
 vi.mock('@convex-dev/auth/server', async (original) => ({
@@ -75,6 +77,7 @@ afterEach(() => {
 
 async function follow(items: Item[]) {
   const t = convexTest(schema, modules);
+  rateLimiterTest.register(t);
   const [a, b] = await t.run(async (ctx) => [
     await ctx.db.insert('users', { email: 'a@example.com' }),
     await ctx.db.insert('users', { email: 'b@example.com' }),
@@ -193,7 +196,7 @@ describe('a summary-only Feed reads in full, from its pages (FEE-25, T8)', () =>
   test('an Article whose reading never finishes (the server stopped mid-page) falls back, never spins forever', async () => {
     const s = await follow([{ guid: 'stuck', link: 'https://calmnotes.example/stuck' }]);
     // Claimed for reading, then nothing: as if the action died before storing what it read.
-    expect(await s.t.mutation(internal.extract.claim, { articleId: await s.idOf('stuck') })).toBe(true);
+    expect(await s.t.mutation(internal.extract.claim, { articleId: await s.idOf('stuck') })).toBe('claimed');
     expect(await s.open('stuck')).toMatchObject({ page: 'extracting' });
     vi.advanceTimersByTime(16 * 60_000);
     await s.t.finishInProgressScheduledFunctions();
@@ -203,8 +206,8 @@ describe('a summary-only Feed reads in full, from its pages (FEE-25, T8)', () =>
   test('a page is claimed once: a second run never reads it again', async () => {
     const s = await follow([{ guid: 'once', link: 'https://calmnotes.example/once' }]);
     const articleId = await s.idOf('once');
-    expect(await s.t.mutation(internal.extract.claim, { articleId })).toBe(true);
-    expect(await s.t.mutation(internal.extract.claim, { articleId })).toBe(false);
+    expect(await s.t.mutation(internal.extract.claim, { articleId })).toBe('claimed');
+    expect(await s.t.mutation(internal.extract.claim, { articleId })).toBe('gone');
   });
 
   test("another User still can't open the Article (Q10)", async () => {
@@ -212,6 +215,80 @@ describe('a summary-only Feed reads in full, from its pages (FEE-25, T8)', () =>
     pages['https://calmnotes.example/slow'] = article;
     await s.finish();
     expect(await s.other.query(api.articles.get, { id: await s.idOf('slow') })).toBeNull();
+  });
+});
+
+describe("a Feed's pages are read within a daily budget, so a hostile Feed can't aim the server at a site (T24)", () => {
+  const DAY = 24 * 60 * 60_000;
+  /** `count` summary-only Articles named `prefix`0, 1, …, each with a page that reads. */
+  const many = (prefix: string, count: number) =>
+    Array.from({ length: count }, (_, i) => {
+      const link = `https://calmnotes.example/${prefix}${i}`;
+      pages[link] = article;
+      return { guid: `${prefix}${i}`, link };
+    });
+  /** The Feed's next fetch brings these Articles, and every page waiting is read. */
+  const fetchAgain = async (s: Awaited<ReturnType<typeof follow>>, items: Item[]) => {
+    pages[FEED] = rss(items);
+    await s.t.action(internal.refresh.refreshFeed, { feedId: s.feedId });
+    await s.finish();
+  };
+
+  test(`a new Feed's first ${PAGE_BURST} pages are all read; the next falls back without a request`, async () => {
+    const s = await follow(many('g', PAGE_BURST));
+    await s.finish();
+    expect(pageFetches()).toHaveLength(PAGE_BURST);
+    network.mockClear();
+
+    await fetchAgain(s, many('late', 1));
+    expect(pageFetches()).toEqual([]);
+    expect(await s.open('late0')).toMatchObject({ page: 'unavailable', subtitle: SUBTITLE });
+  });
+
+  test('the budget refills: a day later its pages are read again', async () => {
+    const s = await follow(many('g', PAGE_BURST));
+    await s.finish();
+    // Each read's 15-minute claim lease runs out (nothing left to expire), then a day passes.
+    await vi.advanceTimersByTimeAsync(16 * 60_000);
+    vi.setSystemTime(NOW + DAY);
+    network.mockClear();
+
+    await fetchAgain(s, many('next', 3));
+    expect(pageFetches()).toHaveLength(3);
+    expect(await s.open('next0')).not.toHaveProperty('page');
+  });
+
+  test("one Feed's budget never touches another's", async () => {
+    const s = await follow(many('g', PAGE_BURST));
+    await s.finish();
+    const other = 'https://quiet.example/feed';
+    pages[other] = rss(many('q', 1)).replace('https://calmnotes.example/', 'https://quiet.example/');
+    network.mockClear();
+
+    expect(await s.owner.action(api.feeds.add, { url: other })).toMatchObject({ ok: true });
+    await s.finish();
+    expect(pageFetches().filter((url) => url !== 'https://quiet.example/' && url !== other)).toEqual(['https://calmnotes.example/q0']);
+  });
+
+  test('removing a Feed clears its budget: nothing of it is kept (Q28)', async () => {
+    const s = await follow(many('g', 3));
+    await s.finish();
+    const used = () => s.t.run(async (ctx) => !(await rateLimiter.check(ctx, 'pageRead', { key: s.feedId, count: PAGE_BURST })).ok);
+    expect(await used()).toBe(true);
+    await s.owner.mutation(api.feeds.remove, { id: s.feedId });
+    expect(await used()).toBe(false);
+  });
+
+  test('a page over budget is logged by its Article, never its link (Q9)', async () => {
+    const s = await follow(many('g', PAGE_BURST));
+    await s.finish();
+    const logs = captureLogs();
+    await fetchAgain(s, many('late', 1));
+    const over = logs.lines('page read').filter((line) => line.annotations.outcome === 'over-budget');
+    expect(over).toHaveLength(1);
+    expect(over[0].annotations.articleId).toBe(await s.idOf('late0'));
+    expect(logs.all()).not.toMatch(/calmnotes\.example/);
+    logs.restore();
   });
 });
 
@@ -294,6 +371,7 @@ describe("reading pages never touches what All reads, unless it brings an image 
 describe('moving page-reading state off the Article (FEE-62 migration)', () => {
   test('each state moves exactly; extracted needs no row; the Articles lose the old field; a second run changes nothing', async () => {
     const t = convexTest(schema, modules);
+    rateLimiterTest.register(t);
     const ids = await t.run(async (ctx) => {
       const userId = await ctx.db.insert('users', { email: 'a@example.com' });
       const feedId = await ctx.db.insert('feeds', { userId, url: FEED, title: 'Calm Notes' });
@@ -326,6 +404,7 @@ describe('moving page-reading state off the Article (FEE-62 migration)', () => {
 
 test("a Feed whose pages were waiting when the code changed has them read, not stranded (FEE-62 migration)", async () => {
   const t = convexTest(schema, modules);
+  rateLimiterTest.register(t);
   pages['https://calmnotes.example/waiting'] = article;
   const articleId = await t.run(async (ctx) => {
     const userId = await ctx.db.insert('users', { email: 'a@example.com' });
