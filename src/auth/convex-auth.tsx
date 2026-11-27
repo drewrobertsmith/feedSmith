@@ -52,7 +52,7 @@ function ConvexAuthBridge({ children }: { children: ReactNode }) {
     // whether or not that call reached it, so the phone always signs out (Q26).
     signOut: async () => {
       setSigningOut(true);
-      trail('auth.signed-out');
+      trail('user.signed-out');
       // It already swallows a failed server call; the catch only keeps the busy state from sticking.
       await signOut().catch(() => null);
       setSigningOut(false);
@@ -87,7 +87,7 @@ function ConvexAuthBridge({ children }: { children: ReactNode }) {
       if (code === undefined) return;
       setView({ status: 'busy' });
       const result = await signIn({ code });
-      trail('auth.signed-in', { outcome: result.status === 'complete' ? 'ok' : 'failed' });
+      trail('user.signed-in', { outcome: result.status === 'complete' ? 'ok' : 'failed' });
       setView(signInOutcome(result));
     },
   };

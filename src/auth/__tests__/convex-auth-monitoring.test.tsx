@@ -103,13 +103,13 @@ describe('auth breadcrumbs', () => {
     mockSignIn = signIn;
     await show();
     await act(async () => auth.completeSignIn({ code: 'c' }));
-    expect(trailed).toHaveBeenCalledWith('auth.signed-in', { outcome });
+    expect(trailed).toHaveBeenCalledWith('user.signed-in', { outcome });
   });
 
   test('signing out', async () => {
     await show();
     await act(() => auth.signOut());
-    expect(trailed).toHaveBeenCalledWith('auth.signed-out');
+    expect(trailed).toHaveBeenCalledWith('user.signed-out');
   });
 
   test.each([

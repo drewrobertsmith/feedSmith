@@ -1,6 +1,6 @@
 import * as Sentry from '@sentry/react-native';
 
-import { trail } from '@/monitoring/trail';
+import { TRAIL_ACTIONS, trail } from '@/monitoring/trail';
 
 jest.mock('@sentry/react-native', () => ({ addBreadcrumb: jest.fn() }));
 
@@ -50,5 +50,11 @@ describe('trail', () => {
   test('drops a key that isn’t an id, an outcome or a count', () => {
     trail('feed.added', { feedId: 'j9xyz', url: 'k57abc', title: 'abc' } as never);
     expect(sent().data).toEqual({ feedId: 'j9xyz' });
+  });
+
+  // Sentry's server-side scrubbing hides any value holding one of these words, so the breadcrumb would read
+  // `[Filtered]` (seen with `auth.signed-out`, FEE-138).
+  test.each(TRAIL_ACTIONS)('“%s” survives Sentry’s scrubbing', (action) => {
+    expect(action).not.toMatch(/auth|token|passw|secret|credential|api_?key|private_?key|bearer|cookie|session/i);
   });
 });
