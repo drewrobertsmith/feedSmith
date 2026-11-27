@@ -14,6 +14,7 @@ import {
   type ArticleView,
   type ChipsView,
   type RemoveFeed,
+  type TryAgain,
   type FeedsData,
   type LastUpdatedView,
 } from '@/feeds/feeds-data';
@@ -141,6 +142,20 @@ function useRemoveFeed(): RemoveFeed {
   return async (id) => ((await remove({ id }).catch(() => null)) ? 'ok' : 'failed');
 }
 
+function useTryAgain(feedId: string): TryAgain {
+  const fetchNow = useAction(api.feeds.tryAgain);
+  const [trying, setTrying] = useState(false);
+  const tryAgain = () => {
+    if (trying) return;
+    setTrying(true);
+    // Whatever it finds, the chips' live query shows; a call that never reached the server changes nothing (Q5).
+    void fetchNow({ id: feedId })
+      .catch(() => null)
+      .finally(() => setTrying(false));
+  };
+  return { trying, tryAgain };
+}
+
 function useLastUpdated(): LastUpdatedView {
   const at = useSignedInQuery(api.feeds.lastUpdated, {});
   return at === undefined ? { status: 'loading' } : { status: 'ready', at };
@@ -154,6 +169,7 @@ const convexFeeds: FeedsData = {
   useAll,
   useChips,
   useRemoveFeed,
+  useTryAgain,
   useArticle,
   usePrefetchArticle,
   useAddFeed,

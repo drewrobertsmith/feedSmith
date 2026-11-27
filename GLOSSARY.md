@@ -17,7 +17,7 @@ One website's RSS or Atom feed that you follow.
 _Avoid_: Source, channel, subscription, site
 
 **Not updating**:
-A Feed that has failed every try for a day (FEE-126, FEE-127): its chip carries a badge, and its page says since when and why, with fixes. Its Articles stay.
+A Feed that has failed every try for a day (FEE-126, FEE-127): its chip carries a badge, and its page says since when and why, with fixes: **Try again** (fetch it now, FEE-128), Open site, then Remove. Its Articles stay.
 _Avoid_: Broken, dead, failing (in the app's words), error
 
 **Article**:

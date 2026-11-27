@@ -510,6 +510,72 @@ describe('pulling down fetches every Feed now', () => {
   });
 });
 
+describe('Try again fetches one failing Feed now (FEE-128)', () => {
+  /** User A's Feed, failing since an hour after it was added: not-a-feed, once. */
+  async function failing(s: Awaited<ReturnType<typeof setup>>) {
+    const feed = await follow(s, [{ guid: 'g1', ago: HOUR }]);
+    network.mockImplementation(async () => new Response('<html><body>Moved</body></html>'));
+    vi.setSystemTime(START + HOUR);
+    await refresh(s, feed._id);
+    network.mockClear();
+    return feed;
+  }
+
+  test('signed out, it is refused, and nothing is fetched (Q10)', async () => {
+    const s = await setup();
+    const feed = await failing(s);
+    await expect(s.t.action(api.feeds.tryAgain, { id: feed._id })).rejects.toThrow(/SIGNED_OUT/);
+    expect(network).not.toHaveBeenCalled();
+  });
+
+  test("User B can't try again on User A's Feed: not found, nothing fetched, nothing changed (Q10)", async () => {
+    const s = await setup();
+    const feed = await failing(s);
+    const before = await feedOf(s, feed._id);
+    expect(await s.b.action(api.feeds.tryAgain, { id: feed._id })).toBe('not-found');
+    expect(network).not.toHaveBeenCalled();
+    expect(await feedOf(s, feed._id)).toEqual(before);
+  });
+
+  test.each([['not an id'], ['x'.repeat(200)]])('an id that is no Feed is not found: %#', async (id) => {
+    const s = await setup();
+    expect(await s.a.action(api.feeds.tryAgain, { id })).toBe('not-found');
+    expect(network).not.toHaveBeenCalled();
+  });
+
+  test('a fetch that works clears the failure and brings new Articles, as a scheduled one does', async () => {
+    const s = await setup();
+    const feed = await failing(s);
+    network.mockImplementation(async () => new Response(rss([{ guid: 'g1', ago: 2 * HOUR }, { guid: 'g2', ago: MINUTE }])));
+    vi.setSystemTime(START + 2 * HOUR);
+    expect(await s.a.action(api.feeds.tryAgain, { id: feed._id })).toBe('working');
+    expect(network).toHaveBeenCalledTimes(1);
+    const after = await feedOf(s, feed._id);
+    expect(after).toMatchObject({ status: 'working', failures: 0 });
+    expect(after).not.toHaveProperty('failingSince');
+    expect(after).not.toHaveProperty('failure');
+    expect(await s.a.query(api.articles.all, {})).toHaveLength(2);
+  });
+
+  test('a fetch that fails updates why, keeps since when, and backs off further (Q7)', async () => {
+    const s = await setup();
+    const feed = await failing(s);
+    network.mockImplementation(async () => new Response('down', { status: 500 }));
+    vi.setSystemTime(START + 2 * HOUR);
+    expect(await s.a.action(api.feeds.tryAgain, { id: feed._id })).toBe('failing');
+    const after = await feedOf(s, feed._id);
+    expect(after).toMatchObject({ status: 'failing', failure: 'unreachable', failures: 2, failingSince: START + HOUR, lastFetchedAt: START + 2 * HOUR });
+    expect(after!.nextFetchAt).toBe(START + 2 * HOUR + backoff(2));
+  });
+
+  test('a working Feed can be tried again too, and stays working', async () => {
+    const s = await setup();
+    const feed = await follow(s, [{ guid: 'g1', ago: HOUR }]);
+    expect(await s.a.action(api.feeds.tryAgain, { id: feed._id })).toBe('working');
+    expect(await feedOf(s, feed._id)).toMatchObject({ status: 'working', failures: 0 });
+  });
+});
+
 describe('cleaning up old Articles (P14)', () => {
   test('deletes Articles and their bodies 30 days after publication, and keeps newer ones', async () => {
     const s = await setup();

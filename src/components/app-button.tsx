@@ -1,3 +1,5 @@
+import { View } from 'react-native';
+
 import { AppText } from '@/components/app-text';
 import { DepthPressable } from '@/components/depth-pressable';
 
@@ -11,6 +13,7 @@ export function AppButton({
   onPress,
   disabled = false,
   busy = false,
+  busyLabel,
   tone = 'plain',
 }: {
   label: string;
@@ -21,13 +24,19 @@ export function AppButton({
   onPress: () => void;
   disabled?: boolean;
   busy?: boolean;
+  /**
+   * What it says while busy (FEE-128), the longer of the two. The button keeps room for it, so its width, and
+   * whatever sits beside it, never moves.
+   */
+  busyLabel?: string;
 }) {
   const off = disabled || busy;
+  const colour = tone === 'destructive' ? 'text-destructive' : 'text-text';
   return (
     <DepthPressable
       level="soft"
       role="button"
-      aria-label={accessibleName}
+      aria-label={busy && busyLabel ? busyLabel : accessibleName}
       aria-disabled={off}
       aria-busy={busy}
       disabled={off}
@@ -35,9 +44,21 @@ export function AppButton({
       frameClassName="self-start"
       className={off ? 'rounded-full px-group py-related opacity-60' : 'rounded-full px-group py-related'}
     >
-      <AppText variant="label" className={tone === 'destructive' ? 'text-destructive' : 'text-text'}>
-        {label}
-      </AppText>
+      {busyLabel ? (
+        // Both labels lie in one cell, centred; only the one that applies shows, and only it is heard.
+        <View>
+          <AppText variant="label" aria-hidden={!busy} className={`text-center ${colour} ${busy ? '' : 'opacity-0'}`}>
+            {busyLabel}
+          </AppText>
+          <AppText variant="label" aria-hidden={busy} className={`absolute inset-x-0 text-center ${colour} ${busy ? 'opacity-0' : ''}`}>
+            {label}
+          </AppText>
+        </View>
+      ) : (
+        <AppText variant="label" className={colour}>
+          {label}
+        </AppText>
+      )}
     </DepthPressable>
   );
 }

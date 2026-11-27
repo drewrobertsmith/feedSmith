@@ -240,6 +240,10 @@ export const NOT_UPDATING_WORLDS = [
     label: 'Its page, largest font size',
     spec: { colorScheme: 'dark', feeds: 'some', failing: 'day', feed: 'f1', fontScale: 2 },
   },
+  // Try again (FEE-128): under way; or, tapped in the gallery, failing again with a new reason, or working.
+  { id: 'not-updating-trying', label: 'Its page, trying again', spec: { colorScheme: 'dark', feeds: 'some', failing: 'day', feed: 'f1', tryAgain: 'busy' } },
+  { id: 'not-updating-try-fails', label: 'Its page, Try again fails', spec: { colorScheme: 'dark', feeds: 'some', failing: 'day', feed: 'f1' } },
+  { id: 'not-updating-try-works', label: 'Its page, Try again works', spec: { colorScheme: 'light', feeds: 'some', failing: 'day', feed: 'f1', tryAgain: 'works' } },
   {
     id: 'not-updating-largest-font',
     label: 'Failing for a day, largest font size',

@@ -172,7 +172,7 @@ export function FeedsScreen({
       ) : null}
       {selectedChip && selection === selectedChip.id ? (
         // A Feed's page: whether it's not updating (FEE-127), and never a dead end when it has no Articles (Q34).
-        <FeedPageTop chip={selectedChip} empty={empty} onRemove={() => confirmRemove(selectedChip)} />
+        <FeedPageTop key={selectedChip.id} chip={selectedChip} empty={empty} onRemove={() => confirmRemove(selectedChip)} />
       ) : null}
     </View>
   );

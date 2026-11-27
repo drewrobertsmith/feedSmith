@@ -4,7 +4,7 @@ import { useSaysOffline, type Connection } from '@/feeds/connection';
 import type { Block, OmittedKind, Span } from '../../convex/lib/feed/blocks';
 import type { AddFeedReason, FetchFailure, ReadingPage } from '../../convex/lib/feed/validators';
 
-export type { AddFeedReason, Block, OmittedKind, Span };
+export type { AddFeedReason, Block, FetchFailure, OmittedKind, Span };
 export { isAddress } from '../../convex/lib/feed/typed';
 
 /** One Article in All or a Feed's list (P12). Never carries a feed URL (Q9). */
@@ -67,6 +67,11 @@ export type ChipsView = { status: 'loading' } | { status: 'ready'; chips: FeedCh
  * reach the server (offline, or an error), so nothing changed (Q5).
  */
 export type RemoveFeed = (id: string) => Promise<'ok' | 'failed'>;
+/**
+ * Try again on a not-updating Feed's page (FEE-128): `trying` while its fetch runs on the server, so it isn't
+ * tapped twice. What it finds reaches the screen through the chips, as any fetch's does.
+ */
+export type TryAgain = { trying: boolean; tryAgain: () => void };
 
 /**
  * The Article the Reading view opens. While it loads, `title` is the one a list already showed for it, when
@@ -104,6 +109,8 @@ export type FeedsData = {
   useChips: () => ChipsView;
   /** Removing a Feed, from its chip (FEE-97). */
   useRemoveFeed: () => RemoveFeed;
+  /** Fetching one Feed now, from its not-updating notice (FEE-128). */
+  useTryAgain: (feedId: string) => TryAgain;
   useArticle: (id: string) => ArticleView;
   /**
    * Starts loading an Article as its row is touched (FEE-114), so the page can grow into its lead image
@@ -161,6 +168,12 @@ export function useChips(): ChipsView {
 export function useRemoveFeed(): RemoveFeed {
   const { useRemoveFeed: read } = useFeedsData();
   return read();
+}
+
+/** Fetching one Feed now. */
+export function useTryAgain(feedId: string): TryAgain {
+  const { useTryAgain: read } = useFeedsData();
+  return read(feedId);
 }
 
 /** One Article for the Reading view. */

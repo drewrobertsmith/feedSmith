@@ -865,8 +865,8 @@ describe('a Feed that stops updating shows a badge on its chip (FEE-126)', () =>
     chipName: string;
     badge: boolean;
     selected: boolean;
-    /** Its page's notice (FEE-127): whether it offers Open site; null when there's none. */
-    notice: { openSite: boolean } | null;
+    /** Its page's notice (FEE-127): whether it offers Open site, and Try again's state (FEE-128); null when there's none. */
+    notice: { openSite: boolean; tryAgain: 'idle' | 'busy' } | null;
     /** Its page has no Articles: the empty line sits under the notice. */
     empty: boolean;
   };
@@ -878,12 +878,16 @@ describe('a Feed that stops updating shows a badge on its chip (FEE-126)', () =>
     'not-updating-light': { chipName: BADGED, badge: true, selected: false, notice: null, empty: false },
     // Failing for under a day says nothing, anywhere: a passing blip never alarms.
     'not-updating-recent': { chipName: 'The Verge', badge: false, selected: false, notice: null, empty: false },
-    'not-updating-chosen': { chipName: BADGED, badge: true, selected: true, notice: { openSite: true }, empty: false },
-    'not-updating-page-light': { chipName: BADGED, badge: true, selected: true, notice: { openSite: true }, empty: false },
-    'not-updating-page-no-site': { chipName: BADGED, badge: true, selected: true, notice: { openSite: false }, empty: false },
-    'not-updating-page-empty': { chipName: 'Farnam Street, not updating', badge: true, selected: true, notice: { openSite: true }, empty: true },
-    'not-updating-page-largest-font': { chipName: BADGED, badge: true, selected: true, notice: { openSite: true }, empty: false },
+    'not-updating-chosen': { chipName: BADGED, badge: true, selected: true, notice: { openSite: true, tryAgain: 'idle' }, empty: false },
+    'not-updating-page-light': { chipName: BADGED, badge: true, selected: true, notice: { openSite: true, tryAgain: 'idle' }, empty: false },
+    'not-updating-page-no-site': { chipName: BADGED, badge: true, selected: true, notice: { openSite: false, tryAgain: 'idle' }, empty: false },
+    'not-updating-page-empty': { chipName: 'Farnam Street, not updating', badge: true, selected: true, notice: { openSite: true, tryAgain: 'idle' }, empty: true },
+    'not-updating-page-largest-font': { chipName: BADGED, badge: true, selected: true, notice: { openSite: true, tryAgain: 'idle' }, empty: false },
     'not-updating-largest-font': { chipName: BADGED, badge: true, selected: false, notice: null, empty: false },
+    // Try again (FEE-128): while it runs, it says so and can't be tapped twice.
+    'not-updating-trying': { chipName: BADGED, badge: true, selected: true, notice: { openSite: true, tryAgain: 'busy' }, empty: false },
+    'not-updating-try-fails': { chipName: BADGED, badge: true, selected: true, notice: { openSite: true, tryAgain: 'idle' }, empty: false },
+    'not-updating-try-works': { chipName: BADGED, badge: true, selected: true, notice: { openSite: true, tryAgain: 'idle' }, empty: false },
   };
   const verge = (name: string) => screen.getByRole('tab', { name });
 
@@ -901,11 +905,45 @@ describe('a Feed that stops updating shows a badge on its chip (FEE-126)', () =>
     expect(screen.getByText(SINCE)).toBeOnTheScreen();
     expect(screen.getByText(NOT_A_FEED)).toBeOnTheScreen();
     expect(screen.queryAllByRole('button', { name: 'Open site' })).toHaveLength(shows.notice.openSite ? 1 : 0);
+    // Try again is the first fix, always there (FEE-128).
+    if (shows.notice.tryAgain === 'busy') expect(screen.getByRole('button', { name: 'Trying again…', busy: true, disabled: true })).toBeOnTheScreen();
+    else expect(screen.getByRole('button', { name: 'Try again', busy: false, disabled: false })).toBeOnTheScreen();
     // One Remove, last, never a second one from the empty line (Q32).
     expect(screen.getAllByRole('button', { name: /^Remove / })).toHaveLength(1);
     // Its Articles stay, below the notice (Q7, Q36); with none, the empty line does.
     if (shows.empty) expect(screen.getByText(/^No Articles from .+ yet\.$/)).toBeOnTheScreen();
     else expect(screen.getAllByRole('link').length).toBeGreaterThan(0);
+  });
+
+  test('Try again, while it runs, is busy and not tappable twice (FEE-128)', async () => {
+    await open({ colorScheme: 'dark', feeds: 'some', failing: 'day', feed: 'f1', tryAgain: 'busy' });
+    await userEvent.press(await screen.findByRole('button', { name: 'Trying again…', busy: true, disabled: true }));
+    expect(world!.feedsLog.triedAgain).toEqual([]);
+    // The notice holds still meanwhile: same reason, same fixes.
+    expect(screen.getByText(NOT_A_FEED)).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Open site', disabled: false })).toBeOnTheScreen();
+  });
+
+  test('Try again that fails keeps the notice and the badge, with its reason updated (FEE-128)', async () => {
+    await open({ colorScheme: 'dark', feeds: 'some', failing: 'day', feed: 'f1' });
+    await userEvent.press(await screen.findByRole('button', { name: 'Try again' }));
+    expect(await screen.findByText('The site couldn’t be reached.')).toBeOnTheScreen();
+    expect(world!.feedsLog.triedAgain).toEqual(['f1']);
+    expect(screen.queryByText(NOT_A_FEED)).not.toBeOnTheScreen();
+    expect(screen.getByText(SINCE)).toBeOnTheScreen();
+    expect(screen.getByTestId('not-updating-badge')).toBeOnTheScreen();
+    // Ready to try again.
+    expect(screen.getByRole('button', { name: 'Try again', disabled: false })).toBeOnTheScreen();
+  });
+
+  test('Try again that works takes the notice and the badge away at once; the Articles stay (FEE-128)', async () => {
+    await open({ colorScheme: 'dark', feeds: 'some', failing: 'day', feed: 'f1', tryAgain: 'works' });
+    await userEvent.press(await screen.findByRole('button', { name: 'Try again' }));
+    expect(await screen.findByRole('tab', { name: 'The Verge', selected: true })).toBeOnTheScreen();
+    expect(screen.queryByText(/Not updating/)).not.toBeOnTheScreen();
+    expect(screen.queryByTestId('not-updating-badge')).not.toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: /^Try again/ })).not.toBeOnTheScreen();
+    expect(screen.getAllByRole('link').length).toBeGreaterThan(0);
   });
 
   test('Open site opens the Feed\'s site in the browser (Q8)', async () => {

@@ -7,7 +7,7 @@ import type { Environment } from '@/environment';
 import type { Connection } from '@/feeds/connection';
 import { memoryPlaceStore, type Place } from '@/navigation/place';
 import { usePull } from '@/feeds/use-pull';
-import { isAddress, type AddFeedReason, type AddFeedView, type AddOutcome, type ArticleRow, type ArticleView, type FeedChip, type FeedsData } from '@/feeds/feeds-data';
+import { isAddress, type AddFeedReason, type AddFeedView, type AddOutcome, type ArticleRow, type ArticleView, type FeedChip, type FeedsData, type FetchFailure } from '@/feeds/feeds-data';
 import {
   FIXTURE_ACCOUNT,
   FIXTURE_ARTICLE,
@@ -86,6 +86,11 @@ export type WorldSpec = {
    */
   failing?: 'day' | 'recent';
   failingSite?: 'none';
+  /**
+   * Try again on the failing Feed's page (FEE-128): `busy` is under way and never ends; `works` brings the Feed back;
+   * by default it fails again, now unreachable.
+   */
+  tryAgain?: 'busy' | 'works';
   /** The place the phone held when the app started (FEE-130): as stored, or any text, to test what's untrusted. */
   place?: Place | string;
   /** The connection to the server (FEE-32): offline from the start; tests change it with the world's `setNetwork`. */
@@ -121,6 +126,8 @@ export type FeedsLog = {
   removed: string[];
   /** Articles whose loading began as a row was touched (FEE-114). */
   prefetched: string[];
+  /** Feeds Try again fetched (FEE-128). */
+  triedAgain: string[];
 };
 
 const emptyLog = (): FeedsLog => ({
@@ -129,6 +136,7 @@ const emptyLog = (): FeedsLog => ({
   read: [],
   removed: [],
   prefetched: [],
+  triedAgain: [],
 });
 
 /** What a world's fake auth was asked to do. */
@@ -192,14 +200,20 @@ export function worldFeeds(
   };
   // A world's failing Feed is the chosen one (The Verge by default), failing since a day and an hour ago, or an hour ago (FEE-126).
   let failingSince: number | null = spec.failing === 'day' ? FIXTURE_NOW - 25 * HOUR : spec.failing === 'recent' ? FIXTURE_NOW - HOUR : null;
+  let failingReason: FetchFailure = 'not-a-feed';
   const recover = () => {
     failingSince = null;
+    chipListeners.forEach((listener) => listener());
+  };
+  /** Try again failing again: still failing since the same time, for a new reason (FEE-128). */
+  const failAgain = () => {
+    failingReason = 'unreachable';
     chipListeners.forEach((listener) => listener());
   };
   const failingId = spec.feed ?? 'f1';
   const failingSite = spec.failingSite === 'none' ? {} : { siteUrl: 'https://www.theverge.com' };
   const withHealth = (chip: FeedChip): FeedChip =>
-    chip.id === failingId && failingSince !== null ? { ...chip, failing: { since: failingSince, reason: 'not-a-feed', ...failingSite } } : chip;
+    chip.id === failingId && failingSince !== null ? { ...chip, failing: { since: failingSince, reason: failingReason, ...failingSite } } : chip;
   const dropChip = (id: string) => {
     removedIds = new Set([...removedIds, id]);
     chipListeners.forEach((listener) => listener());
@@ -274,6 +288,7 @@ export function worldFeeds(
       const added = useSyncExternalStore(subscribeChips, () => addedChips);
       const removed = useSyncExternalStore(subscribeChips, () => removedIds);
       useSyncExternalStore(subscribeChips, () => failingSince);
+      useSyncExternalStore(subscribeChips, () => failingReason);
       if (feeds === 'loading') return { status: 'loading' };
       const chips = [...(feeds === 'none' ? [] : someChips), ...added];
       return { status: 'ready', chips: chips.filter((chip) => !removed.has(chip.id)).map(withHealth) };
@@ -283,6 +298,20 @@ export function worldFeeds(
       log.removed.push(id);
       dropChip(id);
       return 'ok';
+    },
+    useTryAgain: (feedId) => {
+      const [trying, setTrying] = useState(spec.tryAgain === 'busy');
+      const tryAgain = () => {
+        if (trying) return;
+        log.triedAgain.push(feedId);
+        setTrying(true);
+        // As the server records it: the live chips change, then the call answers.
+        if (spec.tryAgain === 'busy') return;
+        if (spec.tryAgain === 'works') recover();
+        else failAgain();
+        setTrying(false);
+      };
+      return { trying, tryAgain };
     },
     usePrefetchArticle: () => (id) => {
       log.prefetched.push(id);

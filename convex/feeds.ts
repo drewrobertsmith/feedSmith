@@ -163,6 +163,31 @@ export const refreshAll = action({
   },
 });
 
+/**
+ * Try again, on a not-updating Feed's page (FEE-128): fetches one of the signed-in User's Feeds now, recorded as a
+ * scheduled fetch is, so a failure still backs off (Q7). Answers whether it works now, or not-found for an id that
+ * isn't one of the User's Feeds, with nothing fetched (Q10). Counted against no budget yet (FEE-90).
+ */
+export const tryAgain = action({
+  args: { id: v.string() },
+  returns: v.union(v.literal('working'), v.literal('failing'), v.literal('not-found')),
+  handler: async (ctx, { id }): Promise<'working' | 'failing' | 'not-found'> => {
+    const userId = await ctx.runQuery(internal.feeds.viewer, {});
+    const feedId = await ctx.runQuery(internal.feeds.owned, { userId, id });
+    if (!feedId) return 'not-found';
+    const recorded = await Effect.runPromise(refreshFeedEffect(ctx, feedId).pipe(Effect.provide(ServerLayer)));
+    if (!recorded) return 'not-found';
+    return recorded.failed ? 'failing' : 'working';
+  },
+});
+
+/** The caller's id as one of this User's Feeds, for actions; null when it isn't (Q10, Q25). */
+export const owned = internalQuery({
+  args: { userId: v.id('users'), id: v.string() },
+  returns: v.union(v.null(), v.id('feeds')),
+  handler: async (ctx, { userId, id }) => (await ownFeed(ctx, userId, id))?._id ?? null,
+});
+
 /** The signed-in User, for actions; refuses a signed-out caller (Q10). */
 export const viewer = internalQuery({
   args: {},
