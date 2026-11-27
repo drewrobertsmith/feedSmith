@@ -23,6 +23,20 @@ describe('initSentry', () => {
     expect(initOptions().dsn).toMatch(/^https:\/\/[0-9a-f]+@[\w.]+\.ingest\.(us\.)?sentry\.io\/\d+$/);
   });
 
+  // Only real crashes reach Sentry: a release build reports, a dev build (the emulator, Fast Refresh) never does.
+  test.each([
+    [false, true],
+    [true, false],
+  ])('in a build with __DEV__ %s, reporting is on: %s', (dev, enabled) => {
+    const was = (globalThis as unknown as { __DEV__: boolean }).__DEV__;
+    (globalThis as unknown as { __DEV__: boolean }).__DEV__ = dev;
+    try {
+      expect(initOptions().enabled).toBe(enabled);
+    } finally {
+      (globalThis as unknown as { __DEV__: boolean }).__DEV__ = was;
+    }
+  });
+
   test('sends default PII and Sentry Logs', () => {
     const options = initOptions();
     expect(options.sendDefaultPii).toBe(true);
