@@ -9,7 +9,7 @@ import { runScheduledNow } from '../test/convex-scheduled';
 import { api, components } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import rateLimiterTest from '@convex-dev/rate-limiter/test';
-import { GUESSES_PER_HOUR, rateLimiter } from './rateLimits';
+import { GUESSES_PER_HOUR, PAGE_BURST, rateLimiter } from './rateLimits';
 import schema from './schema';
 
 // As in auth.test.ts: the test identity's subject is the user id.
@@ -32,9 +32,12 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
+/** Each seeded User's Feed, kept to look its page budget up after the Feed is gone. */
+const feedOf = new Map<Id<'users'>, Id<'feeds'>>();
+
 /**
  * A User with everything feedSmith keeps for one: a Feed, two Articles with bodies, a session, a Google link,
- * and a guessing search used (FEE-88).
+ * a guessing search used (FEE-88), and a page read from the Feed's budget.
  */
 async function seedUser(t: ReturnType<typeof convexTest>, email: string, googleId: string) {
   const userId = await t.run(async (ctx) => {
@@ -46,6 +49,8 @@ async function seedUser(t: ReturnType<typeof convexTest>, email: string, googleI
       await ctx.db.insert('articleBodies', { userId: id, articleId, blocks: [], omitted: [] });
       await ctx.db.insert('pageReads', { articleId, feedId, userId: id, state: 'pending' });
     }
+    await rateLimiter.limit(ctx, 'pageRead', { key: feedId });
+    feedOf.set(id, feedId);
     return id;
   });
   await t.run(async (ctx) => {
@@ -79,11 +84,13 @@ async function holdings(t: ReturnType<typeof convexTest>, userId: Id<'users'>, g
     googleLink: (await ctx.runQuery(components.authGoogle.provider.getUserIdByAccount, { providerAccountId: googleId })) === null ? 0 : 1,
     // A used guessing search shows as an allowance short of full; none left behind means a full one (FEE-88).
     searchesUsed: (await rateLimiter.check(ctx, 'guessingSearch', { key: userId, count: GUESSES_PER_HOUR })).ok ? 0 : 1,
+    // Likewise a Feed's page budget, keyed by the Feed: it goes with the Account.
+    pagesUsed: (await rateLimiter.check(ctx, 'pageRead', { key: feedOf.get(userId)!, count: PAGE_BURST })).ok ? 0 : 1,
   }));
 }
 
-const NOTHING = { users: 0, feeds: 0, feedSchedules: 0, articles: 0, articleBodies: 0, pageReads: 0, sessions: 0, googleLink: 0, searchesUsed: 0 };
-const EVERYTHING = { users: 1, feeds: 1, feedSchedules: 1, articles: 2, articleBodies: 2, pageReads: 2, sessions: 1, googleLink: 1, searchesUsed: 1 };
+const NOTHING = { users: 0, feeds: 0, feedSchedules: 0, articles: 0, articleBodies: 0, pageReads: 0, sessions: 0, googleLink: 0, searchesUsed: 0, pagesUsed: 0 };
+const EVERYTHING = { users: 1, feeds: 1, feedSchedules: 1, articles: 2, articleBodies: 2, pageReads: 2, sessions: 1, googleLink: 1, searchesUsed: 1, pagesUsed: 1 };
 
 async function setup() {
   const t = convexTest(schema, modules);

@@ -6,6 +6,7 @@ import { runScheduledNow } from '../test/convex-scheduled';
 
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
+import rateLimiterTest from '@convex-dev/rate-limiter/test';
 import schema from './schema';
 
 vi.mock('@convex-dev/auth/server', async (original) => ({
@@ -42,6 +43,7 @@ afterEach(() => {
 /** Users A and B, each following one Feed. */
 async function setup() {
   const t = convexTest(schema, modules);
+  rateLimiterTest.register(t);
   const [a, b] = await t.run(async (ctx) => [
     await ctx.db.insert('users', { email: 'a@example.com' }),
     await ctx.db.insert('users', { email: 'b@example.com' }),
@@ -148,6 +150,7 @@ describe('moving existing Feeds onto schedules (FEE-54 migration)', () => {
 
   test('each Feed keeps its schedule exactly, and the Feed loses the old fields', async () => {
     const t = convexTest(schema, modules);
+    rateLimiterTest.register(t);
     const userId = await t.run((ctx) => ctx.db.insert('users', { email: 'a@example.com' }));
     const feedId = await t.run((ctx) =>
       ctx.db.insert(
@@ -174,6 +177,7 @@ describe('moving existing Feeds onto schedules (FEE-54 migration)', () => {
 
   test('a Feed that was due now stays due now, and running it twice changes nothing', async () => {
     const t = convexTest(schema, modules);
+    rateLimiterTest.register(t);
     const userId = await t.run((ctx) => ctx.db.insert('users', { email: 'a@example.com' }));
     await t.run((ctx) => ctx.db.insert('feeds', oldFeed(userId, {})));
 
@@ -191,6 +195,7 @@ describe('moving existing Feeds onto schedules (FEE-54 migration)', () => {
 
 test('more Feeds than one batch are all moved, across scheduled runs', async () => {
   const t = convexTest(schema, modules);
+  rateLimiterTest.register(t);
   const userId = await t.run((ctx) => ctx.db.insert('users', { email: 'a@example.com' }));
   await t.run(async (ctx) => {
     for (let i = 0; i < 230; i++) {
@@ -209,6 +214,7 @@ test('more Feeds than one batch are all moved, across scheduled runs', async () 
 
 test("an add that finishes after its Account was deleted stores nothing (P18)", async () => {
   const t = convexTest(schema, modules);
+  rateLimiterTest.register(t);
   const userId = await t.run((ctx) => ctx.db.insert('users', { email: 'a@example.com' }));
   await t.run((ctx) => ctx.db.delete(userId));
 

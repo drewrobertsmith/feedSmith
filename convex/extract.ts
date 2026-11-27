@@ -4,6 +4,7 @@ import { internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { internalMutation, internalQuery, type QueryCtx } from './_generated/server';
 import { vExtractOutcome } from './lib/feed/validators';
+import { rateLimiter } from './rateLimits';
 
 /** Pages read per run, one after another, so a site is never hit all at once; a backlog continues in the next run. */
 export const PER_RUN = 5;
@@ -36,17 +37,24 @@ export const pending = internalQuery({
 /**
  * Claims one Article for reading, so no other run reads its page too. If the claim isn't
  * settled in time (the run died mid-page), the Article falls back instead of waiting forever.
- * False when it's no longer waiting. Only its page-reading row changes, never the Article (FEE-62).
+ * `gone` when it's no longer waiting. Each claim spends one of its Feed's pages for the day (T24): with none left,
+ * the Article falls back at once, its page never fetched (`over-budget`). Only its page-reading row changes, never
+ * the Article (FEE-62).
  */
 export const claim = internalMutation({
   args: { articleId: v.id('articles') },
-  returns: v.boolean(),
+  returns: v.union(v.literal('claimed'), v.literal('gone'), v.literal('over-budget')),
   handler: async (ctx, { articleId }) => {
     const read = await pageRead(ctx, articleId);
-    if (read?.state !== 'pending') return false;
+    if (read?.state !== 'pending') return 'gone' as const;
+    const { ok } = await rateLimiter.limit(ctx, 'pageRead', { key: read.feedId });
+    if (!ok) {
+      await ctx.db.patch(read._id, { state: 'failed' });
+      return 'over-budget' as const;
+    }
     await ctx.db.patch(read._id, { state: 'reading' });
     await ctx.scheduler.runAfter(READING_LEASE, internal.extract.expire, { articleId });
-    return true;
+    return 'claimed' as const;
   },
 });
 

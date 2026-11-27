@@ -59,7 +59,9 @@ export const run = internalAction({
         batch,
         ({ articleId, link }) =>
           Effect.promise(() => ctx.runMutation(internal.extract.claim, { articleId })).pipe(
-            Effect.flatMap((claimed) => (claimed ? readPage(ctx, articleId, link) : Effect.void)),
+            Effect.flatMap((claim) =>
+              claim === 'claimed' ? readPage(ctx, articleId, link) : claim === 'over-budget' ? logRead('over-budget') : Effect.void,
+            ),
             Effect.annotateLogs({ articleId }),
           ),
         { concurrency: 1, discard: true },
