@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { View } from 'react-native';
 
 import { AppButton } from '@/components/app-button';
@@ -10,12 +9,13 @@ import { openLink } from '@/feeds/open-link';
 import { notUpdating } from '@/screens/chip-row-layout';
 import { notUpdatingReason } from '@/screens/not-updating-reason';
 import { NewAddressSheet } from '@/screens/add-feed-sheet';
+import { useSheet } from '@/navigation/start-state';
 
 /**
  * The top of a Feed's page (FEE-127): when it has failed every try for a day, a quiet notice says since when and
  * why, then its fixes (Try again, FEE-128, then Open site), with Remove last, in brick, behind a divider (Q32); with
  * no Articles, the empty line follows. Key it by the Feed, so one Feed's Try again never shows on another's page.
- * New address (FEE-129) opens its sheet over the page; `newAddressOpen` opens it at once, for the state gallery.
+ * New address (FEE-129) opens its sheet over the page.
  * `onFeed` shows the Feed a new address led to: this one, or another that already uses it (T22).
  * Its Articles stay below (Q7, Q36). It reads the minute clock itself, so the Feeds screen doesn't (FEE-106).
  * Nothing here moves (Q17).
@@ -25,18 +25,16 @@ export function FeedPageTop({
   empty,
   onRemove,
   onFeed,
-  newAddressOpen = false,
 }: {
   chip: FeedChip;
   empty: boolean;
   onRemove: () => void;
   onFeed: (feedId: string) => void;
-  newAddressOpen?: boolean;
 }) {
   const now = useMinuteClock();
   const failing = notUpdating(chip, now) ? chip.failing : undefined;
   const { trying, tryAgain } = useTryAgain(chip.id);
-  const [moving, setMoving] = useState(newAddressOpen);
+  const [moving, setMoving] = useSheet('new-address');
   const moved = (feedId: string) => {
     setMoving(false);
     onFeed(feedId);

@@ -154,3 +154,26 @@ test('a link with parameters the gallery doesn\'t know falls back to its default
   expect(screen.getByRole('radio', { name: 'Dark' })).toBeChecked();
   expect(Uniwind.currentTheme).toBe('dark');
 });
+
+// FEE-105: a world sets where it starts (a sheet open, a chip's menu; the list scrolled is walked on a device) through the gallery,
+// never through a screen's props; the app itself always starts with all of them shut.
+describe('a world opens in its starting state', () => {
+  test.each([
+    ['add-idle', () => screen.getByRole('heading', { name: 'Add a Feed' })],
+    ['account-sheet', () => screen.getByRole('button', { name: 'Sign out' })],
+    ['feed-menu', () => screen.getByRole('menuitem', { name: 'Remove The Verge' })],
+    ['new-address', () => screen.getByRole('heading', { name: 'New address for The Verge' })],
+  ])('%s', async (world, shows) => {
+    await renderRouter(routes, { initialUrl: `/gallery?world=${world}` });
+    await screen.findByRole('heading', { name: 'State gallery' });
+    expect(shows()).toBeOnTheScreen();
+  });
+
+  test('the app starts with no sheet or menu open, at the top', async () => {
+    await renderRouter(routes, { initialUrl: '/' });
+    await screen.findByRole('heading', { name: 'Feeds' });
+    expect(screen.queryByRole('button', { name: 'Sign out' })).not.toBeOnTheScreen();
+    expect(screen.queryByRole('heading', { name: 'Add a Feed' })).not.toBeOnTheScreen();
+    expect(screen.queryByRole('menuitem')).not.toBeOnTheScreen();
+  });
+});
