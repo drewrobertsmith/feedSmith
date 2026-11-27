@@ -6,9 +6,11 @@ import { useEffect } from 'react';
 const dsn =
   'https://74efdb3d193e42142a2216e3b1dca343@o4507147687821312.ingest.us.sentry.io/4512471734484992';
 
-// Every session is traced and profiled while feedSmith has one User (T50); lower these once other people use it.
+// Every session is traced while feedSmith has one User (T50); lower this once other people use it.
 const TRACES_SAMPLE_RATE = 1;
-const PROFILES_SAMPLE_RATE = 1;
+// Off: the free Sentry plan drops profiles, so collecting them only costs CPU, battery and data (T51).
+// Set to 1 when the plan includes profiling.
+const PROFILES_SAMPLE_RATE = 0;
 
 type SpanData = Record<string, unknown> | undefined;
 type Transaction = { contexts?: { trace?: { data?: SpanData } }; spans?: { data?: SpanData }[] };

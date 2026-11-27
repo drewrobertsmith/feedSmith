@@ -87,12 +87,15 @@ describe('initSentry', () => {
   });
 });
 
-// FEE-136 (T50): every event names its screen, and app start, screen loads and Convex calls are traced and profiled.
+// FEE-136 (T50): every event names its screen, and app start, screen loads and Convex calls are traced.
 describe('initSentry: screens, traces and profiles', () => {
-  test('traces and profiles every session', () => {
-    const options = initOptions();
-    expect(options.tracesSampleRate).toBe(1);
-    expect(options.profilesSampleRate).toBe(1);
+  test('traces every session', () => {
+    expect(initOptions().tracesSampleRate).toBe(1);
+  });
+
+  // T51: the free Sentry plan drops profiles, so collecting them would only cost the phone CPU, battery and data.
+  test('collects no profiles', () => {
+    expect(initOptions().profilesSampleRate).toBe(0);
   });
 
   test('follows navigation, so events name their screen and screen changes leave breadcrumbs', () => {
