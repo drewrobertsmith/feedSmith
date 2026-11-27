@@ -1,4 +1,5 @@
 import { act, render } from '@testing-library/react-native';
+import { useEffect } from 'react';
 
 import { useAuth, type Auth } from '@/auth/auth-context';
 import { ConvexAuth } from '@/auth/convex-auth';
@@ -39,7 +40,8 @@ const seeAuth = (seen: Auth) => {
   auth = seen;
 };
 function Probe({ onAuth }: { onAuth: (seen: Auth) => void }) {
-  onAuth(useAuth());
+  const seen = useAuth();
+  useEffect(() => onAuth(seen));
   return null;
 }
 const app = () => (
