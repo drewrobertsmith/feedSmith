@@ -21,7 +21,7 @@ async function setup() {
     await ctx.db.insert('users', { email: 'ada@example.com', name: 'Ada Lovelace' }),
     await ctx.db.insert('users', { email: 'brian@example.com' }),
   ]);
-  return { t, a: t.withIdentity({ subject: a }), b: t.withIdentity({ subject: b }) };
+  return { t, aId: a, bId: b, a: t.withIdentity({ subject: a }), b: t.withIdentity({ subject: b }) };
 }
 
 describe('viewer (P17)', () => {
@@ -30,14 +30,15 @@ describe('viewer (P17)', () => {
     expect(await t.query(api.users.viewer, {})).toBeNull();
   });
 
-  test('a signed-in User gets their name, email and initial', async () => {
-    const { a } = await setup();
-    expect(await a.query(api.users.viewer, {})).toEqual({ name: 'Ada Lovelace', email: 'ada@example.com', initial: 'A' });
+  // FEE-138 (T50): the opaque id is what crash reports carry, so a phone crash can be matched to the server's logs.
+  test('a signed-in User gets their own id, name, email and initial', async () => {
+    const { a, aId } = await setup();
+    expect(await a.query(api.users.viewer, {})).toEqual({ id: aId, name: 'Ada Lovelace', email: 'ada@example.com', initial: 'A' });
   });
 
   test("with no name from Google, the initial is the email's first letter", async () => {
-    const { b } = await setup();
-    expect(await b.query(api.users.viewer, {})).toEqual({ email: 'brian@example.com', initial: 'B' });
+    const { b, bId } = await setup();
+    expect(await b.query(api.users.viewer, {})).toEqual({ id: bId, email: 'brian@example.com', initial: 'B' });
   });
 
   test("User B never gets User A's Account, even by asking for it (Q10)", async () => {
@@ -45,6 +46,7 @@ describe('viewer (P17)', () => {
     const aId = await t.run(async (ctx) => (await ctx.db.query('users').first())!._id);
     // `viewer` takes no arguments: there is no way to name another User.
     await expect(b.query(api.users.viewer, { userId: aId } as never)).rejects.toThrow(/userId/);
+    expect(await b.query(api.users.viewer, {})).not.toMatchObject({ id: aId });
     expect(await b.query(api.users.viewer, {})).toMatchObject({ email: 'brian@example.com' });
   });
 

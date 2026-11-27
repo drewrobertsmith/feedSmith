@@ -9,20 +9,28 @@ import { AUTH_ERRORS } from './lib/authErrors';
 import { allowedSignUpEmail } from './lib/signUp';
 
 /**
- * The signed-in User's Account, for the account circle and sheet (P17). It takes no arguments,
- * so it can only ever return the caller's own (Q10). Signed out, or with the User gone, it
- * returns nothing rather than refusing, since the app asks for it while signing out.
+ * The signed-in User's Account, for the account circle and sheet (P17), and their own opaque id, which crash reports
+ * carry (T50). It takes no arguments, so it can only ever return the caller's own (Q10). Signed out, or with the User
+ * gone, it returns nothing rather than refusing, since the app asks for it while signing out.
  */
 export const viewer = query({
   args: {},
-  returns: v.union(v.null(), v.object({ name: v.optional(v.string()), email: v.string(), initial: v.string() })),
+  returns: v.union(
+    v.null(),
+    v.object({ id: v.id('users'), name: v.optional(v.string()), email: v.string(), initial: v.string() }),
+  ),
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (userId === null) return null;
     const user = await ctx.db.get(userId);
     if (user === null) return null;
     const name = user.name?.trim() || undefined;
-    return { ...(name ? { name } : {}), email: user.email, initial: accountInitial({ name, email: user.email }) };
+    return {
+      id: userId,
+      ...(name ? { name } : {}),
+      email: user.email,
+      initial: accountInitial({ name, email: user.email }),
+    };
   },
 });
 

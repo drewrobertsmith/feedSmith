@@ -1,15 +1,25 @@
 import { addBreadcrumb } from '@sentry/react-native';
 
-/** The User's actions a crash report can show (T50). Auth actions join with FEE-138. */
-export type TrailAction =
-  | 'article.prefetched'
-  | 'article.opened'
-  | 'article.read'
-  | 'feed.added'
-  | 'feed.new-address'
-  | 'feed.removed'
-  | 'feed.try-again'
-  | 'feeds.refreshed';
+/**
+ * The User's actions a crash report can show (T50). No name contains a word Sentry's server-side scrubbing hides
+ * (`auth`, `token`, `password`, `secret`, …): it would arrive as `[Filtered]`.
+ */
+export const TRAIL_ACTIONS = [
+  'user.signed-in',
+  'user.signed-out',
+  'account.deletion-started',
+  'account.deleted',
+  'article.prefetched',
+  'article.opened',
+  'article.read',
+  'feed.added',
+  'feed.new-address',
+  'feed.removed',
+  'feed.try-again',
+  'feeds.refreshed',
+] as const;
+
+export type TrailAction = (typeof TRAIL_ACTIONS)[number];
 
 export type TrailOutcome = 'ok' | 'failed' | 'added' | 'already' | 'choose';
 
