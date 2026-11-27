@@ -2,7 +2,6 @@ import { faceOf } from '../../../test/depth';
 import { depthStyle } from '@/theme/depth';
 import { act, userEvent, within } from '@testing-library/react-native';
 import { renderRouter, screen } from 'expo-router/testing-library';
-import { Alert } from 'react-native';
 import { Uniwind } from 'uniwind';
 
 import FeedsRoute from '@/app/index';
@@ -185,29 +184,28 @@ describe.each(ACCOUNT_WORLDS)('$label', ({ id, spec }) => {
   });
 
   if (open.deletion !== 'deleting') {
-    test('Delete account asks first, with a native confirmation; Cancel deletes nothing', async () => {
+    test('Delete account asks first, in Android\'s own dialog; Cancel deletes nothing (FEE-49)', async () => {
       const world = createWorld(spec);
-      const alert = jest.spyOn(Alert, 'alert');
       await renderWorld(world);
       await userEvent.press(await circle(shows));
 
       await userEvent.press(within(sheet()).getByRole('button', { name: 'Delete account' }));
 
-      expect(alert).toHaveBeenCalledTimes(1);
-      const [title, message, buttons] = alert.mock.calls[0];
-      expect(title).toBe('Delete your account and everything in it?');
-      expect(message).toBe("This can't be undone.");
-      expect(buttons?.map((button) => [button.text, button.style])).toEqual([
-        ['Cancel', 'cancel'],
-        ['Delete', 'destructive'],
-      ]);
-      await act(async () => buttons?.[0].onPress?.());
+      const dialog = screen.getByRole('alertdialog', { name: 'Delete your account and everything in it?' });
+      expect(within(dialog).getByText("This can't be undone.")).toBeOnTheScreen();
+      // Cancel, then the button that deletes.
+      const [cancel, confirmDelete] = within(dialog).getAllByRole('button');
+      expect(cancel).toHaveAccessibleName('Cancel');
+      expect(confirmDelete).toHaveAccessibleName('Delete');
+      await userEvent.press(within(dialog).getByRole('button', { name: 'Cancel' }));
+      expect(screen.queryByRole('alertdialog')).not.toBeOnTheScreen();
       expect(world.signInLog.deletes).toBe(0);
 
-      await act(async () => buttons?.[1].onPress?.());
+      await userEvent.press(within(sheet()).getByRole('button', { name: 'Delete account' }));
+      await userEvent.press(screen.getByRole('button', { name: 'Delete' }));
+      expect(screen.queryByRole('alertdialog')).not.toBeOnTheScreen();
       expect(world.signInLog.deletes).toBe(1);
 
-      alert.mockRestore();
       world.dispose();
     });
   }

@@ -29,6 +29,24 @@ jest.mock('@/components/native-sheet', () => ({
   NativeSheet: jest.fn(({ open, children }) => (open ? children : null)),
 }));
 
+// Asking first is Compose's AlertDialog too (FEE-49): while open, its adapter shows the question and its two
+// buttons, Cancel then the confirming one, as TalkBack hears them.
+jest.mock('@/components/confirm-dialog', () => {
+  const { Pressable, Text, View } = jest.requireActual('react-native');
+  return {
+    ConfirmDialog: jest.fn(({ open, title, message, confirmLabel, onConfirm, onCancel }) =>
+      open ? (
+        <View accessible role="alertdialog" aria-label={title}>
+          <Text role="heading">{title}</Text>
+          <Text>{message}</Text>
+          <Pressable role="button" aria-label="Cancel" onPress={onCancel} />
+          <Pressable role="button" aria-label={confirmLabel} onPress={onConfirm} />
+        </View>
+      ) : null,
+    ),
+  };
+});
+
 // Android's own menu is Compose too (FEE-97): its adapter shows the trigger, and while open, each
 // action as a menu item named by its label.
 jest.mock('@/components/native-menu', () => {
