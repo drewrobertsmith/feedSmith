@@ -21,6 +21,7 @@ import {
   type LastUpdatedView,
 } from '@/feeds/feeds-data';
 import { usePull } from '@/feeds/use-pull';
+import { trail, type TrailAction } from '@/monitoring/trail';
 
 /**
  * A query that runs only while signed in, and not while the Account is being deleted. Every User
@@ -68,6 +69,7 @@ function useChips(): ChipsView {
 
 function useArticle(id: string): ArticleView {
   const article = useSignedInQuery(api.articles.get, { id });
+  useEffect(() => trail('article.opened', { articleId: id }), [id]);
   if (article === undefined) return { status: 'loading', title: shownTitles.get(id) };
   return article === null ? { status: 'missing' } : { status: 'ready', article };
 }
@@ -85,6 +87,7 @@ function usePrefetchArticle() {
     // Watched briefly: the Reading view's own query shares it if it opens, and it's let go either way (Q20).
     const stop = client.watchQuery(api.articles.get, { id }).onUpdate(() => {});
     setTimeout(stop, PREFETCH_KEPT);
+    trail('article.prefetched', { articleId: id });
   };
 }
 
@@ -98,7 +101,11 @@ type AddressResult =
  * A form that sends an address to the server: adding a Feed, or giving one a new address (FEE-129). Only an address
  * is sent; anything else (a name, say) never is (FEE-96).
  */
-function useAddressForm(send: (url: string) => Promise<AddressResult>): AddressForm {
+function useAddressForm(
+  send: (url: string) => Promise<AddressResult>,
+  action: Extract<TrailAction, 'feed.added' | 'feed.new-address'>,
+  feedId?: string,
+): AddressForm {
   const [view, setView] = useState<AddFeedView>({ status: 'idle' });
 
   const add = async (typed: string): Promise<AddOutcome> => {
@@ -110,6 +117,7 @@ function useAddressForm(send: (url: string) => Promise<AddressResult>): AddressF
     setView({ status: 'busy' });
     try {
       const result = await send(text);
+      trail(action, outcomeOf(result, feedId));
       if (result.ok) {
         setView({ status: 'idle' });
         return { kind: 'added', feedId: result.feedId };
@@ -124,6 +132,7 @@ function useAddressForm(send: (url: string) => Promise<AddressResult>): AddressF
       return { kind: 'stay' };
     } catch {
       // The call itself failed (no connection, or the server is down).
+      trail(action, { outcome: 'failed', ...(feedId ? { feedId } : {}) });
       setView({ status: 'error', reason: 'unreachable' });
       return { kind: 'stay' };
     }
@@ -132,14 +141,22 @@ function useAddressForm(send: (url: string) => Promise<AddressResult>): AddressF
   return { view, add };
 }
 
+/** What an address form's answer leaves in the trail: its outcome and the Feed it names, never the address (Q12). */
+function outcomeOf(result: AddressResult, feedId: string | undefined) {
+  if (result.ok) return { outcome: 'added' as const, feedId: result.feedId };
+  if (result.reason === 'already-added') return { outcome: 'already' as const, feedId: result.feedId };
+  const of = feedId ? { feedId } : {};
+  return result.reason === 'choose' ? { outcome: 'choose' as const, ...of } : { outcome: 'failed' as const, ...of };
+}
+
 function useAddFeed(): AddressForm {
   const addFeed = useAction(api.feeds.add);
-  return useAddressForm((url) => addFeed({ url }));
+  return useAddressForm((url) => addFeed({ url }), 'feed.added');
 }
 
 function useNewAddress(feedId: string): AddressForm {
   const newAddress = useAction(api.feeds.newAddress);
-  return useAddressForm((url) => newAddress({ id: feedId, url }));
+  return useAddressForm((url) => newAddress({ id: feedId, url }), 'feed.new-address', feedId);
 }
 
 function useRefresh() {
@@ -147,20 +164,30 @@ function useRefresh() {
   const at = useSignedInQuery(api.feeds.lastUpdated, {});
   // A failed pull changes nothing on screen; the schedule keeps Feeds fresh regardless. A pull's results
   // reach the line and the rows together, after the pull answers: "Updating…" lasts until then (FEE-103).
-  return usePull(() => refreshAll().catch(() => null), at);
+  const run = () =>
+    refreshAll().then(
+      (until) => (trail('feeds.refreshed', { outcome: 'ok' }), until),
+      () => (trail('feeds.refreshed', { outcome: 'failed' }), null),
+    );
+  return usePull(run, at);
 }
 
 function useMarkRead() {
   const markRead = useMutation(api.articles.markRead);
   return (id: string) => {
     // Read is best-effort: a dropped call leaves the Article undimmed, nothing worse.
+    trail('article.read', { articleId: id });
     void markRead({ id }).catch(() => null);
   };
 }
 
 function useRemoveFeed(): RemoveFeed {
   const remove = useMutation(api.feeds.remove);
-  return async (id) => ((await remove({ id }).catch(() => null)) ? 'ok' : 'failed');
+  return async (id) => {
+    const outcome = (await remove({ id }).catch(() => null)) ? 'ok' : 'failed';
+    trail('feed.removed', { feedId: id, outcome });
+    return outcome;
+  };
 }
 
 function useTryAgain(feedId: string): TryAgain {
@@ -171,7 +198,10 @@ function useTryAgain(feedId: string): TryAgain {
     setTrying(true);
     // Whatever it finds, the chips' live query shows; a call that never reached the server changes nothing (Q5).
     void fetchNow({ id: feedId })
-      .catch(() => null)
+      .then(
+        () => trail('feed.try-again', { feedId, outcome: 'ok' }),
+        () => trail('feed.try-again', { feedId, outcome: 'failed' }),
+      )
       .finally(() => setTrying(false));
   };
   return { trying, tryAgain };
