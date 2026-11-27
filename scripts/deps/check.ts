@@ -24,7 +24,8 @@ const deps: Dep[] = [
 ];
 
 async function releaseDates(name: string): Promise<Record<string, string>> {
-  const response = await fetch(`https://registry.npmjs.org/${name.replace('/', '%2F')}`);
+  // A registry that hangs mustn't stall the weekly run: give up after 30 seconds.
+  const response = await fetch(`https://registry.npmjs.org/${name.replace('/', '%2F')}`, { signal: AbortSignal.timeout(30_000) });
   if (!response.ok) throw new Error(`npm registry: ${name}: ${response.status}`);
   const { time = {} } = (await response.json()) as { time?: Record<string, string> };
   return time;
