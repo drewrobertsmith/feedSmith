@@ -4,9 +4,34 @@ import * as Sentry from '@sentry/react-native';
 const dsn =
   'https://74efdb3d193e42142a2216e3b1dca343@o4507147687821312.ingest.us.sentry.io/4512471734484992';
 
+// Every session is traced and profiled while feedSmith has one User (T50); lower these once other people use it.
+const TRACES_SAMPLE_RATE = 1;
+const PROFILES_SAMPLE_RATE = 1;
+
+type SpanData = Record<string, unknown> | undefined;
+type Transaction = { contexts?: { trace?: { data?: SpanData } }; spans?: { data?: SpanData }[] };
+
+/**
+ * With PII on (T16), the router integration attaches a screen's concrete URL, its params and the raw deep link
+ * (`feedsmith://auth?code=…` carries a sign-in code). Link params are untrusted (Q25), so only route names go.
+ */
+function withoutRouteDetail(data: SpanData) {
+  if (!data) return;
+  for (const key of Object.keys(data)) {
+    if (key === 'route.url' || key === 'deeplink.url' || key.startsWith('route.params.')) delete data[key];
+  }
+}
+
+function scrubTransaction<T extends Transaction>(event: T): T {
+  withoutRouteDetail(event.contexts?.trace?.data);
+  for (const span of event.spans ?? []) withoutRouteDetail(span.data);
+  return event;
+}
+
 /**
  * Starts crash reporting (T16): PII and Sentry Logs on, and Session Replay with every
- * text, image and vector masked so a replay never shows what's being read (Q12).
+ * text, image and vector masked so a replay never shows what's being read (Q12). Screens, traces
+ * and profiles as T50 says.
  * Call once, before the root renders.
  */
 export function initSentry() {
@@ -21,12 +46,19 @@ export function initSentry() {
     enableAutoConsoleLogs: false,
     replaysSessionSampleRate: 0.1,
     replaysOnErrorSampleRate: 1,
+    tracesSampleRate: TRACES_SAMPLE_RATE,
+    profilesSampleRate: PROFILES_SAMPLE_RATE,
+    // Trace headers go only to the Convex deployment, never to a Feed's site or anywhere else.
+    tracePropagationTargets: process.env.EXPO_PUBLIC_CONVEX_URL ? [process.env.EXPO_PUBLIC_CONVEX_URL] : [],
+    beforeSendTransaction: scrubTransaction,
     integrations: [
       Sentry.mobileReplayIntegration({
         maskAllText: true,
         maskAllImages: true,
         maskAllVectors: true,
       }),
+      // Names the screen on every event, leaves a breadcrumb per screen change and times screen loads (T50).
+      Sentry.expoRouterIntegration(),
     ],
   });
 }
