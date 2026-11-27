@@ -84,6 +84,8 @@ const SHOWS: Record<AccountWorldId, Shows> = {
 };
 
 const FAILED = "Couldn't delete your account. Check your connection and try again.";
+/** Which build this is (FEE-140): a test runs as a development build. */
+const BUILD = 'feedSmith 1.0.0 · dev';
 
 function renderWorld(world: World) {
   return renderRouter(
@@ -157,6 +159,10 @@ describe.each(ACCOUNT_WORLDS)('$label', ({ id, spec }) => {
     // A failure says what happened and what to do, and the User stays signed in (P18).
     if (open.deletion === 'failed') expect(within(sheet()).getByRole('alert')).toHaveTextContent(FAILED);
     else expect(within(sheet()).queryByText(FAILED)).toBeNull();
+    // Last, plain text: nothing to press, read as written.
+    const build = within(sheet()).getByText(BUILD);
+    expect(build).not.toHaveProp('role');
+    expect(within(sheet()).queryByRole('button', { name: /feedSmith/ })).toBeNull();
     if (open.signingOut) {
       expect(signOut).toBeBusy();
       expect(signOut).toBeDisabled();

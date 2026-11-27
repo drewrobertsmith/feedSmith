@@ -99,3 +99,11 @@ jest.mock('expo-sqlite/kv-store', () => ({ Storage: { getItemSync: () => null, s
 // The Sentry SDK ships ESM that Jest can't load, and has nothing to send to here. Breadcrumbs from the
 // adapters (`trail`, FEE-137) go nowhere; a test that checks what reaches Sentry mocks it itself.
 jest.mock('@sentry/react-native', () => ({ addBreadcrumb: jest.fn(), setUser: jest.fn() }));
+
+// A build embeds its app config, version included; Jest's doesn't. The Account sheet names the version (FEE-140).
+jest.mock('expo-constants', () => {
+  const actual = jest.requireActual('expo-constants');
+  const constants = actual.default;
+  const expoConfig = { ...constants.expoConfig, version: require('../app.json').expo.version };
+  return { ...actual, __esModule: true, default: new Proxy(constants, { get: (target, key) => (key === 'expoConfig' ? expoConfig : target[key]) }) };
+});
