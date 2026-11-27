@@ -8,6 +8,7 @@ import {
   ADD_FEED_WORLDS,
   ALL_WORLDS,
   NEW_ARTICLES_WORLDS,
+  NEW_ADDRESS_WORLDS,
   NOT_UPDATING_WORLDS,
   READING_WORLDS,
   SHELL_WORLDS,
@@ -50,6 +51,8 @@ export const GALLERY: readonly GalleryEntry[] = [
   { screen: 'Reading view', worlds: READING_WORLDS, render: () => <ReadingScreen id={FIXTURE_ROWS[0].id} /> },
   // A Feed that has stopped updating: its chip's badge (FEE-126).
   { screen: 'Not updating', worlds: NOT_UPDATING_WORLDS, render: (spec) => <FeedsScreen feed={spec.feed} /> },
+  // Its new-address sheet, open (FEE-129).
+  { screen: 'New address', worlds: NEW_ADDRESS_WORLDS, render: (spec) => <FeedsScreen feed={spec.feed} newAddressOpen /> },
   {
     screen: 'Account',
     worlds: ACCOUNT_WORLDS,

@@ -252,3 +252,18 @@ export const NOT_UPDATING_WORLDS = [
 ] as const satisfies readonly CatalogWorld[];
 
 export type NotUpdatingWorldId = (typeof NOT_UPDATING_WORLDS)[number]['id'];
+
+/** New address, on The Verge's not-updating page (FEE-129): the sheet open, at each step. */
+const MOVING = { feeds: 'some', failing: 'day', feed: 'f1' } as const;
+export const NEW_ADDRESS_WORLDS = [
+  { id: 'new-address', label: 'New address', spec: { colorScheme: 'dark', ...MOVING } },
+  { id: 'new-address-light', label: 'New address, light', spec: { colorScheme: 'light', ...MOVING } },
+  { id: 'new-address-busy', label: 'Checking', spec: { colorScheme: 'dark', ...MOVING, newAddress: 'busy' } },
+  { id: 'new-address-choose', label: 'Choose a feed', spec: { colorScheme: 'dark', ...MOVING, newAddress: 'choose' } },
+  { id: 'new-address-not-a-feed', label: 'Not a feed', spec: { colorScheme: 'light', ...MOVING, newAddress: 'not-a-feed' } },
+  // Tapped in the gallery: another Feed uses the address, so it opens instead.
+  { id: 'new-address-already', label: 'Another Feed’s address', spec: { colorScheme: 'dark', ...MOVING, newAddress: 'already' } },
+  { id: 'new-address-largest-font', label: 'Choose a feed, largest font size', spec: { colorScheme: 'dark', ...MOVING, newAddress: 'choose', fontScale: 2 } },
+] as const satisfies readonly CatalogWorld[];
+
+export type NewAddressWorldId = (typeof NEW_ADDRESS_WORLDS)[number]['id'];

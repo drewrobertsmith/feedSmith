@@ -88,6 +88,9 @@ export type AddOutcome =
   | { kind: 'already'; title: string; feedId: string }
   | { kind: 'stay' };
 
+/** A form that takes an address: where it's up to, and `add`, which resolves to what happened. */
+export type AddressForm = { view: AddFeedView; add: (typed: string) => Promise<AddOutcome> };
+
 /** A feed a site advertises, to choose from (T21). */
 export type FeedChoice = { url: string; title: string };
 
@@ -121,7 +124,12 @@ export type FeedsData = {
    * Adding a Feed: where it's up to, and `add`, which resolves to what happened. Only an address is
    * added (T21); any other text is the invalid-address error, with nothing sent (FEE-96).
    */
-  useAddFeed: () => { view: AddFeedView; add: (typed: string) => Promise<AddOutcome> };
+  useAddFeed: () => AddressForm;
+  /**
+   * Giving a Feed a new address (FEE-129), found as adding finds one: `added` with this Feed's id once it has it,
+   * `already` with another Feed that uses it, or stay. The Feed keeps its name and Articles.
+   */
+  useNewAddress: (feedId: string) => AddressForm;
   /** Pulling down: fetches every Feed now, on the server (P15, Q21). */
   useRefresh: () => { refreshing: boolean; refresh: () => Promise<void> };
   /** The newest fetch across the User's Feeds, for the line under the Feeds title (FEE-47). */
@@ -192,6 +200,12 @@ export function usePrefetchArticle(): (id: string) => void {
 export function useAddFeed(): ReturnType<FeedsData['useAddFeed']> {
   const { useAddFeed: read } = useFeedsData();
   return read();
+}
+
+/** Giving a Feed a new address. */
+export function useNewAddress(feedId: string): AddressForm {
+  const { useNewAddress: read } = useFeedsData();
+  return read(feedId);
 }
 
 /** Marking an Article Read. */

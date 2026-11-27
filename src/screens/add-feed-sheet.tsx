@@ -6,7 +6,7 @@ import { AppText } from '@/components/app-text';
 import { NativeSheet } from '@/components/native-sheet';
 import { NativeTextField } from '@/components/native-text-field';
 import { DepthPressable } from '@/components/depth-pressable';
-import { useAddFeed, type AddFeedReason, type FeedChoice } from '@/feeds/feeds-data';
+import { useAddFeed, useNewAddress, type AddFeedReason, type AddressForm, type FeedChoice } from '@/feeds/feeds-data';
 
 /** What went wrong, and what to do next. */
 const ERRORS: Record<AddFeedReason, string> = {
@@ -44,16 +44,30 @@ function Choice({ choice, onChoose }: { choice: FeedChoice; onChoose: (url: stri
 /** At most this much of the screen's height: a long list of feeds scrolls inside the sheet (Q16). */
 const SHEET_MAX = 0.85;
 
+/** What tells one address sheet from another: its words, and the form it sends to. */
+type AddressSheetProps = {
+  open: boolean;
+  onClose: () => void;
+  /** A Feed found or already followed: the sheet closes on its chip. */
+  onFeed: (feedId: string) => void;
+  form: AddressForm;
+  heading: string;
+  /** A line under the heading saying what happens. */
+  hint?: string;
+  placeholder?: string;
+  submit: { label: string; busyLabel: string };
+  testID: string;
+};
+
 /**
- * Adding a Feed, in a sheet over Feeds (FEE-45, Q32): from a website or feed URL, and nothing else
- * (FEE-96). What's typed stays while the sheet is closed, for the next time it opens; a Feed added,
- * or one already followed, closes it on that Feed's chip (`onFeed`), a followed one with a quiet
- * note naming it (T22).
+ * A sheet that takes a website or feed URL (FEE-45, Q32): adding a Feed, or giving one a new address (FEE-129). What's
+ * typed stays while the sheet is closed, for the next time it opens; a Feed found, or one already followed, closes it
+ * on that Feed's chip (`onFeed`), a followed one with a quiet note naming it (T22).
  */
-export function AddFeedSheet({ open, onClose, onFeed }: { open: boolean; onClose: () => void; onFeed: (feedId: string) => void }) {
-  const { view, add } = useAddFeed();
+function AddressSheet({ open, onClose, onFeed, form, heading, hint, placeholder, submit: labels, testID }: AddressSheetProps) {
+  const { view, add } = form;
   const [typed, setTyped] = useState('');
-  // The field keeps its own text natively; after an add it starts afresh, empty.
+  // The field keeps its own text natively; after a Feed is found it starts afresh, empty.
   const [adds, setAdds] = useState(0);
   const { height } = useWindowDimensions();
   const adding = view.status === 'busy';
@@ -70,7 +84,7 @@ export function AddFeedSheet({ open, onClose, onFeed }: { open: boolean; onClose
     else if (outcome.kind === 'added') {
       setTyped('');
       setAdds((count) => count + 1);
-      // Even if the sheet was swiped shut while adding: the Feed was added, so its chip opens.
+      // Even if the sheet was swiped shut meanwhile: the Feed was found, so its chip opens.
       onFeed(outcome.feedId);
     }
   };
@@ -79,16 +93,21 @@ export function AddFeedSheet({ open, onClose, onFeed }: { open: boolean; onClose
   return (
     <NativeSheet open={open} onClose={onClose}>
       {/* Scrolls past most of the screen: a site can offer up to ten feeds, and the largest font needs room (Q16). */}
-      <ScrollView testID="add-feed-sheet" style={{ maxHeight: height * SHEET_MAX }} keyboardShouldPersistTaps="handled">
+      <ScrollView testID={testID} style={{ maxHeight: height * SHEET_MAX }} keyboardShouldPersistTaps="handled">
         <View className="gap-group px-edge pb-section">
           <AppText variant="title" className="text-text">
-            Add a Feed
+            {heading}
           </AppText>
+          {hint ? (
+            <AppText variant="label" className="text-text-muted">
+              {hint}
+            </AppText>
+          ) : null}
           {/* Material's filled field, its label floating inside it (FEE-81). */}
           <NativeTextField
             key={adds}
             label="Website or feed URL"
-            placeholder="theverge.com"
+            placeholder={placeholder}
             defaultValue={typed}
             onChangeText={setTyped}
             onSubmitEditing={() => void submit()}
@@ -109,14 +128,42 @@ export function AddFeedSheet({ open, onClose, onFeed }: { open: boolean; onClose
               ))}
             </View>
           ) : null}
-          <AppButton
-            label={adding ? 'Adding…' : 'Add Feed'}
-            onPress={() => void submit()}
-            busy={adding}
-            disabled={!typed.trim()}
-          />
+          <AppButton label={adding ? labels.busyLabel : labels.label} onPress={() => void submit()} busy={adding} disabled={!typed.trim()} />
         </View>
       </ScrollView>
     </NativeSheet>
+  );
+}
+
+type SheetProps = Pick<AddressSheetProps, 'open' | 'onClose' | 'onFeed'>;
+
+/** Adding a Feed, in a sheet over Feeds (FEE-45), from a website or feed URL and nothing else (FEE-96). */
+export function AddFeedSheet(props: SheetProps) {
+  return (
+    <AddressSheet
+      {...props}
+      form={useAddFeed()}
+      heading="Add a Feed"
+      placeholder="theverge.com"
+      submit={{ label: 'Add Feed', busyLabel: 'Adding…' }}
+      testID="add-feed-sheet"
+    />
+  );
+}
+
+/**
+ * A not-updating Feed's new address (FEE-129), found as adding finds one; the Feed keeps its name and Articles. It
+ * starts empty and suggests nothing, so nothing in it reads as the old address (Q9).
+ */
+export function NewAddressSheet({ feed, ...props }: SheetProps & { feed: { id: string; title: string } }) {
+  return (
+    <AddressSheet
+      {...props}
+      form={useNewAddress(feed.id)}
+      heading={`New address for ${feed.title}`}
+      hint="Its name and Articles stay."
+      submit={{ label: 'Use this address', busyLabel: 'Checking…' }}
+      testID="new-address-sheet"
+    />
   );
 }

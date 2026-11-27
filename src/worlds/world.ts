@@ -91,6 +91,11 @@ export type WorldSpec = {
    * by default it fails again, now unreachable.
    */
   tryAgain?: 'busy' | 'works';
+  /**
+   * New address on the failing Feed's page (FEE-129), as `addFeed` for adding: idle works, and the Feed works again;
+   * `already`: Calm Notes uses that address.
+   */
+  newAddress?: 'idle' | 'busy' | 'choose' | 'already' | AddFeedReason;
   /** The place the phone held when the app started (FEE-130): as stored, or any text, to test what's untrusted. */
   place?: Place | string;
   /** The connection to the server (FEE-32): offline from the start; tests change it with the world's `setNetwork`. */
@@ -128,6 +133,8 @@ export type FeedsLog = {
   prefetched: string[];
   /** Feeds Try again fetched (FEE-128). */
   triedAgain: string[];
+  /** New addresses sent, by Feed (FEE-129). */
+  moved: { id: string; url: string }[];
 };
 
 const emptyLog = (): FeedsLog => ({
@@ -137,6 +144,7 @@ const emptyLog = (): FeedsLog => ({
   removed: [],
   prefetched: [],
   triedAgain: [],
+  moved: [],
 });
 
 /** What a world's fake auth was asked to do. */
@@ -168,6 +176,30 @@ export type WorldFeeds = FeedsData & {
 
 const HOUR = 3_600_000;
 
+/** Where adding a Feed, or giving one a new address, starts in a world. */
+function addressView(state: NonNullable<WorldSpec['addFeed']>): AddFeedView {
+  if (state === 'idle' || state === 'already') return { status: 'idle' };
+  if (state === 'busy') return { status: 'busy' };
+  if (state === 'choose') return { status: 'choose', choices: FIXTURE_CHOICES };
+  return { status: 'error', reason: state };
+}
+
+/**
+ * A world's address form (adding, or a new address): as the app's, text that isn't an address is never sent (FEE-96);
+ * an error stays on the screen until the next try.
+ */
+function useAddress(start: AddFeedView, send: (url: string) => Promise<AddOutcome>) {
+  const [view, setView] = useState(start);
+  const add = (url: string): Promise<AddOutcome> => {
+    if (!isAddress(url)) {
+      setView({ status: 'error', reason: 'invalid-url' });
+      return Promise.resolve({ kind: 'stay' });
+    }
+    return send(url);
+  };
+  return { view, add };
+}
+
 /** A world's Feeds and Articles: fixture data, and a log of what it's asked. */
 export function worldFeeds(
   spec: WorldSpec,
@@ -178,14 +210,8 @@ export function worldFeeds(
   const someChips = spec.chips === 'many' ? FIXTURE_MANY_CHIPS : FIXTURE_CHIPS;
   const addFeed = spec.addFeed ?? 'idle';
   const article = spec.article ?? 'full';
-  const addView: AddFeedView =
-    addFeed === 'idle' || addFeed === 'already'
-      ? { status: 'idle' }
-      : addFeed === 'busy'
-        ? { status: 'busy' }
-        : addFeed === 'choose'
-          ? { status: 'choose', choices: FIXTURE_CHOICES }
-          : { status: 'error', reason: addFeed };
+  const addView = addressView(addFeed);
+  const newAddress = spec.newAddress ?? 'idle';
   // A Feed added in this world joins the chips, and one removed leaves them, as Convex's live query would (FEE-45).
   let addedChips: FeedChip[] = [];
   let removedIds = new Set<string>();
@@ -321,14 +347,8 @@ export function worldFeeds(
       void id;
       return articleView;
     },
-    useAddFeed: () => {
-      const [view, setView] = useState(addView);
-      const add = (url: string): Promise<AddOutcome> => {
-        // As the app does: text that isn't an address is never sent (FEE-96).
-        if (!isAddress(url)) {
-          setView({ status: 'error', reason: 'invalid-url' });
-          return Promise.resolve({ kind: 'stay' });
-        }
+    useAddFeed: () =>
+      useAddress(addView, (url) => {
         log.added.push(url);
         // Busy stays busy; an error stays on the screen; idle adds the Feed.
         if (addFeed === 'busy') return new Promise(() => {});
@@ -338,9 +358,19 @@ export function worldFeeds(
         }
         if (addFeed === 'already') return Promise.resolve({ kind: 'already', title: 'The Verge', feedId: 'f1' });
         return Promise.resolve({ kind: 'stay' });
-      };
-      return { view, add };
-    },
+      }),
+    useNewAddress: (feedId) =>
+      useAddress(addressView(newAddress), (url) => {
+        log.moved.push({ id: feedId, url });
+        if (newAddress === 'busy') return new Promise(() => {});
+        // Idle finds a working feed: the Feed keeps its name and Articles and works again, as the server records it.
+        if (newAddress === 'idle') {
+          recover();
+          return Promise.resolve({ kind: 'added', feedId });
+        }
+        if (newAddress === 'already') return Promise.resolve({ kind: 'already', title: 'Calm Notes', feedId: 'f2' });
+        return Promise.resolve({ kind: 'stay' });
+      }),
     useMarkRead: () => (id) => {
       log.read.push(id);
     },

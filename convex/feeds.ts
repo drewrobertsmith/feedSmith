@@ -6,7 +6,7 @@ import { DELETE_BATCH } from './lib/feed/blocks';
 import { deleteArticles } from './lib/deleteArticles';
 import { MAX_FEED_NAME } from './lib/feedName';
 import type { Id } from './_generated/dataModel';
-import { action, internalAction, internalMutation, internalQuery, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
+import { action, internalAction, internalMutation, internalQuery, mutation, query, type ActionCtx, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireUserId } from './lib/currentUser';
 import { findFeedLinks, siteMeta, type FeedLink, type SiteMeta } from './lib/feed/discover';
 import { faviconOf, hostOf } from './lib/feed/face';
@@ -80,6 +80,49 @@ export const renameFromPageTitle = internalMutation({
   },
 });
 
+/** A working feed found at a typed address: its URL, the fetch that proved it, and what its site said, when a website led to it. */
+type Found = { ok: true; feedUrl: string; outcome: Extract<FetchOutcome, { _tag: 'Fetched' }>; meta?: SiteMeta };
+
+/**
+ * Finds the feed at a typed address, as adding does (T21, T22): a feed URL, or a website's one feed link; several
+ * links to choose from; or why not. A Feed the User already follows at that URL is found before anything is fetched,
+ * except `self`, the Feed being given a new address (FEE-129). The URL is never logged (Q9).
+ */
+async function findFeed(ctx: ActionCtx, userId: Id<'users'>, url: string, self?: Id<'feeds'>): Promise<Found | Exclude<AddResult, { ok: true }>> {
+  // One spelling per Feed: the parsed URL, its host lower-cased and its spaces trimmed.
+  const typed = url.length <= MAX_URL ? safeUrl(withScheme(url))?.href : undefined;
+  if (!typed) return { ok: false, reason: 'invalid-url' };
+  const followedOther = async (at: string) => {
+    const following = await ctx.runQuery(internal.feeds.followed, { userId, url: at });
+    return following !== null && following.feedId !== self ? following : null;
+  };
+
+  // Already followed at this URL: known before fetching anything.
+  const following = await followedOther(typed);
+  if (following !== null) return { ok: false, reason: 'already-added', ...following };
+
+  let feedUrl = typed;
+  let outcome: FetchOutcome = await fetchFeed(typed);
+  let meta: SiteMeta | undefined;
+  if (outcome._tag === 'Page') {
+    // A web page: its feed links are its feeds, followed one level only (T21).
+    const links = findFeedLinks(outcome.body, outcome.url);
+    if (links.length === 0) return { ok: false, reason: 'no-feed-found' };
+    if (links.length > 1) return { ok: false, reason: 'choose', choices: links };
+    meta = siteMeta(outcome.body, outcome.url);
+    feedUrl = links[0].url;
+    const followingLink = await followedOther(feedUrl);
+    if (followingLink !== null) return { ok: false, reason: 'already-added', ...followingLink };
+    outcome = await fetchFeed(feedUrl);
+  }
+  if (outcome._tag === 'Failed') return { ok: false, reason: outcome.reason };
+  // A feed link that led to another page: links are followed one level only (T21).
+  if (outcome._tag === 'Page') return { ok: false, reason: 'not-a-feed' };
+  // Without validators of ours, a "not modified" answer is no answer at all.
+  if (outcome._tag === 'NotModified') return { ok: false, reason: 'unreachable' };
+  return { ok: true, feedUrl, outcome, meta };
+}
+
 /**
  * Adds a Feed for the signed-in User: fetches it at once under the fetch policy (T18),
  * and only a working feed becomes a Feed. The URL is never logged (Q9).
@@ -89,40 +132,16 @@ export const add = action({
   returns: vAddResult,
   handler: async (ctx, { url }): Promise<AddResult> => {
     const userId = await ctx.runQuery(internal.feeds.viewer, {});
-    // One spelling per Feed: the parsed URL, its host lower-cased and its spaces trimmed.
-    const typed = url.length <= MAX_URL ? safeUrl(withScheme(url))?.href : undefined;
-    if (!typed) return { ok: false, reason: 'invalid-url' };
-
-    // Already followed at this URL: known before fetching anything.
-    const following = await ctx.runQuery(internal.feeds.followed, { userId, url: typed });
-    if (following !== null) return { ok: false, reason: 'already-added', ...following };
-
-    let feedUrl = typed;
-    let outcome: FetchOutcome = await fetchFeed(typed);
-    let meta: SiteMeta | undefined;
-    if (outcome._tag === 'Page') {
-      // A web page: its feed links are its feeds, followed one level only (T21).
-      const links = findFeedLinks(outcome.body, outcome.url);
-      if (links.length === 0) return { ok: false, reason: 'no-feed-found' };
-      if (links.length > 1) return { ok: false, reason: 'choose', choices: links };
-      meta = siteMeta(outcome.body, outcome.url);
-      feedUrl = links[0].url;
-      const followingLink = await ctx.runQuery(internal.feeds.followed, { userId, url: feedUrl });
-      if (followingLink !== null) return { ok: false, reason: 'already-added', ...followingLink };
-      outcome = await fetchFeed(feedUrl);
-    }
-    if (outcome._tag === 'Failed') return { ok: false, reason: outcome.reason };
-    // A feed link that led to another page: links are followed one level only (T21).
-    if (outcome._tag === 'Page') return { ok: false, reason: 'not-a-feed' };
-    // Without validators of ours, a "not modified" answer is no answer at all.
-    if (outcome._tag === 'NotModified') return { ok: false, reason: 'unreachable' };
-    meta ??= await homepageMeta(outcome.siteUrl);
-    const title = meta.name ?? outcome.title;
+    const found = await findFeed(ctx, userId, url);
+    if (!found.ok) return found;
+    const { feedUrl, outcome } = found;
+    // A new Feed is named and pictured by its site: read from its homepage when a website didn't lead here.
+    const meta = found.meta ?? (await homepageMeta(outcome.siteUrl));
 
     const stored = await ctx.runMutation(internal.feeds.store, {
       userId,
       url: feedUrl,
-      title,
+      title: meta.name ?? outcome.title,
       siteUrl: outcome.siteUrl,
       iconUrl: meta.iconUrl,
       articles: outcome.articles,
@@ -135,6 +154,64 @@ export const add = action({
       return { ok: false, reason: 'unreachable' };
     }
     return stored.added ? { ok: true, feedId: stored.feedId } : { ok: false, reason: 'already-added', title: stored.title, feedId: stored.feedId };
+  },
+});
+
+/**
+ * New address, on a not-updating Feed's page (FEE-129): finds the feed at a typed address as adding does, then gives
+ * one of the signed-in User's Feeds that address. The Feed keeps its name, icon and Articles, stores the new ones it
+ * doesn't hold, and works again. Refuses another of the User's Feeds' addresses with that Feed (T22), and answers
+ * not-found, with nothing fetched, for an id that isn't one of the User's Feeds (Q10). Never answers or logs an address (Q9).
+ */
+export const newAddress = action({
+  args: { id: v.string(), url: v.string() },
+  returns: v.union(vAddResult, v.object({ ok: v.literal(false), reason: v.literal('not-found') })),
+  handler: async (ctx, { id, url }): Promise<AddResult | { ok: false; reason: 'not-found' }> => {
+    const userId = await ctx.runQuery(internal.feeds.viewer, {});
+    const feedId = await ctx.runQuery(internal.feeds.owned, { userId, id });
+    if (!feedId) return { ok: false, reason: 'not-found' };
+    const found = await findFeed(ctx, userId, url, feedId);
+    if (!found.ok) return found;
+    const { feedUrl, outcome } = found;
+    return ctx.runMutation(internal.feeds.moveFeed, {
+      userId,
+      feedId,
+      url: feedUrl,
+      siteUrl: outcome.siteUrl,
+      articles: outcome.articles,
+      now: Date.now(),
+      ...outcome.validators,
+    });
+  },
+});
+
+/**
+ * Gives a Feed its new address (FEE-129), checking again that it's still the User's and that no other of their Feeds
+ * took the address meanwhile. Stores the Articles it doesn't hold, by guid, and marks it working from this fetch.
+ */
+export const moveFeed = internalMutation({
+  args: {
+    userId: v.id('users'),
+    feedId: v.id('feeds'),
+    url: v.string(),
+    siteUrl: v.optional(v.string()),
+    articles: v.array(vStoredArticle),
+    now: v.number(),
+    ...vValidators,
+  },
+  returns: v.union(vAddResult, v.object({ ok: v.literal(false), reason: v.literal('not-found') })),
+  handler: async (ctx, { userId, feedId, url, siteUrl, articles, now, etag, lastModified }) => {
+    const feed = await ctx.db.get(feedId);
+    if (!feed || feed.userId !== userId) return { ok: false as const, reason: 'not-found' as const };
+    const other = await ctx.db
+      .query('feeds')
+      .withIndex('by_user_url', (q) => q.eq('userId', userId).eq('url', url))
+      .first();
+    if (other && other._id !== feedId) return { ok: false as const, reason: 'already-added' as const, title: other.title, feedId: other._id };
+    await ctx.db.patch(feedId, { url, ...(siteUrl ? { siteUrl } : {}) });
+    await storeNewArticles(ctx, userId, feedId, articles, now);
+    await markWorking(ctx, feedId, now, { etag, lastModified });
+    return { ok: true as const, feedId };
   },
 });
 
