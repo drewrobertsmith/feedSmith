@@ -1,8 +1,10 @@
 import type { SymbolViewProps } from 'expo-symbols';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
 
-import { useSheet } from '@/navigation/start-state';
 import { useAuth } from '@/auth/auth-context';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { useSheet } from '@/navigation/start-state';
 import { AppSymbol } from '@/components/app-symbol';
 import { AppText } from '@/components/app-text';
 import { DepthPressable } from '@/components/depth-pressable';
@@ -63,20 +65,12 @@ function SheetRow({
   );
 }
 
-/** Asks once, with Android's own dialog, before deleting the Account for good (P18, Q32). */
-function confirmDelete(deleteAccount: () => Promise<void>) {
-  Alert.alert('Delete your account and everything in it?', "This can't be undone.", [
-    { text: 'Cancel', style: 'cancel' },
-    { text: 'Delete', style: 'destructive', onPress: () => void deleteAccount() },
-  ]);
-}
-
 /**
  * The Account sheet (P17): who is signed in, then, behind a divider, Sign out and Delete account
  * last (Q32). Manage Feeds is gone (FEE-97).
  */
-function AccountSheetContent() {
-  const { account, signOut, signingOut, deleteAccount, deletion } = useAuth();
+function AccountSheetContent({ onDelete }: { onDelete: () => void }) {
+  const { account, signOut, signingOut, deletion } = useAuth();
   const { colorScheme } = useEnvironment();
 
   return (
@@ -108,7 +102,7 @@ function AccountSheetContent() {
         busy={deletion === 'deleting'}
         tone="destructive"
         icon={{ ios: 'trash', android: 'delete' }}
-        onPress={() => confirmDelete(deleteAccount)}
+        onPress={onDelete}
       />
       {deletion === 'failed' ? (
         // Nothing was deleted and the User is still signed in: say so, and what to do (P18).
@@ -125,8 +119,11 @@ function AccountSheetContent() {
  * "yours" Gold, on a soft face (D27). Tapping it opens the Account sheet.
  */
 export function AccountButton() {
-  const { account } = useAuth();
+  const { account, deleteAccount } = useAuth();
   const [open, setOpen] = useSheet('account');
+  // Delete account asks once, in Android's own dialog, before deleting it for good (P18, Q32, FEE-49). The dialog
+  // sits beside the sheet, never inside it: it's a window over both.
+  const [askingDelete, setAskingDelete] = useState(false);
   const close = () => setOpen(false);
   // Grows with the initial inside it, so large text never outgrows the circle (Q16).
   const size = CIRCLE * useSizeScale();
@@ -151,8 +148,19 @@ export function AccountButton() {
         ) : null}
       </DepthPressable>
       <NativeSheet open={open} onClose={close}>
-        <AccountSheetContent />
+        <AccountSheetContent onDelete={() => setAskingDelete(true)} />
       </NativeSheet>
+      <ConfirmDialog
+        open={askingDelete}
+        title="Delete your account and everything in it?"
+        message="This can't be undone."
+        confirmLabel="Delete"
+        onCancel={() => setAskingDelete(false)}
+        onConfirm={() => {
+          setAskingDelete(false);
+          void deleteAccount();
+        }}
+      />
     </>
   );
 }

@@ -1,7 +1,7 @@
 import { LegendList, type LegendListRef } from '@legendapp/list/react-native';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import { Alert, RefreshControl, ToastAndroid, View } from 'react-native';
+import { RefreshControl, ToastAndroid, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/app-button';
@@ -17,6 +17,7 @@ import { useShownRows } from '@/feeds/use-shown-rows';
 import { usePlaceKeeper } from '@/navigation/place-context';
 import { AccountButton } from '@/screens/account/account-sheet';
 import { useSheet, useStartState } from '@/navigation/start-state';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { AddFeedSheet } from '@/screens/add-feed-sheet';
 import { ChipRow } from '@/screens/chip-row';
 import { NewArticlesNote } from '@/screens/new-articles-note';
@@ -26,20 +27,31 @@ import { spacing } from '@/theme/spacing';
 import { themes } from '@/theme/tokens';
 
 /**
- * Removing a Feed (FEE-97, T23): Android's dialog asks first (Q32), saying its Articles go too. Once it's
+ * Removing a Feed (FEE-97, T23): Android's dialog asks first (Q32, FEE-49), saying its Articles go too. Once it's
  * gone, Feeds shows All (`onRemoved`); a remove that didn't reach the server says so and changes nothing (Q5).
+ * `ask` opens the question for a chip; `dialog` is the question, to render once on the screen.
  */
 function useConfirmRemove(onRemoved: () => void) {
   const remove = useRemoveFeed();
+  const [asking, setAsking] = useState<FeedChip | null>(null);
   const removeFeed = async (chip: FeedChip) => {
     if ((await remove(chip.id)) === 'failed') ToastAndroid.show(`Couldn't remove ${chip.title}. Try again.`, ToastAndroid.SHORT);
     else onRemoved();
   };
-  return (chip: FeedChip) =>
-    Alert.alert(`Remove ${chip.title}?`, 'Its Articles go too.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => void removeFeed(chip) },
-    ]);
+  const dialog = (
+    <ConfirmDialog
+      open={asking !== null}
+      title={`Remove ${asking?.title}?`}
+      message="Its Articles go too."
+      confirmLabel="Remove"
+      onCancel={() => setAsking(null)}
+      onConfirm={() => {
+        setAsking(null);
+        if (asking) void removeFeed(asking);
+      }}
+    />
+  );
+  return { ask: setAsking, dialog };
 }
 
 /** Offline, a pull asks for nothing: the spinner ends at once and the line says why (FEE-32). */
@@ -148,7 +160,7 @@ export function FeedsScreen({
     setAdding(false);
     select(feedId);
   };
-  const confirmRemove = useConfirmRemove(() => select(null));
+  const { ask: confirmRemove, dialog: removeDialog } = useConfirmRemove(() => select(null));
   const addSheet = <AddFeedSheet open={adding} onClose={() => setAdding(false)} onFeed={showFeed} />;
 
   const header = (
@@ -236,6 +248,7 @@ export function FeedsScreen({
       </ChipSwitch>
       {newArticles.waiting ? <NewArticlesNote onPress={goToTop} /> : null}
       {addSheet}
+      {removeDialog}
     </View>
   );
 }

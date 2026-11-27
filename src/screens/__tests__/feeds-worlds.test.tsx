@@ -3,7 +3,7 @@ import { act, fireEvent, userEvent, within } from '@testing-library/react-native
 import { router } from 'expo-router';
 import { screen } from 'expo-router/testing-library';
 import { useState } from 'react';
-import { AccessibilityInfo, Alert, Animated, AppState, ScrollView, StyleSheet, ToastAndroid } from 'react-native';
+import { AccessibilityInfo, Animated, AppState, ScrollView, StyleSheet, ToastAndroid } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { Uniwind } from 'uniwind';
 
@@ -957,14 +957,12 @@ describe('a Feed that stops updating shows a badge on its chip (FEE-126)', () =>
   });
 
   test('Remove on the notice asks first, then shows All (Q32, D43)', async () => {
-    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     await open({ colorScheme: 'dark', feeds: 'some', failing: 'day', feed: 'f1' });
     await userEvent.press(await screen.findByRole('button', { name: 'Remove The Verge' }));
-    expect(alert).toHaveBeenCalledWith('Remove The Verge?', 'Its Articles go too.', expect.any(Array));
-    const remove = alert.mock.calls[0][2]!.find((button) => button.text === 'Remove')!;
-    await act(async () => remove.onPress!());
+    const dialog = screen.getByRole('alertdialog', { name: 'Remove The Verge?' });
+    expect(within(dialog).getByText('Its Articles go too.')).toBeOnTheScreen();
+    await userEvent.press(within(dialog).getByRole('button', { name: 'Remove' }));
     expect(await screen.findByRole('tab', { name: 'All', selected: true })).toBeOnTheScreen();
-    alert.mockRestore();
   });
 
   test('a badged chip still opens its Feed, and its long-press Remove still works', async () => {
@@ -1414,11 +1412,9 @@ describe('links into Feeds screens (Q25)', () => {
 const ARTICLE_TITLE = FIXTURE_ARTICLE.title;
 
 describe('Remove, from a Feed\'s chip (FEE-97, T23, Q32)', () => {
-  const alerts = () => jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-  type Buttons = Parameters<typeof Alert.alert>[2];
-  const confirm = async (buttons: Buttons, text: 'Remove' | 'Cancel') =>
-    // Cancel has no handler: Android just closes the dialog.
-    act(async () => buttons!.find((button) => button.text === text)!.onPress?.());
+  /** Answers the open "Remove …?" dialog (FEE-49). */
+  const confirm = async (text: 'Remove' | 'Cancel') =>
+    userEvent.press(within(screen.getByRole('alertdialog')).getByRole('button', { name: text }));
 
   test('a long-press on a Feed\'s chip opens its menu, with Remove by name; All has none', async () => {
     const user = userEvent.setup();
@@ -1430,67 +1426,58 @@ describe('Remove, from a Feed\'s chip (FEE-97, T23, Q32)', () => {
   });
 
   test('Remove asks first, saying its Articles go too; confirming removes it and shows All', async () => {
-    const alert = alerts();
     const user = userEvent.setup();
     const w = await open({ colorScheme: 'dark', feeds: 'some', feed: 'f1' });
     await user.longPress(await screen.findByRole('tab', { name: 'The Verge' }));
     await user.press(screen.getByRole('menuitem', { name: 'Remove The Verge' }));
     expect(screen.queryByRole('menuitem')).not.toBeOnTheScreen();
     expect(w.feedsLog.removed).toEqual([]);
-    const [title, message, buttons] = alert.mock.lastCall!;
-    expect([title, message]).toEqual(['Remove The Verge?', 'Its Articles go too.']);
-    expect(buttons!.find((button) => button.text === 'Remove')!.style).toBe('destructive');
-    await confirm(buttons, 'Remove');
+    const dialog = screen.getByRole('alertdialog', { name: 'Remove The Verge?' });
+    expect(within(dialog).getByText('Its Articles go too.')).toBeOnTheScreen();
+    await confirm('Remove');
+    expect(screen.queryByRole('alertdialog')).not.toBeOnTheScreen();
     expect(w.feedsLog.removed).toEqual(['f1']);
     expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName('All');
     expect(screen.queryByRole('tab', { name: 'The Verge' })).not.toBeOnTheScreen();
-    alert.mockRestore();
   });
 
   test('cancelling keeps the Feed and stays on its page', async () => {
-    const alert = alerts();
     const user = userEvent.setup();
     const w = await open({ colorScheme: 'dark', feeds: 'some', feed: 'f1' });
     await user.longPress(await screen.findByRole('tab', { name: 'The Verge' }));
     await user.press(screen.getByRole('menuitem', { name: 'Remove The Verge' }));
-    await confirm(alert.mock.lastCall![2], 'Cancel');
+    await confirm('Cancel');
+    expect(screen.queryByRole('alertdialog')).not.toBeOnTheScreen();
     expect(w.feedsLog.removed).toEqual([]);
     expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName('The Verge');
-    alert.mockRestore();
   });
 
   test('TalkBack\'s Remove action on a chip asks the same question', async () => {
-    const alert = alerts();
     await open({ colorScheme: 'dark', feeds: 'some' });
     const chip = await screen.findByRole('tab', { name: 'Calm Notes' });
     await act(async () => chip.props.onAccessibilityAction({ nativeEvent: { actionName: 'remove' } }));
-    expect(alert.mock.lastCall![0]).toBe('Remove Calm Notes?');
-    alert.mockRestore();
+    expect(screen.getByRole('alertdialog', { name: 'Remove Calm Notes?' })).toBeOnTheScreen();
   });
 
   test('a Feed with no Articles yet offers Remove there too (Q34)', async () => {
-    const alert = alerts();
     const user = userEvent.setup();
     const w = await open({ colorScheme: 'dark', feeds: 'some', chips: 'many', feed: 'f4' });
     await user.press(await screen.findByRole('button', { name: 'Remove Farnam Street' }));
-    await confirm(alert.mock.lastCall![2], 'Remove');
+    await confirm('Remove');
     expect(w.feedsLog.removed).toEqual(['f4']);
     expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName('All');
-    alert.mockRestore();
   });
 
   test("a remove that doesn't reach the server says so, and keeps the Feed (Q5)", async () => {
-    const alert = alerts();
     const toast = jest.spyOn(ToastAndroid, 'show').mockImplementation(() => {});
     const user = userEvent.setup();
     const w = await open({ colorScheme: 'dark', feeds: 'some', feed: 'f1', removes: 'fail' });
     await user.longPress(await screen.findByRole('tab', { name: 'The Verge' }));
     await user.press(screen.getByRole('menuitem', { name: 'Remove The Verge' }));
-    await confirm(alert.mock.lastCall![2], 'Remove');
+    await confirm('Remove');
     expect(toast).toHaveBeenCalledWith("Couldn't remove The Verge. Try again.", ToastAndroid.SHORT);
     expect(w.feedsLog.removed).toEqual([]);
     expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName('The Verge');
-    alert.mockRestore();
     toast.mockRestore();
   });
 });
