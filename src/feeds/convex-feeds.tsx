@@ -77,6 +77,21 @@ function useArticle(id: string): ArticleView {
 /** How long a touched row's Article keeps loading for the Reading view to pick up (FEE-114). */
 const PREFETCH_KEPT = 5000;
 
+/**
+ * The Articles touched rows are holding, by id: one watch each, and when it's let go. Never two watches of one
+ * Article: the React Compiler gives every prefetch the same empty callback, and Convex crashed letting go of the
+ * second of two watches sharing one (FEE-143, FEEDSMITH-X).
+ */
+const held = new Map<string, { stop: () => void; timer: ReturnType<typeof setTimeout> }>();
+
+function letGo(id: string) {
+  const watch = held.get(id);
+  if (!watch) return;
+  clearTimeout(watch.timer);
+  held.delete(id);
+  watch.stop();
+}
+
 function usePrefetchArticle() {
   const client = useConvex();
   const { isAuthenticated } = useConvexAuth();
@@ -85,8 +100,11 @@ function usePrefetchArticle() {
     // Only while signed in, as every query here (`useSignedInQuery`).
     if (!isAuthenticated || deletion === 'deleting') return;
     // Watched briefly: the Reading view's own query shares it if it opens, and it's let go either way (Q20).
-    const stop = client.watchQuery(api.articles.get, { id }).onUpdate(() => {});
-    setTimeout(stop, PREFETCH_KEPT);
+    // Touched again while held, it's held five seconds more instead of watched twice.
+    const watch = held.get(id);
+    if (watch) clearTimeout(watch.timer);
+    const stop = watch?.stop ?? client.watchQuery(api.articles.get, { id }).onUpdate(() => {});
+    held.set(id, { stop, timer: setTimeout(() => letGo(id), PREFETCH_KEPT) });
     trail('article.prefetched', { articleId: id });
   };
 }
@@ -234,9 +252,12 @@ const convexFeeds: FeedsData = {
 /** The app's Feeds and Articles, from Convex. Sits inside `ConvexAuth`, which owns the client. */
 export function ConvexFeeds({ children }: { children: ReactNode }) {
   // Signing out, or deleting the Account, forgets the titles the lists showed: another account never sees them.
+  // It lets go of every Article a touched row was holding, too.
   const { isAuthenticated } = useConvexAuth();
   useEffect(() => {
-    if (!isAuthenticated) shownTitles.clear();
+    if (isAuthenticated) return;
+    shownTitles.clear();
+    for (const id of [...held.keys()]) letGo(id);
   }, [isAuthenticated]);
   return <FeedsContext value={convexFeeds}>{children}</FeedsContext>;
 }
