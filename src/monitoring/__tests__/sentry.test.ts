@@ -2,6 +2,10 @@ import * as Sentry from '@sentry/react-native';
 
 import { initSentry } from '@/monitoring/sentry';
 
+import type { ExpoConfig } from 'expo/config';
+import appJson from '../../../app.json';
+import appConfig from '../../../app.config';
+
 jest.mock('@sentry/react-native', () => ({
   init: jest.fn(),
   mobileReplayIntegration: jest.fn((options: object) => ({ name: 'MobileReplay', options })),
@@ -47,6 +51,20 @@ describe('initSentry', () => {
       maskAllImages: true,
       maskAllVectors: true,
     });
+  });
+
+  // FEE-135: the release the build's app config names, which is also what its source maps upload under.
+  test('reports the release the build named after its commit', () => {
+    const saved = { ...process.env };
+    delete process.env.SENTRY_RELEASE;
+    delete process.env.EXPO_PUBLIC_SENTRY_RELEASE;
+    try {
+      appConfig({ config: appJson.expo as ExpoConfig, projectRoot: '.', staticConfigPath: null, packageJsonPath: null });
+      expect(initOptions().release).toMatch(/^com\.mediatedreality\.feedsmith@\d+\.\d+\.\d+\+[0-9a-f]{7,}(-dirty)?$/);
+      expect(initOptions().release).toBe(process.env.SENTRY_RELEASE);
+    } finally {
+      process.env = saved;
+    }
   });
 
   test('takes no screenshots or view hierarchy, and adds no feedback widget', () => {
