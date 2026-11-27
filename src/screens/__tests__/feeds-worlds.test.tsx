@@ -8,6 +8,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { Uniwind } from 'uniwind';
 
 import { NativeSheet } from '@/components/native-sheet';
+import { READ_IMAGE_OPACITY } from '@/components/article-row-style';
 import { publishedAgo, publishedDate } from '@/feeds/format';
 import { depthStyle } from '@/theme/depth';
 import { themes } from '@/theme/tokens';
@@ -335,24 +336,30 @@ describe('All', () => {
     expect(rows[2]).toHaveAccessibleName(`${third.title}, The Verge, ${publishedAgo(third.publishedAt, FIXTURE_NOW)}`);
   });
 
-  test("a row credits its authors under the title, above the Subtitle; a row with none has no byline (FEE-41)", async () => {
+  test("a row reads meta, then title, then the authors; a row with none has no byline (FEE-41, FEE-132)", async () => {
     await open({ colorScheme: 'dark', feeds: 'some' });
     await screen.findAllByRole('link');
     const [first] = FIXTURE_ROWS;
     const order = screen.getAllByText(/.+/).map((node) => node.props.children).filter((text) => typeof text === 'string');
+    expect(order.indexOf(publishedAgo(first.publishedAt, FIXTURE_NOW))).toBeLessThan(order.indexOf(first.title));
     expect(order.indexOf(first.title)).toBeLessThan(order.indexOf('By Terrence O’Brien'));
-    expect(order.indexOf('By Terrence O’Brien')).toBeLessThan(order.indexOf(first.subtitle!));
     expect(screen.getByText('By Emma Roth and Jay Peters')).toHaveProp('numberOfLines', 1);
     expect(screen.getAllByText(/^By /)).toHaveLength(2);
   });
 
-  test('a row shows its Subtitle and lead image when it has them, and leaves them out when not (P12)', async () => {
-    await open({ colorScheme: 'dark', feeds: 'some' });
+  test.each([
+    [1, 96],
+    // It grows with large text only so far, so the title keeps its room (Q16).
+    [2, 120],
+  ])('at font scale %d, a row shows its lead image as a %d dp square, and never its Subtitle (P12, FEE-132)', async (fontScale, side) => {
+    await open({ colorScheme: 'dark', feeds: 'some', fontScale });
     await screen.findAllByRole('link');
-    expect(screen.getByText(FIXTURE_ROWS[0].subtitle!)).toBeOnTheScreen();
-    expect(screen.getByText(FIXTURE_ROWS[1].subtitle!)).toBeOnTheScreen();
-    // Rows 1 and 3 have lead images; 2 and 4 don't.
-    expect(screen.getAllByTestId('row-image')).toHaveLength(2);
+    // The Subtitle is the Reading view's, not the row's (FEE-132).
+    for (const row of FIXTURE_ROWS) if (row.subtitle) expect(screen.queryByText(row.subtitle)).not.toBeOnTheScreen();
+    // Rows 1 and 3 have lead images; 2 and 4 don't, and keep the full width for their words.
+    const images = screen.getAllByTestId('row-image');
+    expect(images).toHaveLength(2);
+    for (const image of images) expect(image).toHaveStyle({ width: side, height: side });
     // A Feed without a favicon shows its initial instead.
     expect(screen.getAllByTestId('row-favicon')).toHaveLength(3);
     expect(screen.getByText('C')).toBeOnTheScreen();
@@ -378,7 +385,7 @@ describe('All', () => {
     expect(screen.getByText('T')).toBeOnTheScreen();
   });
 
-  test("a row's meta, byline and Subtitle are three voices: muted sans, full sans, muted Literata (Q29, FEE-42)", async () => {
+  test("a row's meta, title and byline are three voices: muted sans, Literata, full sans (Q29, FEE-42, FEE-132)", async () => {
     await open({ colorScheme: 'dark', feeds: 'some' });
     await screen.findAllByRole('link');
     const [first] = FIXTURE_ROWS;
@@ -388,9 +395,6 @@ describe('All', () => {
     const credit = screen.getByText('By Terrence O’Brien');
     expect(credit).toHaveStyle({ fontFamily: 'InstrumentSans' });
     expect(credit).not.toHaveProp('className', expect.stringContaining('text-text-muted'));
-    const summary = screen.getByText(first.subtitle!);
-    expect(summary).toHaveStyle({ fontFamily: 'Literata', fontSize: 15 });
-    expect(summary).toHaveProp('className', expect.stringContaining('text-text-muted'));
   });
 
   test("with one Feed chosen, rows don't repeat its name, to the eye or to TalkBack (FEE-42)", async () => {
@@ -410,9 +414,12 @@ describe('All', () => {
     expect(screen.getByTestId('chip-switch')).toHaveProp('index', 2);
   });
 
-  test('a Subtitle is two lines at most', async () => {
-    await open({ colorScheme: 'dark', feeds: 'some' });
-    expect(await screen.findByText(FIXTURE_ROWS[0].subtitle!)).toHaveProp('numberOfLines', 2);
+  test.each([
+    [1, 3],
+    [2, 6],
+  ])('at font scale %d, a title is %d lines at most: one headline never takes over the list, and large text never cuts it short (FEE-132, Q16)', async (fontScale, lines) => {
+    await open({ colorScheme: 'dark', feeds: 'some', fontScale });
+    expect(await screen.findByText(FIXTURE_ROWS[0].title)).toHaveProp('numberOfLines', lines);
   });
 
   test('Read rows are dimmed, never hidden, and nothing counts them (P7)', async () => {
@@ -421,6 +428,12 @@ describe('All', () => {
     expect(screen.getByText(FIXTURE_ROWS[1].title)).toHaveProp('className', expect.stringContaining('text-text-muted'));
     expect(screen.getByText(FIXTURE_ROWS[0].title)).not.toHaveProp('className', expect.stringContaining('text-text-muted'));
     expect(screen.queryByText(/unread|\b\d+ new\b/i)).not.toBeOnTheScreen();
+  });
+
+  test("a Read row's image fades back with its words (P7)", async () => {
+    await open({ colorScheme: 'dark', feeds: 'read' });
+    await screen.findAllByRole('link');
+    for (const image of screen.getAllByTestId('row-image')) expect(image).toHaveStyle({ opacity: READ_IMAGE_OPACITY });
   });
 
   test('tapping an Article opens its Reading view', async () => {
