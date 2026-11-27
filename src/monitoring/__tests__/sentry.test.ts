@@ -1,6 +1,8 @@
 import * as Sentry from '@sentry/react-native';
 
-import { initSentry } from '@/monitoring/sentry';
+import { renderHook } from '@testing-library/react-native';
+
+import { initSentry, useScreenTracking } from '@/monitoring/sentry';
 
 import type { ExpoConfig } from 'expo/config';
 import appJson from '../../../app.json';
@@ -10,8 +12,11 @@ jest.mock('@sentry/react-native', () => ({
   init: jest.fn(),
   mobileReplayIntegration: jest.fn((options: object) => ({ name: 'MobileReplay', options })),
   feedbackIntegration: jest.fn(() => ({ name: 'Feedback' })),
-  expoRouterIntegration: jest.fn(() => ({ name: 'ExpoRouter' })),
+  reactNavigationIntegration: jest.fn(() => ({ name: 'ReactNavigation', registerNavigationContainer: jest.fn() })),
 }));
+
+const mockNavigationRef = { current: null };
+jest.mock('expo-router', () => ({ useNavigationContainerRef: () => mockNavigationRef }));
 
 const init = jest.mocked(Sentry.init);
 
@@ -90,9 +95,17 @@ describe('initSentry: screens, traces and profiles', () => {
     expect(options.profilesSampleRate).toBe(1);
   });
 
-  test('follows Expo Router, so events name their screen and screen changes leave breadcrumbs', () => {
+  test('follows navigation, so events name their screen and screen changes leave breadcrumbs', () => {
     const names = (initOptions().integrations as { name: string }[]).map(({ name }) => name);
-    expect(names).toEqual(['MobileReplay', 'ExpoRouter']);
+    expect(names).toEqual(['MobileReplay', 'ReactNavigation']);
+  });
+
+  test("registers Expo Router's navigation container with it", async () => {
+    const navigation = (initOptions().integrations as { name: string; registerNavigationContainer?: jest.Mock }[]).find(
+      ({ name }) => name === 'ReactNavigation',
+    )!;
+    await renderHook(() => useScreenTracking());
+    expect(navigation.registerNavigationContainer).toHaveBeenCalledWith(mockNavigationRef);
   });
 
   test('sends trace headers only to the Convex deployment', () => {

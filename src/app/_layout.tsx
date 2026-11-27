@@ -2,12 +2,13 @@ import '@/global.css';
 
 import * as Sentry from '@sentry/react-native';
 
-import { initSentry } from '@/monitoring/sentry';
+import { initSentry, useScreenTracking } from '@/monitoring/sentry';
 import { AppRoot } from '@/navigation/app-root';
 
 initSentry();
 
 function RootLayout() {
+  useScreenTracking();
   return <AppRoot />;
 }
 

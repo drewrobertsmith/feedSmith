@@ -1,4 +1,6 @@
 import * as Sentry from '@sentry/react-native';
+import { useNavigationContainerRef } from 'expo-router';
+import { useEffect } from 'react';
 
 // The DSN identifies the project to send to; it ships in the app and isn't a secret (FEE-20).
 const dsn =
@@ -26,6 +28,20 @@ function scrubTransaction<T extends Transaction>(event: T): T {
   withoutRouteDetail(event.contexts?.trace?.data);
   for (const span of event.spans ?? []) withoutRouteDetail(span.data);
   return event;
+}
+
+/**
+ * Names the screen on every event, leaves a breadcrumb per screen change and times screen loads (T50). Registered by
+ * hand: Sentry's `expoRouterIntegration` reads a module expo-router 58 no longer has, and silently does nothing.
+ */
+const navigation = Sentry.reactNavigationIntegration();
+
+/** Connects Expo Router's navigation container to Sentry. Call once, in the root layout. */
+export function useScreenTracking() {
+  const ref = useNavigationContainerRef();
+  useEffect(() => {
+    navigation.registerNavigationContainer(ref);
+  }, [ref]);
 }
 
 /**
@@ -57,8 +73,7 @@ export function initSentry() {
         maskAllImages: true,
         maskAllVectors: true,
       }),
-      // Names the screen on every event, leaves a breadcrumb per screen change and times screen loads (T50).
-      Sentry.expoRouterIntegration(),
+      navigation,
     ],
   });
 }
